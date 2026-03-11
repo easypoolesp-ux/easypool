@@ -64,6 +64,7 @@ jobs:
           --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
           --region ${REGION} \
           --project ${PROJECT_ID} \
+          --port 8000 \
           --quiet
 
     - name: Update Dashboard Cloud Run Service
