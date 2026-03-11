@@ -56,18 +56,25 @@ def seed_isolation():
     u2.save()
 
     # Buses for School 1
-    Bus.objects.get_or_create(
+    b1_s1, _ = Bus.objects.get_or_create(
         internal_id="OAK-101",
         school=school1,
         transporter=t1_s1,
         defaults={"plate_number": "TS09EX1234", "driver_name": "Ravi"}
     )
-    Bus.objects.get_or_create(
+    # Add Cameras for OAK-101
+    from apps.buses.models import Camera
+    Camera.objects.get_or_create(bus=b1_s1, name="Front Camera", defaults={"stream_slug": "front"})
+    Camera.objects.get_or_create(bus=b1_s1, name="Interior", defaults={"stream_slug": "interior"})
+
+    b2_s1, _ = Bus.objects.get_or_create(
         internal_id="OAK-201",
         school=school1,
         transporter=t2_s1,
         defaults={"plate_number": "TS09EX5678", "driver_name": "Suresh"}
     )
+    # Add Camera for OAK-201
+    Camera.objects.get_or_create(bus=b2_s1, name="Driver Cam", defaults={"stream_slug": "driver"})
 
     # --- SCHOOL 2: Glendale ---
     school2, _ = School.objects.get_or_create(
@@ -95,12 +102,13 @@ def seed_isolation():
     u3.save()
 
     # Buses for School 2
-    Bus.objects.get_or_create(
+    b1_s2, _ = Bus.objects.get_or_create(
         internal_id="GLEN-501",
         school=school2,
         transporter=t1_s2,
         defaults={"plate_number": "TS07AZ9999", "driver_name": "Ahmed"}
     )
+    # No cameras for GLEN-501 to test 0-camera case
 
     print("Isolation seed completed successfully!")
     print("\nAccounts to test:")
