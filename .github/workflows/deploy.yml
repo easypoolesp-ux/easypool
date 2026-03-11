@@ -64,6 +64,7 @@ jobs:
           --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
           --region ${REGION} \
           --project ${PROJECT_ID} \
+          --allow-unauthenticated \
           --quiet
 
     - name: Update Dashboard Cloud Run Service
@@ -72,4 +73,5 @@ jobs:
           --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/dashboard:latest \
           --region ${REGION} \
           --project ${PROJECT_ID} \
+          --allow-unauthenticated \
           --quiet
