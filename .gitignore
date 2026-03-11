@@ -10,4 +10,5 @@ env/
 *.log
 .terraform/
 .terragrunt-cache/
-infra/
+# infra/ (Uncommented to support Terragrunt in Git)
+# infra/
