@@ -1,0 +1,29 @@
+from django.db import models
+from apps.students.models import Student
+from apps.buses.models import Bus
+
+class Attendance(models.Model):
+    DIRECTION_CHOICES = (
+        ('boarding', 'Boarding'),
+        ('alighting', 'Alighting'),
+    )
+    
+    id = models.BigAutoField(primary_key=True)
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendance_records')
+    bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='attendance_records')
+    direction = models.CharField(max_length=20, choices=DIRECTION_CHOICES)
+    confidence = models.FloatField()
+    clip_url = models.URLField(blank=True)
+    frame_url = models.URLField(blank=True)
+    notified = models.BooleanField(default=False)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['bus', '-timestamp']),
+            models.Index(fields=['student', '-timestamp']),
+        ]
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.direction} @ {self.timestamp}"

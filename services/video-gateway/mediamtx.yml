@@ -1,0 +1,25 @@
+# MediaMTX configuration
+
+# Set the log level
+logLevel: info
+
+# Enable WebRTC
+webrtc: yes
+webrtcAddress: :8889
+# In a cloud environment, you might need to set the ICE external IP
+# webrtcICEExternalIPs: [ "YOUR_GCP_VM_IPV6" ]
+
+# API for monitoring
+api: yes
+apiAddress: :8080
+
+# Define paths for your cameras
+paths:
+  # Example: Bus 1
+  # bus1:
+  #   source: rtsp://[BUS1_IPV6]:554/stream
+  
+  # Default path for all streams
+  all:
+    # Allow publishing to any path
+    source: publisher

@@ -1,0 +1,1762 @@
+openapi: 3.0.3
+info:
+  title: School Bus Safety API
+  version: 1.0.0
+  description: Universal API for school bus tracking, attendance, and video monitoring.
+paths:
+  /api/alerts:
+    get:
+      operationId: alerts_list
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - alerts
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAlertList'
+          description: ''
+    post:
+      operationId: alerts_create
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      tags:
+      - alerts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Alert'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Alert'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Alert'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+  /api/alerts/{id}:
+    get:
+      operationId: alerts_retrieve
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this alert.
+        required: true
+      tags:
+      - alerts
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+    put:
+      operationId: alerts_update
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this alert.
+        required: true
+      tags:
+      - alerts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Alert'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Alert'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Alert'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+    patch:
+      operationId: alerts_partial_update
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this alert.
+        required: true
+      tags:
+      - alerts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAlert'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAlert'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAlert'
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+    delete:
+      operationId: alerts_destroy
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this alert.
+        required: true
+      tags:
+      - alerts
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/alerts/{id}/resolve:
+    post:
+      operationId: alerts_resolve_create
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this alert.
+        required: true
+      tags:
+      - alerts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Alert'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Alert'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Alert'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+  /api/auth/token:
+    post:
+      operationId: auth_token_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/auth/token/:
+    post:
+      operationId: auth_token_create_2
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/auth/token/refresh:
+    post:
+      operationId: auth_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/auth/token/refresh/:
+    post:
+      operationId: auth_token_refresh_create_2
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/buses:
+    get:
+      operationId: buses_list
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: query
+        name: internal_id
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: route
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - idle
+          - offline
+          - online
+        description: |-
+          * `online` - Online
+          * `offline` - Offline
+          * `idle` - Idle
+      - in: query
+        name: transporter
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - buses
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBusListList'
+          description: ''
+    post:
+      operationId: buses_create
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      tags:
+      - buses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusDetail'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BusDetail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BusDetail'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusDetail'
+          description: ''
+  /api/buses/{id}:
+    get:
+      operationId: buses_retrieve
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this bus.
+        required: true
+      tags:
+      - buses
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusDetail'
+          description: ''
+    put:
+      operationId: buses_update
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this bus.
+        required: true
+      tags:
+      - buses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusDetail'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BusDetail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BusDetail'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusDetail'
+          description: ''
+    patch:
+      operationId: buses_partial_update
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this bus.
+        required: true
+      tags:
+      - buses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBusDetail'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBusDetail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBusDetail'
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusDetail'
+          description: ''
+    delete:
+      operationId: buses_destroy
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this bus.
+        required: true
+      tags:
+      - buses
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/buses/{id}/update_status:
+    post:
+      operationId: buses_update_status_create
+      description: Update just the bus status.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this bus.
+        required: true
+      tags:
+      - buses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusDetail'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BusDetail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BusDetail'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusDetail'
+          description: ''
+  /api/buses/online:
+    get:
+      operationId: buses_online_retrieve
+      description: Return only online buses for the school.
+      tags:
+      - buses
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusDetail'
+          description: ''
+  /api/gps:
+    get:
+      operationId: gps_list
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - gps
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGPSPointList'
+          description: ''
+  /api/gps/{id}:
+    get:
+      operationId: gps_retrieve
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this gps point.
+        required: true
+      tags:
+      - gps
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GPSPoint'
+          description: ''
+  /api/gps/latest:
+    get:
+      operationId: gps_latest_retrieve
+      description: Return latest GPS point for every bus in the school.
+      tags:
+      - gps
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GPSPoint'
+          description: ''
+  /api/routes:
+    get:
+      operationId: routes_list
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - routes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRouteList'
+          description: ''
+    post:
+      operationId: routes_create
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      tags:
+      - routes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Route'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Route'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Route'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Route'
+          description: ''
+  /api/routes/{id}:
+    get:
+      operationId: routes_retrieve
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this route.
+        required: true
+      tags:
+      - routes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Route'
+          description: ''
+    put:
+      operationId: routes_update
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this route.
+        required: true
+      tags:
+      - routes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Route'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Route'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Route'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Route'
+          description: ''
+    patch:
+      operationId: routes_partial_update
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this route.
+        required: true
+      tags:
+      - routes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRoute'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRoute'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRoute'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Route'
+          description: ''
+    delete:
+      operationId: routes_destroy
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this route.
+        required: true
+      tags:
+      - routes
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/schools:
+    get:
+      operationId: schools_list
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - schools
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSchoolList'
+          description: ''
+    post:
+      operationId: schools_create
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      tags:
+      - schools
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/School'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/School'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/School'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/School'
+          description: ''
+  /api/schools/{id}:
+    get:
+      operationId: schools_retrieve
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this school.
+        required: true
+      tags:
+      - schools
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/School'
+          description: ''
+    put:
+      operationId: schools_update
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this school.
+        required: true
+      tags:
+      - schools
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/School'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/School'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/School'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/School'
+          description: ''
+    patch:
+      operationId: schools_partial_update
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this school.
+        required: true
+      tags:
+      - schools
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSchool'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSchool'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSchool'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/School'
+          description: ''
+    delete:
+      operationId: schools_destroy
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this school.
+        required: true
+      tags:
+      - schools
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/users:
+    get:
+      operationId: users_list
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+          description: ''
+    post:
+      operationId: users_create
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/users/{id}:
+    get:
+      operationId: users_retrieve
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: users_update
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: users_partial_update
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    delete:
+      operationId: users_destroy
+      description: |-
+        Mixin to filter querysets by the user's school.
+        Superadmins can see everything.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+components:
+  schemas:
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        bus:
+          allOf:
+          - $ref: '#/components/schemas/BusList'
+          readOnly: true
+        type:
+          $ref: '#/components/schemas/AlertTypeEnum'
+        message:
+          type: string
+        is_resolved:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        resolved_by:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - bus
+      - created_at
+      - id
+      - message
+      - type
+    AlertTypeEnum:
+      enum:
+      - sos
+      - overspeed
+      - off_route
+      - camera_offline
+      - student_missing
+      type: string
+      description: |-
+        * `sos` - SOS
+        * `overspeed` - Overspeed
+        * `off_route` - Off Route
+        * `camera_offline` - Camera Offline
+        * `student_missing` - Student Missing
+    BusDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        route:
+          allOf:
+          - $ref: '#/components/schemas/Route'
+          readOnly: true
+        school:
+          allOf:
+          - $ref: '#/components/schemas/School'
+          readOnly: true
+        cameras:
+          type: array
+          items:
+            $ref: '#/components/schemas/Camera'
+          readOnly: true
+        internal_id:
+          type: string
+          maxLength: 50
+        plate_number:
+          type: string
+          maxLength: 50
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        router_ip:
+          type: string
+          nullable: true
+        driver_name:
+          type: string
+          maxLength: 200
+        driver_phone:
+          type: string
+          maxLength: 20
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        transporter:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - cameras
+      - created_at
+      - id
+      - internal_id
+      - plate_number
+      - route
+      - school
+      - updated_at
+    BusList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        internal_id:
+          type: string
+          maxLength: 50
+        plate_number:
+          type: string
+          maxLength: 50
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        lat:
+          type: number
+          format: double
+          readOnly: true
+        lng:
+          type: number
+          format: double
+          readOnly: true
+        route_name:
+          type: string
+          readOnly: true
+        driver_name:
+          type: string
+          maxLength: 200
+      required:
+      - id
+      - internal_id
+      - lat
+      - lng
+      - plate_number
+      - route_name
+    Camera:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        stream_slug:
+          type: string
+          maxLength: 50
+        is_active:
+          type: boolean
+      required:
+      - id
+      - name
+      - stream_slug
+    GPSPoint:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        speed:
+          type: number
+          format: double
+        heading:
+          type: number
+          format: double
+        accuracy:
+          type: number
+          format: double
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+        bus:
+          type: string
+          format: uuid
+      required:
+      - bus
+      - id
+      - lat
+      - lng
+      - timestamp
+    PaginatedAlertList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+    PaginatedBusListList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusList'
+    PaginatedGPSPointList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/GPSPoint'
+    PaginatedRouteList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Route'
+    PaginatedSchoolList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/School'
+    PaginatedUserList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    PatchedAlert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        bus:
+          allOf:
+          - $ref: '#/components/schemas/BusList'
+          readOnly: true
+        type:
+          $ref: '#/components/schemas/AlertTypeEnum'
+        message:
+          type: string
+        is_resolved:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        resolved_by:
+          type: string
+          format: uuid
+          nullable: true
+    PatchedBusDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        route:
+          allOf:
+          - $ref: '#/components/schemas/Route'
+          readOnly: true
+        school:
+          allOf:
+          - $ref: '#/components/schemas/School'
+          readOnly: true
+        cameras:
+          type: array
+          items:
+            $ref: '#/components/schemas/Camera'
+          readOnly: true
+        internal_id:
+          type: string
+          maxLength: 50
+        plate_number:
+          type: string
+          maxLength: 50
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        router_ip:
+          type: string
+          nullable: true
+        driver_name:
+          type: string
+          maxLength: 200
+        driver_phone:
+          type: string
+          maxLength: 20
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        transporter:
+          type: string
+          format: uuid
+          nullable: true
+    PatchedRoute:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        type:
+          $ref: '#/components/schemas/RouteTypeEnum'
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        school:
+          type: string
+          format: uuid
+        transporter:
+          type: string
+          format: uuid
+          nullable: true
+    PatchedSchool:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        address:
+          type: string
+        contact_email:
+          type: string
+          format: email
+          maxLength: 254
+        phone:
+          type: string
+          maxLength: 20
+        is_active:
+          type: boolean
+    PatchedUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        full_name:
+          type: string
+          maxLength: 200
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        school:
+          type: string
+          format: uuid
+          nullable: true
+        transporter:
+          type: string
+          format: uuid
+          nullable: true
+        photo_url:
+          type: string
+          format: uri
+          maxLength: 200
+    RoleEnum:
+      enum:
+      - superadmin
+      - transporter
+      - school_admin
+      - parent
+      type: string
+      description: |-
+        * `superadmin` - Super Admin
+        * `transporter` - Transporter
+        * `school_admin` - School Admin
+        * `parent` - Parent
+    Route:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        type:
+          $ref: '#/components/schemas/RouteTypeEnum'
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        school:
+          type: string
+          format: uuid
+        transporter:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - created_at
+      - id
+      - name
+      - school
+    RouteTypeEnum:
+      enum:
+      - morning
+      - afternoon
+      - custom
+      type: string
+      description: |-
+        * `morning` - Morning
+        * `afternoon` - Afternoon
+        * `custom` - Custom
+    School:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        address:
+          type: string
+        contact_email:
+          type: string
+          format: email
+          maxLength: 254
+        phone:
+          type: string
+          maxLength: 20
+        is_active:
+          type: boolean
+      required:
+      - id
+      - name
+    StatusEnum:
+      enum:
+      - online
+      - offline
+      - idle
+      type: string
+      description: |-
+        * `online` - Online
+        * `offline` - Offline
+        * `idle` - Idle
+    TokenObtainPair:
+      type: object
+      properties:
+        email:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - email
+      - password
+      - refresh
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          writeOnly: true
+      required:
+      - access
+      - refresh
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        full_name:
+          type: string
+          maxLength: 200
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        school:
+          type: string
+          format: uuid
+          nullable: true
+        transporter:
+          type: string
+          format: uuid
+          nullable: true
+        photo_url:
+          type: string
+          format: uri
+          maxLength: 200
+      required:
+      - email
+      - full_name
+      - id
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

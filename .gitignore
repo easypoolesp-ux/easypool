@@ -1,0 +1,12 @@
+node_modules/
+.next/
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+.env
+.DS_Store
+*.log
+.terraform/
+.terragrunt-cache/

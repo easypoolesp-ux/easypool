@@ -1,0 +1,75 @@
+services:
+  video-gateway:
+    build: 
+      context: ./services/video-gateway
+    container_name: video-gateway
+    restart: always
+    ports:
+      - "8554:8554"   # RTSP
+      - "1935:1935"   # RTMP
+      - "8888:8888"   # HLS
+      - "8889:8889"   # WebRTC
+      - "8189:8189/udp" # WebRTC ICE UDP
+      - "8080:8080"   # API
+    volumes:
+      - ./services/video-gateway/mediamtx.yml:/mediamtx.yml
+    environment:
+      - MTX_PROTOCOLS=tcp
+
+  db:
+    build:
+      context: ./services/database
+    container_name: database
+    restart: always
+    environment:
+      - POSTGRES_DB=bustrak
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=adminpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./services/backend
+    container_name: backend
+    restart: always
+    environment:
+      - DEBUG=True
+      - DB_NAME=bustrak
+      - DB_USER=admin
+      - DB_PASSWORD=adminpassword
+      - DB_HOST=db
+      - DB_PORT=5432
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/backend:/app
+    depends_on:
+      - db
+
+  dashboard:
+    build: 
+      context: ./services/dashboard
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+    container_name: dashboard
+    restart: always
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./services/dashboard:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - NEXT_PUBLIC_VIDEO_URL=http://[2600:1900:40a0:ac2:0:1::]
+      - WATCHPACK_POLLING=true
+      - NODE_ENV=development
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
