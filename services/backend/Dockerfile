@@ -18,5 +18,5 @@ COPY . .
 
 EXPOSE 8000
 
-# We use gunicorn for prod, but for dev we might use manage.py runserver
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# We use gunicorn for prod
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "4", "--worker-class", "gthread"]

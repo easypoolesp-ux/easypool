@@ -37,17 +37,26 @@ jobs:
       run: |
         gcloud auth configure-docker ${REGION}-docker.pkg.dev
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Build and Push Backend Image
-      run: |
-        IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest"
-        docker build -t $IMAGE_NAME ./services/backend
-        docker push $IMAGE_NAME
+      uses: docker/build-push-action@v5
+      with:
+        context: ./services/backend
+        push: true
+        tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
     - name: Build and Push Dashboard Image
-      run: |
-        IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/dashboard:latest"
-        docker build -t $IMAGE_NAME ./services/dashboard
-        docker push $IMAGE_NAME
+      uses: docker/build-push-action@v5
+      with:
+        context: ./services/dashboard
+        push: true
+        tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/dashboard:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
     - name: Update Backend Cloud Run Service
       run: |
