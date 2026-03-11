@@ -21,6 +21,7 @@ router.register('alerts', AlertViewSet, basename='alert')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', RedirectView.as_view(url='/api/docs/', permanent=False), name='index'),
 
     # Unified API Endpoints
     path('api/', include(router.urls)),

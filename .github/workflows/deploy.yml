@@ -65,6 +65,7 @@ jobs:
           --region ${REGION} \
           --project ${PROJECT_ID} \
           --allow-unauthenticated \
+          --set-env-vars "DEBUG=False" \
           --quiet
 
     - name: Update Dashboard Cloud Run Service
