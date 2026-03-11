@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy project
 COPY . .
 
+# Collect static files for WhiteNoise (with dummy DB URL to bypass connection during build)
+RUN python manage.py collectstatic --noinput
+
 EXPOSE 8000
 
 # We use gunicorn for prod. Listen on the dynamic PORT system variable.

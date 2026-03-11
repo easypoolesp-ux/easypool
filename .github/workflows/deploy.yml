@@ -64,8 +64,10 @@ jobs:
           --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
           --region ${REGION} \
           --project ${PROJECT_ID} \
+          --memory 1024Mi \
+          --add-cloudsql-instances ${PROJECT_ID}:${REGION}:easypool-postgres \
+          --set-env-vars "DB_HOST=/cloudsql/${PROJECT_ID}:${REGION}:easypool-postgres,DB_USER=admin,DB_PASSWORD=adminpassword,DB_NAME=bustrak,DEBUG=False" \
           --allow-unauthenticated \
-          --set-env-vars "DEBUG=False" \
           --quiet
 
     - name: Update Dashboard Cloud Run Service
