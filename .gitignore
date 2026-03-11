@@ -10,3 +10,4 @@ env/
 *.log
 .terraform/
 .terragrunt-cache/
+infra/

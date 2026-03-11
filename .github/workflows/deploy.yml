@@ -1,0 +1,62 @@
+name: Build and Deploy EasyPool to GCP
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'services/**'
+      - '.github/workflows/**'
+
+env:
+  PROJECT_ID: project-05588bf2-f685-4769-a37
+  REGION: asia-south1
+  REPO_NAME: easypool-repo
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker Auth
+      run: |
+        gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+    - name: Build and Push Backend Image
+      run: |
+        IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest"
+        docker build -t $IMAGE_NAME ./services/backend
+        docker push $IMAGE_NAME
+
+    - name: Build and Push Dashboard Image
+      run: |
+        IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/dashboard:latest"
+        docker build -t $IMAGE_NAME ./services/dashboard
+        docker push $IMAGE_NAME
+
+    - name: Update Backend Cloud Run Service
+      run: |
+        gcloud run deploy easypool-backend \
+          --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
+          --region ${REGION} \
+          --project ${PROJECT_ID} \
+          --quiet
+
+    - name: Update Dashboard Cloud Run Service
+      run: |
+        gcloud run deploy easypool-dashboard-schools \
+          --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/dashboard:latest \
+          --region ${REGION} \
+          --project ${PROJECT_ID} \
+          --quiet
