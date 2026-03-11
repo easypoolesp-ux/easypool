@@ -136,6 +136,7 @@ SIMPLE_JWT = {
 
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True
+CSRF_TRUSTED_ORIGINS = ['https://*.run.app']
 
 # Custom User Model
 AUTH_USER_MODEL = 'schools.User'
