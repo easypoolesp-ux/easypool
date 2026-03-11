@@ -55,6 +55,9 @@ jobs:
         context: ./services/dashboard
         push: true
         tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/dashboard:latest
+        build-args: |
+          BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
+          NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
