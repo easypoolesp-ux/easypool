@@ -32,26 +32,28 @@ def seed_isolation():
     )
 
     # Users for School 1
-    User.objects.get_or_create(
+    u1, _ = User.objects.get_or_create(
         email='admin@oakridge.edu',
         defaults={
             'full_name': 'Oakridge Admin',
-            'password': 'schoolpass',
             'role': 'school_admin',
             'school': school1
         }
     )
+    u1.set_password('schoolpass')
+    u1.save()
     
-    User.objects.get_or_create(
+    u2, _ = User.objects.get_or_create(
         email='manager@fleeta.com',
         defaults={
             'full_name': 'Fleet A Manager',
-            'password': 'transporterpass',
             'role': 'transporter',
             'school': school1,
             'transporter': t1_s1
         }
     )
+    u2.set_password('transporterpass')
+    u2.save()
 
     # Buses for School 1
     Bus.objects.get_or_create(
@@ -81,15 +83,16 @@ def seed_isolation():
     )
 
     # Users for School 2
-    User.objects.get_or_create(
+    u3, _ = User.objects.get_or_create(
         email='admin@glendale.edu',
         defaults={
             'full_name': 'Glendale Admin',
-            'password': 'schoolpass',
             'role': 'school_admin',
             'school': school2
         }
     )
+    u3.set_password('schoolpass')
+    u3.save()
 
     # Buses for School 2
     Bus.objects.get_or_create(
