@@ -7,13 +7,14 @@ from rest_framework_simplejwt.views import (
 )
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
-from apps.schools.views import SchoolViewSet, UserViewSet
+from apps.schools.views import SchoolViewSet, UserViewSet, TransporterViewSet
 from apps.buses.views import RouteViewSet, BusViewSet
 from apps.gps.views import GPSPointViewSet, AlertViewSet
 
 router = DefaultRouter(trailing_slash=False)
 router.register('schools', SchoolViewSet, basename='school')
 router.register('users', UserViewSet, basename='user')
+router.register('transporters', TransporterViewSet, basename='transporter')
 router.register('routes', RouteViewSet, basename='route')
 router.register('buses', BusViewSet, basename='bus')
 router.register('gps', GPSPointViewSet, basename='gps')
