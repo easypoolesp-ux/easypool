@@ -89,15 +89,20 @@ jobs:
           --quiet
 
     - name: Deploy GPS-MQTT to VM
+      # Only run if GPS-MQTT or Workflow files changed
+      if: contains(github.event.head_commit.modified, 'services/gps-mqtt/') || contains(github.event.head_commit.added, 'services/gps-mqtt/') || contains(github.event.head_commit.modified, '.github/workflows/')
       run: |
+        # Generate a short-lived access token for the remote VM to use
+        ACCESS_TOKEN=$(gcloud auth print-access-token)
+        
         gcloud compute ssh camera-relay-server \
           --zone asia-south1-a \
           --project ${PROJECT_ID} \
           --tunnel-through-iap \
           --quiet \
           --command "
-          # Configure Docker to authenticate with Artifact Registry
-          gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+          # Login to Docker using the short-lived token (The Industrial Way)
+          echo '${ACCESS_TOKEN}' | docker login -u oauth2accesstoken --password-stdin https://${REGION}-docker.pkg.dev
           
           # Pull latest image
           docker pull ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
@@ -122,4 +127,7 @@ jobs:
           
           # Health Check: Verify container is actually running
           docker ps | grep gps-mqtt
+          
+          # Logout for security
+          docker logout https://${REGION}-docker.pkg.dev
         "
