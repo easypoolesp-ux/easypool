@@ -22,6 +22,7 @@ export default function DashboardPage() {
     const [buses, setBuses] = useState<BusType[]>([])
     const [alerts, setAlerts] = useState<components['schemas']['Alert'][]>([])
     const [loading, setLoading] = useState(true)
+    const [transporters, setTransporters] = useState<any[]>([])
 
     useEffect(() => {
         setMounted(true)
@@ -35,9 +36,10 @@ export default function DashboardPage() {
             const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
             const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
             const ts = Date.now()
-            const [busRes, alertRes] = await Promise.all([
+            const [busRes, alertRes, transRes] = await Promise.all([
                 fetch(`/api/buses?_t=${ts}`, { headers }),
-                fetch(`/api/alerts?_t=${ts}`, { headers })
+                fetch(`/api/alerts?_t=${ts}`, { headers }),
+                fetch(`/api/transporters?_t=${ts}`, { headers })
             ])
 
             if (busRes.ok) {
@@ -47,6 +49,10 @@ export default function DashboardPage() {
             if (alertRes.ok) {
                 const data = await alertRes.json()
                 setAlerts(data.results || data)
+            }
+            if (transRes.ok) {
+                const data = await transRes.json()
+                setTransporters(data.results || data)
             }
         } catch (err) {
             console.error("Failed to fetch dashboard data:", err)
@@ -87,13 +93,24 @@ export default function DashboardPage() {
             </header>
 
             {/* Top Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="border-none shadow-sm bg-primary text-primary-foreground transition-all hover:scale-[1.02]">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-xs font-semibold uppercase opacity-90">Total Buses</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="text-3xl font-bold italic">{buses.length}</div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Company Groups</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-blue-500 font-mono tracking-tighter">
+                            {transporters.length}
+                        </div>
                     </CardContent>
                 </Card>
 
