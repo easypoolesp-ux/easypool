@@ -132,7 +132,8 @@ export default function DashboardPage() {
                     </button>
                     <FleetMap
                         buses={filteredBuses.map(b => ({
-                            id: b.internal_id,
+                            id: (b as any).id,
+                            internal_id: b.internal_id,
                             status: b.status || 'offline',
                             lat: b.lat,
                             lng: b.lng,

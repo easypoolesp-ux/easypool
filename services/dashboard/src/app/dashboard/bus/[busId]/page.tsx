@@ -62,7 +62,8 @@ export default function BusDetailPage({ params }: Props) {
     if (!bus) return <div className="p-6 text-center text-red-500">Bus not found</div>
 
     const busMapData = {
-        id: bus.internal_id,
+        id: (bus as any).id,
+        internal_id: bus.internal_id,
         status: bus.status || 'offline',
         lat: (bus as any).lat,
         lng: (bus as any).lng,
@@ -260,7 +261,7 @@ export default function BusDetailPage({ params }: Props) {
                             <div className="aspect-square bg-muted rounded-xl overflow-hidden border border-border shadow-inner relative group">
                                 <FleetMap 
                                     buses={[busMapData]} 
-                                    initialBusId={bus.internal_id}
+                                    initialBusId={(bus as any).id}
                                 />
                             </div>
                             <div className="space-y-2">

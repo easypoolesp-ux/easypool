@@ -18,6 +18,7 @@ const fixLeafletIcon = () => {
 
 interface Bus {
     id: string
+    internal_id: string
     status: string
     lat: number
     lng: number
@@ -180,7 +181,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 const marker = L.marker(position)
                     .bindPopup(`
             <div style="font-family: sans-serif; padding: 4px;">
-              <b style="font-size: 14px;">${bus.id}</b><br/>
+              <b style="font-size: 14px;">${bus.internal_id}</b><br/>
               <span style="font-size: 11px; color: #666;">${bus.plate}</span><br/>
               <button onclick="window.dispatchEvent(new CustomEvent('map:viewHistory', {detail: '${bus.id}'}))" style="background: #2563eb; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; margin-top: 5px;">View History</button>
             </div>
@@ -285,7 +286,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                                         className="text-sm font-bold bg-transparent border-none focus:ring-0 p-0 text-slate-800 cursor-pointer hover:text-blue-600 transition-colors"
                                       >
                                         {buses.map(bus => (
-                                          <option key={bus.id} value={bus.id}>{bus.id}</option>
+                                          <option key={bus.id} value={bus.id}>{bus.internal_id}</option>
                                         ))}
                                       </select>
                                       <span className="w-1 h-1 rounded-full bg-slate-300" />

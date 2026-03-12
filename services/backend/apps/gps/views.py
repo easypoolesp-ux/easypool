@@ -41,11 +41,11 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         if not bus_id:
             return response.Response({'error': 'bus_id is required'}, status=400)
             
-        # Security: Ensure bus belongs to the user's school
-        if not request.user.school.buses.filter(internal_id=bus_id).exists():
+        # Security: Ensure bus belongs to the user's school (Standardized on UUID)
+        if not request.user.school.buses.filter(id=bus_id).exists():
             return response.Response({'error': 'Unauthorized or invalid bus_id'}, status=403)
 
-        qs = GPSPoint.objects.filter(bus__internal_id=bus_id)
+        qs = GPSPoint.objects.filter(bus_id=bus_id)
         
         if date_str:
             from django.utils.dateparse import parse_date
@@ -120,8 +120,27 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         start_time = datetime.combine(today, datetime.min.time()).replace(hour=8, minute=0)
         start_time = timezone.make_aware(start_time, timezone.get_current_timezone())
 
+        from apps.schools.models import Transporter
+        
+        # Create a default transporter for the school if none exists to demo "Groups"
+        for school in list(set([b.school for b in buses])):
+            if not Transporter.objects.filter(school=school).exists():
+                Transporter.objects.create(
+                    school=school,
+                    name=f"{school.name} - Official Group",
+                    contact_person="Admin",
+                    is_active=True
+                )
+        
+        default_transporters = {t.school_id: t for t in Transporter.objects.all()}
+
         total_points = 0
         for i, bus in enumerate(buses):
+            # Assing to group if unassigned to address user's "Groups" question
+            if not bus.transporter:
+                bus.transporter = default_transporters.get(bus.school_id)
+                bus.save()
+
             # Clear existing data for today to avoid duplicates
             GPSPoint.objects.filter(bus=bus, timestamp__date=today).delete()
 
