@@ -143,7 +143,7 @@ export default function PlaybackCamera({ hlsUrl, title, busId }: Props) {
                 </div>
             )}
 
-            <div className="absolute top-3 right-3 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-3 right-3 flex gap-2 z-20">
                 <button
                     onClick={takeSnapshot}
                     className="p-2 rounded-md bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/10 shadow-lg"

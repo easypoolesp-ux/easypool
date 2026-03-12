@@ -65,15 +65,25 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     const [playbackIndex, setPlaybackIndex] = useState(0)
     const [isPlaying, setIsPlaying] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [isSmall, setIsSmall] = useState(false)
+
+    // Detect small container for adaptive UI
+    useEffect(() => {
+        if (!mapContainer.current) return
+        const observer = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                setIsSmall(entry.contentRect.width < 500)
+            }
+        })
+        observer.observe(mapContainer.current)
+        return () => observer.disconnect()
+    }, [])
 
     // Handle initialBusId changes
     useEffect(() => {
         if (initialBusId && !isHistoryMode) {
             setSelectedBusId(initialBusId)
-            // Auto-trigger history mode if we have an initial bus
-            setTimeout(() => {
-              toggleHistoryMode(initialBusId)
-            }, 500)
+            // Removed auto-trigger of history mode as per user request
         }
     }, [initialBusId])
 
@@ -270,60 +280,62 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
 
             {/* Playback Control Bar */}
             {isHistoryMode && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[95%] max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white/90 backdrop-blur-xl border border-white/20 p-5 rounded-3xl shadow-2xl flex flex-col gap-4">
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
+                <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] transition-all duration-300 ${isSmall ? 'w-[92%]' : 'w-[90%] max-w-lg'}`}>
+                    <div className={`bg-white/80 backdrop-blur-xl border border-white/20 shadow-2xl flex flex-col ${isSmall ? 'p-2 rounded-xl gap-1.5' : 'p-3 rounded-2xl gap-2'}`}>
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => setIsPlaying(!isPlaying)}
                                     disabled={isLoading || historyPoints.length === 0}
-                                    className="p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                    className={`${isSmall ? 'p-1.5' : 'p-2'} bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md active:scale-95 disabled:opacity-50`}
                                 >
-                                    {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
+                                    {isPlaying ? <Pause size={isSmall ? 14 : 18} fill="currentColor" /> : <Play size={isSmall ? 14 : 18} fill="currentColor" />}
                                 </button>
                                 <div>
-                                    <div className="flex items-center gap-2">
-                                      <select 
-                                        value={selectedBusId || ''} 
-                                        onChange={(e) => {
-                                          setSelectedBusId(e.target.value)
-                                          loadHistory(e.target.value, playbackDate)
-                                        }}
-                                        className="text-sm font-bold bg-transparent border-none focus:ring-0 p-0 text-slate-800 cursor-pointer hover:text-blue-600 transition-colors"
-                                      >
-                                        {buses.map(bus => (
-                                          <option key={bus.id} value={bus.id}>{bus.internal_id}</option>
-                                        ))}
-                                      </select>
-                                      <span className="w-1 h-1 rounded-full bg-slate-300" />
-                                      <input 
-                                        type="date" 
-                                        value={playbackDate}
-                                        onChange={(e) => {
-                                          setPlaybackDate(e.target.value)
-                                          if (selectedBusId) loadHistory(selectedBusId, e.target.value)
-                                        }}
-                                        className="text-[11px] font-medium text-slate-500 bg-transparent border-none focus:ring-0 p-0 cursor-pointer"
-                                      />
-                                    </div>
-                                    <p className="text-[10px] text-blue-500 font-mono font-bold mt-0.5">
-                                        {isLoading ? 'Fetching path...' : historyPoints.length > 0 ? `${new Date(historyPoints[playbackIndex].timestamp).toLocaleTimeString()}` : 'No logs for this date'}
+                                    {!isSmall && (
+                                        <div className="flex items-center gap-2">
+                                            <select 
+                                                value={selectedBusId || ''} 
+                                                onChange={(e) => {
+                                                  setSelectedBusId(e.target.value)
+                                                  loadHistory(e.target.value, playbackDate)
+                                                }}
+                                                className="text-[11px] font-bold bg-transparent border-none focus:ring-0 p-0 text-slate-800 cursor-pointer"
+                                            >
+                                                {buses.map(bus => (
+                                                  <option key={bus.id} value={bus.id}>{bus.internal_id}</option>
+                                                ))}
+                                            </select>
+                                            <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                            <input 
+                                                type="date" 
+                                                value={playbackDate}
+                                                onChange={(e) => {
+                                                  setPlaybackDate(e.target.value)
+                                                  if (selectedBusId) loadHistory(selectedBusId, e.target.value)
+                                                }}
+                                                className="text-[10px] font-medium text-slate-500 bg-transparent border-none focus:ring-0 p-0 cursor-pointer"
+                                            />
+                                        </div>
+                                    )}
+                                    <p className={`${isSmall ? 'text-[9px]' : 'text-[10px]'} text-blue-600 font-mono font-bold leading-tight`}>
+                                        {isLoading ? '...' : historyPoints.length > 0 ? `${new Date(historyPoints[playbackIndex].timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'No logs'}
                                     </p>
                                 </div>
                             </div>
-                            <div className="text-[10px] font-black text-blue-600 bg-blue-50/50 px-3 py-1.5 rounded-full border border-blue-100/50">
+                            <div className={`${isSmall ? 'text-[8px] px-2 py-0.5' : 'text-[10px] px-3 py-1'} font-black text-blue-600 bg-blue-50/50 rounded-full border border-blue-100/50`}>
                                 {playbackIndex + 1} / {historyPoints.length}
                             </div>
                         </div>
 
-                        <div className="relative flex items-center group/slider">
+                        <div className="relative flex items-center group/slider px-1">
                             <input
                                 type="range"
                                 min="0"
                                 max={Math.max(0, historyPoints.length - 1)}
                                 value={playbackIndex}
                                 onChange={(e) => setPlaybackIndex(parseInt(e.target.value))}
-                                className="w-full h-2 bg-slate-100 rounded-full appearance-none cursor-pointer accent-blue-600"
+                                className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-blue-600"
                             />
                         </div>
                     </div>

@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 };
 
 import QueryProvider from "@/components/providers/QueryProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
 export default function RootLayout({
     children,
@@ -17,9 +18,16 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
+        <html lang="en" suppressHydrationWarning>
             <body className={inter.className}>
-                <QueryProvider>{children}</QueryProvider>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="system"
+                    enableSystem
+                    disableTransitionOnChange
+                >
+                    <QueryProvider>{children}</QueryProvider>
+                </ThemeProvider>
             </body>
         </html>
     );

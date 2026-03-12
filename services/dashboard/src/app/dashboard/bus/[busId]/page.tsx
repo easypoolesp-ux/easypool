@@ -11,6 +11,7 @@ import FleetMap from '@/components/map/FleetMap'
 import { components } from '@/types/api'
 
 import UserProfile from '@/components/layout/UserProfile'
+import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
 interface Props {
     params: {
@@ -151,6 +152,7 @@ export default function BusDetailPage({ params }: Props) {
                             </div>
                         )
                     })()}
+                    <ThemeToggle />
                     <UserProfile />
                 </div>
             </div>
@@ -334,18 +336,38 @@ export default function BusDetailPage({ params }: Props) {
                                     initialBusId={(bus as any).id}
                                 />
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-3 pt-2">
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-muted-foreground uppercase font-bold">Vehicle ID</span>
-                                    <span className="font-bold">{bus.internal_id}</span>
+                                    <span className="text-muted-foreground uppercase font-black text-[9px] tracking-tight">Vehicle ID</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{bus.internal_id}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-muted-foreground uppercase font-bold">Plate Number</span>
-                                    <span className="font-bold">{bus.plate_number}</span>
+                                    <span className="text-muted-foreground uppercase font-black text-[9px] tracking-tight">Plate Number</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{bus.plate_number}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-muted-foreground uppercase font-bold">Route</span>
-                                    <span className="font-bold">{bus.route?.name || 'Unassigned'}</span>
+                                    <span className="text-muted-foreground uppercase font-black text-[9px] tracking-tight">Current Route</span>
+                                    <span className="font-bold text-primary">{bus.route?.name || 'Unassigned'}</span>
+                                </div>
+                                
+                                <div className="h-[1px] bg-slate-100 dark:bg-slate-800 my-4" />
+                                
+                                <div className="space-y-3">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground uppercase font-black text-[9px] tracking-tight">Driver Name</span>
+                                        <span className="font-bold">{bus.driver_name || 'Not Assigned'}</span>
+                                    </div>
+                                    {(bus as any).driver_phone && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground uppercase font-black text-[9px] tracking-tight">Emergency Contact</span>
+                                            <a 
+                                                href={`tel:${(bus as any).driver_phone}`}
+                                                className="px-3 py-1 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full text-[10px] font-black hover:bg-green-500 hover:text-white transition-all border border-green-500/20"
+                                            >
+                                                {(bus as any).driver_phone}
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>

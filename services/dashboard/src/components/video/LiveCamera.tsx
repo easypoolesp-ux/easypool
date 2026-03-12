@@ -160,7 +160,7 @@ export default function LiveCamera({ streamUrl, title }: Props) {
                 </>
             )}
 
-            <div className="absolute top-3 right-3 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-3 right-3 flex gap-2 z-20">
                 {!isBlocked && (
                     <button
                         onClick={takeSnapshot}
