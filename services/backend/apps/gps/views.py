@@ -32,6 +32,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             if point:
                 latest_points.append(GPSLatestSerializer(point).data)
         return response.Response(latest_points)
+    @decorators.action(detail=False, methods=['get'])
     def playback(self, request):
         """Return historical points for a bus on a specific date."""
         bus_id = request.query_params.get('bus')
@@ -40,7 +41,11 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         if not bus_id:
             return response.Response({'error': 'bus_id is required'}, status=400)
             
-        qs = GPSPoint.objects.filter(bus_id=bus_id)
+        # Security: Ensure bus belongs to the user's school
+        if not request.user.school.buses.filter(internal_id=bus_id).exists():
+            return response.Response({'error': 'Unauthorized or invalid bus_id'}, status=403)
+
+        qs = GPSPoint.objects.filter(bus__internal_id=bus_id)
         
         if date_str:
             from django.utils.dateparse import parse_date
@@ -50,7 +55,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             else:
                 return response.Response({'error': 'Invalid date format (use YYYY-MM-DD)'}, status=400)
         else:
-            # Default to today
+            # Default to today in current timezone (Kolkata)
             from django.utils import timezone
             qs = qs.filter(timestamp__date=timezone.now().date())
             
