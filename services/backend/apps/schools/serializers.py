@@ -12,7 +12,9 @@ class TransporterSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class UserSerializer(serializers.ModelSerializer):
+    school_name = serializers.CharField(source='school.name', read_only=True)
+    
     class Meta:
         model = User
-        fields = ('id', 'email', 'full_name', 'role', 'school', 'transporter', 'photo_url')
+        fields = ('id', 'email', 'full_name', 'role', 'school', 'school_name', 'transporter', 'photo_url')
         read_only_fields = ('id',)

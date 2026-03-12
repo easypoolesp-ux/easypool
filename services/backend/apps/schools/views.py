@@ -1,4 +1,4 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, decorators, response
 from core.permissions import IsSuperAdmin, IsSchoolAdmin, SchoolIsolationMixin
 from .models import School, User, Transporter
 from .serializers import SchoolSerializer, UserSerializer, TransporterSerializer
@@ -29,3 +29,9 @@ class UserViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsSuperAdmin | IsSchoolAdmin]
+
+    @decorators.action(detail=False, methods=['get'])
+    def me(self, request):
+        """Return the current user's profile info."""
+        serializer = self.get_serializer(request.user)
+        return response.Response(serializer.data)

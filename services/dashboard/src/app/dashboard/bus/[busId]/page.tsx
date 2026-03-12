@@ -10,6 +10,8 @@ import PlaybackCamera from '@/components/video/PlaybackCamera'
 import FleetMap from '@/components/map/FleetMap'
 import { components } from '@/types/api'
 
+import UserProfile from '@/components/layout/UserProfile'
+
 interface Props {
     params: {
         busId: string
@@ -125,7 +127,7 @@ export default function BusDetailPage({ params }: Props) {
                         Bus Monitoring: {bus.internal_id}
                     </h1>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                     {(() => {
                         const status = getStatusInfo((bus as any).last_heartbeat)
                         return (
@@ -135,6 +137,7 @@ export default function BusDetailPage({ params }: Props) {
                             </div>
                         )
                     })()}
+                    <UserProfile />
                 </div>
             </div>
 
