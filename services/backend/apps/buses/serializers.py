@@ -36,7 +36,7 @@ class BusListSerializer(serializers.ModelSerializer):
 class CameraSerializer(serializers.ModelSerializer):
     class Meta:
         model = Camera
-        fields = ('id', 'name', 'stream_slug', 'is_active')
+        fields = ('id', 'name', 'stream_slug', 'stream_url', 'is_active')
 
 class BusDetailSerializer(serializers.ModelSerializer):
     route = RouteSerializer(read_only=True)

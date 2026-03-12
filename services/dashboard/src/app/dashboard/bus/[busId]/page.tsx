@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Bus, Camera, MapPin, History, ArrowLeft } from 'lucide-react'
+import { Bus, Camera, MapPin, History, ArrowLeft, Clock } from 'lucide-react'
 import Link from 'next/link'
 import LiveCamera from '@/components/video/LiveCamera'
 import PlaybackCamera from '@/components/video/PlaybackCamera'
@@ -99,13 +99,23 @@ export default function BusDetailPage({ params }: Props) {
         { id: 'rec-4', time: '04:00 PM', duration: '05m 45s', type: 'Normal' },
     ]
 
-    // Example stream URLs
-    const gcpVmIp = "2600:1900:40a0:ac2:0:1::"
+    // Dynamic Media Gateway URL (Cloud or Local)
+    const MEDIA_GATEWAY_URL = process.env.NEXT_PUBLIC_MEDIA_GATEWAY_URL || 'http://localhost'
+    const WHEP_PORT = '8889'
+    const HLS_PORT = '8888'
+
     const activeCamera = bus?.cameras?.find(c => c.stream_slug === selectedCamera)
-    const liveUrl = activeCamera ? `http://[${gcpVmIp}]:8889/${busId}-${activeCamera.stream_slug}` : `http://[${gcpVmIp}]:8889/${busId}`
+    
+    // PUBLIC TEST STREAM (Zero-Install fallback)
+    const TEST_LIVE_URL = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+
+    // Live URL points to the WHEP (WebRTC) endpoint on the Gateway
+    const liveUrl = activeCamera?.stream_url || TEST_LIVE_URL
+
+    // HLS URL points to the HLS endpoint on the Gateway
     const hlsUrl = selectedRecording
-        ? `http://[${gcpVmIp}]:8888/${busId}/recordings/${selectedRecording}.m3u8`
-        : `http://[${gcpVmIp}]:8888/${busId}`
+        ? `${MEDIA_GATEWAY_URL}:${HLS_PORT}/${busId}/recordings/${selectedRecording}.m3u8`
+        : activeCamera?.stream_url || TEST_LIVE_URL
 
     const handleRecordingClick = (recId: string) => {
         setSelectedRecording(recId)
@@ -206,37 +216,77 @@ export default function BusDetailPage({ params }: Props) {
                     </Card>
 
                     {activeTab === 'playback' && (
-                        <Card className="border-none shadow-premium">
+                        <Card className="border-none shadow-premium bg-slate-900/50 backdrop-blur-md">
                             <CardHeader className="flex flex-row items-center justify-between py-4">
-                                <CardTitle className="text-sm font-medium">Playback Archive</CardTitle>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs text-muted-foreground">Date:</span>
+                                <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-primary" />
+                                    Visual Timeline
+                                </CardTitle>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Select Date:</span>
                                     <input
                                         type="date"
                                         value={selectedDate}
                                         onChange={(e) => setSelectedDate(e.target.value)}
-                                        className="text-xs bg-muted/50 border-none rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary/30"
+                                        className="text-xs bg-slate-800 border border-white/5 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-primary/40 text-white"
                                     />
                                 </div>
                             </CardHeader>
-                            <CardContent className="pb-4">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <CardContent className="pb-6">
+                                {/* Visual Scrubber */}
+                                <div className="mb-8 px-2">
+                                    <div className="flex justify-between text-[9px] text-slate-500 font-bold mb-2 uppercase tracking-tighter">
+                                        <span>06:00 AM</span>
+                                        <span>12:00 PM</span>
+                                        <span>06:00 PM</span>
+                                    </div>
+                                    <div className="relative h-10 w-full bg-slate-800/50 rounded-xl border border-white/5 overflow-hidden flex items-center p-1">
+                                        {/* Available Slots Map */}
+                                        <div className="absolute inset-0 flex items-center px-1">
+                                            {recordings.map((rec) => {
+                                                // Simple percentage calculation for demo (assumes school day 6am-6pm)
+                                                const timeParts = rec.time.split(':');
+                                                const hour = parseInt(timeParts[0]);
+                                                const min = parseInt(timeParts[1]);
+                                                const totalMinutes = (hour * 60 + min) - (6 * 60);
+                                                const percentage = Math.max(0, Math.min(100, (totalMinutes / (12 * 60)) * 100));
+                                                
+                                                return (
+                                                    <div 
+                                                        key={`slot-${rec.id}`}
+                                                        className={`absolute h-6 w-1 rounded-full cursor-pointer transition-all hover:scale-y-125 ${
+                                                            selectedRecording === rec.id ? 'bg-primary shadow-[0_0_10px_rgba(37,99,235,0.5)] z-20 h-8' : 'bg-primary/30 z-10'
+                                                        }`}
+                                                        style={{ left: `${percentage}%` }}
+                                                        onClick={() => handleRecordingClick(rec.id)}
+                                                        title={`${rec.time} - ${rec.type}`}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                        {/* Timeline Base Line */}
+                                        <div className="w-full h-[1px] bg-white/10" />
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 mt-2 italic">Tip: Click the vertical blue lines to jump to a specific time.</p>
+                                </div>
+
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                                     {recordings.map((rec) => (
                                         <button
                                             key={rec.id}
                                             onClick={() => handleRecordingClick(rec.id)}
                                             className={`p-3 rounded-xl border text-left transition-all group ${selectedRecording === rec.id
-                                                ? 'bg-primary/5 border-primary ring-1 ring-primary'
-                                                : 'hover:bg-muted/50 border-border bg-white dark:bg-slate-900'
+                                                ? 'bg-primary/10 border-primary ring-1 ring-primary shadow-lg shadow-primary/10'
+                                                : 'hover:bg-white/5 border-white/5 bg-slate-800/30'
                                                 }`}
                                         >
                                             <div className="flex justify-between items-start mb-1">
-                                                <p className="text-xs font-bold leading-none">{rec.time}</p>
+                                                <p className="text-xs font-bold leading-none text-white">{rec.time}</p>
                                                 {rec.type === 'Event' && (
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                                    <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                                                 )}
                                             </div>
-                                            <p className="text-[10px] text-muted-foreground">{rec.duration} • {rec.type}</p>
+                                            <p className="text-[10px] text-slate-400 font-medium">{rec.duration} • {rec.type}</p>
                                         </button>
                                     ))}
                                 </div>

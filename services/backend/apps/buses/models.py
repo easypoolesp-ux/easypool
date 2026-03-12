@@ -52,6 +52,7 @@ class Camera(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='cameras')
     name = models.CharField(max_length=100) # e.g. Front Camera
     stream_slug = models.CharField(max_length=50) # e.g. front
+    stream_url = models.URLField(max_length=500, blank=True, null=True) # e.g. rtsp://1.2.3.4:554/live1
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

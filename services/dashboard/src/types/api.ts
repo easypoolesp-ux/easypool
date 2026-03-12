@@ -537,6 +537,7 @@ export interface components {
             readonly id: string;
             name: string;
             stream_slug: string;
+            stream_url?: string | null;
             is_active?: boolean;
         };
         GPSPoint: {
