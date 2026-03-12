@@ -96,17 +96,30 @@ jobs:
           --tunnel-through-iap \
           --quiet \
           --command "
+          # Configure Docker to authenticate with Artifact Registry
           gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+          
+          # Pull latest image
           docker pull ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
+          
+          # Stop and remove existing container
           docker stop gps-mqtt || true
           docker rm gps-mqtt || true
+          
+          # Start the new container with industrial safeguards
           docker run -d --name gps-mqtt \
             --restart always \
             -e MQTT_BROKER=localhost \
-            -e MQTT_USER=${{ secrets.MQTT_USER }} \
-            -e MQTT_PASSWORD=${{ secrets.MQTT_PASSWORD }} \
+            -e MQTT_USER='${{ secrets.MQTT_USER }}' \
+            -e MQTT_PASSWORD='${{ secrets.MQTT_PASSWORD }}' \
             -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
-            -e GPS_SERVICE_API_KEY=${{ secrets.GPS_SERVICE_API_KEY }} \
+            -e GPS_SERVICE_API_KEY='${{ secrets.GPS_SERVICE_API_KEY }}' \
             --network host \
             ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
+          
+          # Industrial Cleanup: Remove old/unused images to save VM disk space
+          docker image prune -a -f --filter \"until=24h\"
+          
+          # Health Check: Verify container is actually running
+          docker ps | grep gps-mqtt
         "
