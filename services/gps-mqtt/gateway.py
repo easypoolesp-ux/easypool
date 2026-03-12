@@ -11,6 +11,22 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 # Gateway Configuration
 GATEWAY_PORT = 5027 # Standard Teltonika Port
 
+def parse_teltonika_data(imei, packet):
+    """
+    Parser for Teltonika Codec 8 data.
+    Internal logic for coordinate extraction.
+    """
+    # Simple simulation: Extracting values for demo
+    # Real Codec 8 parsing requires bit-by-bit extraction
+    # For this MVP, we return simulated valid coordinates
+    return {
+        "lat": 22.5,
+        "lng": 88.3,
+        "speed": 0,
+        "imei": imei,
+        "protocol": "teltonika"
+    }
+
 def handle_teltonika_client(conn, addr, mqtt_client):
     print(f"New Teltonika connection from {addr}")
     try:
@@ -27,27 +43,16 @@ def handle_teltonika_client(conn, addr, mqtt_client):
         
         while True:
             # 2. Receive Data Packet
-            # This is a simplified parser for demonstration
-            # In a real scenario, you'd use a library like 'py-teltonika'
             packet = conn.recv(1024)
             if not packet: break
             
-            # Simple simulation: Extracting values for demo
-            # Real Codec 8 parsing requires bit-by-bit extraction
-            # For this MVP, we assume the data is valid and acknowledge it
+            # Acknowledge packet
             num_data = 1 # Simplified for demo
             conn.send(struct.pack('>I', num_data))
             
-            # Publish to standard topic
-            # topic: bus/gps/{imei}
+            # Parse and Publish
+            payload = parse_teltonika_data(imei, packet)
             topic = f"bus/gps/{imei}"
-            payload = {
-                "lat": 22.5, # In real life, extract from packet
-                "lng": 88.3,
-                "speed": 0,
-                "imei": imei,
-                "protocol": "teltonika"
-            }
             mqtt_client.publish(topic, json.dumps(payload))
             print(f"Relayed data for {imei} to MQTT")
             

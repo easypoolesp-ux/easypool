@@ -14,13 +14,13 @@ BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://backend-api/api/gps/updat
 API_KEY = os.getenv("GPS_SERVICE_API_KEY", "your-secure-api-key")
 
 def on_connect(client, userdata, flags, rc):
-    print(f"Connected to MQTT Broker with result code {rc}")
+    print(f"Connected to MQTT Broker with result code {rc}", flush=True)
     client.subscribe(MQTT_TOPIC)
 
 def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode())
-        print(f"Received GPS data for {msg.topic}: {payload}")
+        print(f"Received GPS data for {msg.topic}: {payload}", flush=True)
         
         # Topic expected: bus/gps/{imei}
         imei = msg.topic.split('/')[-1]
@@ -39,9 +39,9 @@ def on_message(client, userdata, msg):
         response = requests.post(BACKEND_API_URL, json=data, headers=headers)
         
         if response.status_code == 200:
-            print(f"Successfully updated GPS for {bus_id}")
+            print(f"Successfully updated GPS for IMEI: {imei}", flush=True)
         else:
-            print(f"Failed to update GPS for {bus_id}: {response.status_code} - {response.text}")
+            print(f"Failed to update GPS for IMEI: {imei}: {response.status_code} - {response.text}", flush=True)
             
     except Exception as e:
         print(f"Error processing MQTT message: {str(e)}")

@@ -1,7 +1,7 @@
 from rest_framework import viewsets, decorators, response, permissions
 from core.permissions import IsSchoolAdmin, SchoolIsolationMixin
 from .models import GPSPoint, Alert
-from .serializers import GPSPointSerializer, GPSLatestSerializer, AlertSerializer
+from .serializers import GPSPointSerializer, GPSLatestSerializer, GPSPlaybackSerializer, AlertSerializer
 
 class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
     queryset = GPSPoint.objects.all()
@@ -21,16 +21,35 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             
         return qs[:1000] # Limit trail points
 
-    @decorators.action(detail=False, methods=['get'])
-    def latest(self, request):
-        """Return latest GPS point for every bus in the school."""
-        buses = self.request.user.school.buses.all()
-        latest_points = []
-        for bus in buses:
-            point = GPSPoint.objects.filter(bus=bus).first()
-            if point:
-                latest_points.append(GPSLatestSerializer(point).data)
         return response.Response(latest_points)
+
+    @decorators.action(detail=False, methods=['get'])
+    def playback(self, request):
+        """Return historical points for a bus on a specific date."""
+        bus_id = request.query_params.get('bus')
+        date_str = request.query_params.get('date') # Format: YYYY-MM-DD
+        
+        if not bus_id:
+            return response.Response({'error': 'bus_id is required'}, status=400)
+            
+        qs = GPSPoint.objects.filter(bus_id=bus_id)
+        
+        if date_str:
+            from django.utils.dateparse import parse_date
+            target_date = parse_date(date_str)
+            if target_date:
+                qs = qs.filter(timestamp__date=target_date)
+            else:
+                return response.Response({'error': 'Invalid date format (use YYYY-MM-DD)'}, status=400)
+        else:
+            # Default to today
+            from django.utils import timezone
+            qs = qs.filter(timestamp__date=timezone.now().date())
+            
+        # Order by timestamp for playback order
+        qs = qs.order_by('timestamp')
+        
+        return response.Response(GPSPlaybackSerializer(qs, many=True).data)
 
     @decorators.action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def telemetry(self, request):

@@ -8,6 +8,9 @@ class RouteViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     serializer_class = RouteSerializer
     permission_classes = [IsSchoolAdmin]
 
+    def perform_create(self, serializer):
+        serializer.save(school=self.request.user.school)
+
 class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Bus.objects.all()
     permission_classes = [permissions.AllowAny] # Relax for dashboard demo
@@ -17,6 +20,9 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
         if self.action == 'list':
             return BusListSerializer
         return BusDetailSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(school=self.request.user.school)
 
     @decorators.action(detail=False, methods=['get'])
     def online(self, request):
