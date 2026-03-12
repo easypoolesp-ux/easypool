@@ -11,6 +11,7 @@ class RouteSerializer(serializers.ModelSerializer):
 class BusListSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
     lng = serializers.SerializerMethodField()
+    route_name = serializers.CharField(source='route.name', read_only=True)
     last_heartbeat = serializers.SerializerMethodField()
     
     class Meta:

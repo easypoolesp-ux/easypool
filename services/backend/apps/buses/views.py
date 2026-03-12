@@ -12,7 +12,7 @@ class RouteViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
         serializer.save(school=self.request.user.school)
 
 class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
-    queryset = Bus.objects.all()
+    queryset = Bus.objects.select_related('route').all()
     permission_classes = [permissions.AllowAny] # Relax for dashboard demo
     filterset_fields = ['status', 'route', 'internal_id', 'transporter']
     
