@@ -1,7 +1,7 @@
 from rest_framework import viewsets
 from core.permissions import IsSuperAdmin, IsSchoolAdmin, SchoolIsolationMixin
-from .models import School, User
-from .serializers import SchoolSerializer, UserSerializer
+from .models import School, User, Transporter
+from .serializers import SchoolSerializer, UserSerializer, TransporterSerializer
 
 class SchoolViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = School.objects.all()
@@ -13,6 +13,17 @@ class SchoolViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
         if user.role == 'superadmin':
             return School.objects.all()
         return School.objects.filter(id=user.school_id)
+
+class TransporterViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
+    queryset = Transporter.objects.all()
+    serializer_class = TransporterSerializer
+    permission_classes = [IsSuperAdmin | IsSchoolAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'superadmin':
+            return Transporter.objects.all()
+        return Transporter.objects.filter(school_id=user.school_id)
 
 class UserViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = User.objects.all()
