@@ -70,17 +70,20 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
 
         markersLayer.current.clearLayers()
 
-        buses.forEach(bus => {
-            const marker = L.marker([bus.lat, bus.lng])
-                .bindPopup(`
+        // Only show markers for buses with valid GPS data
+        buses
+            .filter(bus => bus.lat != null && bus.lng != null)
+            .forEach(bus => {
+                const marker = L.marker([bus.lat, bus.lng])
+                    .bindPopup(`
           <div style="font-family: sans-serif; padding: 4px;">
             <b style="font-size: 14px;">${bus.id}</b><br/>
             <span style="font-size: 11px; color: #666;">${bus.plate}</span><br/>
             <a href="/dashboard/bus/${bus.id}" style="color: #2563eb; font-size: 10px; font-weight: bold; text-decoration: none; margin-top: 5px; display: block;">View Live Feed</a>
           </div>
         `)
-                .addTo(markersLayer.current!)
-        })
+                    .addTo(markersLayer.current!)
+            })
     }, [buses])
 
     return (

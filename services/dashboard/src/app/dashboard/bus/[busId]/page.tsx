@@ -59,8 +59,8 @@ export default function BusDetailPage({ params }: Props) {
     const busMapData = {
         id: bus.internal_id,
         status: bus.status || 'offline',
-        lat: (bus as any).lat || 22.5726,
-        lng: (bus as any).lng || 88.3639,
+        lat: (bus as any).lat,
+        lng: (bus as any).lng,
         plate: bus.plate_number
     }
 

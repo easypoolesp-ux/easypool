@@ -20,12 +20,12 @@ class BusListSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.FloatField())
     def get_lat(self, obj):
         latest = obj.gps_points.first()
-        return latest.lat if latest else 22.5726 # Default to Kolkata center
+        return latest.lat if latest else None
 
     @extend_schema_field(serializers.FloatField())
     def get_lng(self, obj):
         latest = obj.gps_points.first()
-        return latest.lng if latest else 88.3639
+        return latest.lng if latest else None
 
 class CameraSerializer(serializers.ModelSerializer):
     class Meta:
@@ -46,9 +46,9 @@ class BusDetailSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.FloatField())
     def get_lat(self, obj):
         latest = obj.gps_points.first()
-        return latest.lat if latest else 22.5726
+        return latest.lat if latest else None
 
     @extend_schema_field(serializers.FloatField())
     def get_lng(self, obj):
         latest = obj.gps_points.first()
-        return latest.lng if latest else 88.3639
+        return latest.lng if latest else None

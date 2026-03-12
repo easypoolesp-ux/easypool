@@ -12,3 +12,4 @@ env/
 .terragrunt-cache/
 # infra/ (Uncommented to support Terragrunt in Git)
 # infra/
+simulation/
