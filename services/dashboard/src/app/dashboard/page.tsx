@@ -64,15 +64,23 @@ export default function DashboardPage() {
     if (!mounted || loading) return <div className="p-6 text-center">Loading Dashboard...</div>
 
     const getStatusInfo = (lastHeartbeat: string | null) => {
-        if (!lastHeartbeat) return { label: 'OFFLINE', color: 'text-slate-400', dot: 'bg-slate-300' }
+        if (!lastHeartbeat) return { label: 'NO DATA', color: 'text-slate-300', dot: 'bg-slate-200' }
         const last = new Date(lastHeartbeat).getTime()
         const now = new Date().getTime()
         const diffMinutes = (now - last) / (1000 * 60)
 
         if (diffMinutes < 2) return { label: 'LIVE', color: 'text-green-600', dot: 'bg-green-500 animate-pulse' }
-        if (diffMinutes < 10) return { label: `${Math.round(diffMinutes)}m AGO`, color: 'text-amber-500', dot: 'bg-amber-400' }
-        if (diffMinutes < 60) return { label: `${Math.round(diffMinutes)}m AGO`, color: 'text-orange-500', dot: 'bg-orange-400' }
-        return { label: 'OFFLINE', color: 'text-slate-400', dot: 'bg-slate-300' }
+        
+        if (diffMinutes < 60) {
+            return { label: `${Math.round(diffMinutes)}m AGO`, color: 'text-amber-500', dot: 'bg-amber-400' }
+        }
+        
+        const diffHours = Math.round(diffMinutes / 60)
+        if (diffHours < 24) {
+            return { label: `${diffHours}h AGO`, color: 'text-orange-500', dot: 'bg-orange-400' }
+        }
+
+        return { label: `${Math.round(diffHours / 24)}d AGO`, color: 'text-slate-400', dot: 'bg-slate-300' }
     }
 
     const filteredBuses = buses.filter(bus =>

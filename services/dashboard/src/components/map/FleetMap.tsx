@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { History, Play, Pause, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { History, Play, Pause, X, ChevronLeft, ChevronRight, Route } from 'lucide-react'
 
 // Fix for default marker icons in Leaflet + Next.js
 const fixLeafletIcon = () => {
@@ -259,13 +259,13 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         <div className="relative w-full h-full rounded-xl overflow-hidden border border-border shadow-inner bg-slate-100 group">
             <div ref={mapContainer} className="w-full h-full z-0" />
 
-            {/* Float Toggle Button - Moved to Right (below expand) to avoid zoom overlap */}
+            {/* Premium Square History Toggle - Matching Expand Button Style */}
             <button
                 onClick={() => toggleHistoryMode()}
-                className={`absolute top-16 right-4 z-[1000] p-2.5 rounded-xl shadow-premium transition-all duration-300 flex items-center gap-2 text-xs font-bold ${isHistoryMode ? 'bg-blue-600 text-white' : 'bg-white/90 backdrop-blur-sm text-slate-700 hover:bg-white'}`}
+                className={`absolute top-4 right-4 z-[1000] p-2.5 rounded-lg shadow-premium transition-all duration-300 border border-border group ${isHistoryMode ? 'bg-blue-600 text-white border-blue-700' : 'bg-white/90 backdrop-blur-sm text-slate-700 hover:bg-white'}`}
+                title={isHistoryMode ? 'Back to Live' : 'View Route History'}
             >
-                {isHistoryMode ? <X size={16} /> : <History size={16} />}
-                {isHistoryMode ? 'Back to Live' : 'View History'}
+                {isHistoryMode ? <X size={20} className="group-hover:rotate-90 transition-transform" /> : <Route size={20} className="group-hover:scale-110 transition-transform" />}
             </button>
 
             {/* Playback Control Bar */}
