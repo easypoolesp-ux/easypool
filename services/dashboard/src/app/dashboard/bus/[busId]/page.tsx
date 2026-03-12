@@ -36,8 +36,13 @@ export default function BusDetailPage({ params }: Props) {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                const token = localStorage.getItem('token')
                 // Standardized path from single source of truth, trailing slash removed for best practice proxying
-                const res = await fetch(`/api/buses/${busId}`)
+                const res = await fetch(`/api/buses/${busId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
                 if (res.ok) {
                     const data = await res.json()
                     setBus(data)

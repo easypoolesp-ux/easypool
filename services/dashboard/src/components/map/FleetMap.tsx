@@ -111,7 +111,12 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         if (!busId) return
         setIsLoading(true)
         try {
-            const res = await fetch(`${BACKEND_URL}/api/gps/playback/?bus=${busId}&date=${date}`)
+            const token = localStorage.getItem('token')
+            const res = await fetch(`${BACKEND_URL}/api/gps/playback/?bus=${busId}&date=${date}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
             const data = await res.json()
             setHistoryPoints(data)
             setPlaybackIndex(0)
