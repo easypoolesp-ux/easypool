@@ -90,12 +90,18 @@ jobs:
 
     - name: Deploy GPS-MQTT to VM
       run: |
-        gcloud compute ssh camera-relay-server --zone asia-south1-a --project ${PROJECT_ID} --command "
+        gcloud compute ssh camera-relay-server \
+          --zone asia-south1-a \
+          --project ${PROJECT_ID} \
+          --tunnel-through-iap \
+          --quiet \
+          --command "
           gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
           docker pull ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
           docker stop gps-mqtt || true
           docker rm gps-mqtt || true
           docker run -d --name gps-mqtt \
+            --restart always \
             -e MQTT_BROKER=localhost \
             -e MQTT_USER=${{ secrets.MQTT_USER }} \
             -e MQTT_PASSWORD=${{ secrets.MQTT_PASSWORD }} \
