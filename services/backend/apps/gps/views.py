@@ -33,7 +33,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         return response.Response(latest_points)
 
     @decorators.action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
-    def update(self, request):
+    def telemetry(self, request):
         """Update GPS point for a bus (called by MQTT subscriber)."""
         api_key = request.headers.get('X-API-KEY')
         if api_key != "easypool_gps_secret_2026": # Should match GH Secret

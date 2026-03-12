@@ -78,8 +78,8 @@ services:
     restart: always
     environment:
       - MQTT_BROKER=localhost
-      - BACKEND_API_URL=http://backend:8000/api/gps/update
-      - GPS_SERVICE_API_KEY=your-secure-api-key
+      - BACKEND_API_URL=http://backend:8000/api/gps/telemetry
+      - GPS_SERVICE_API_KEY=easypool_gps_secret_2026
     depends_on:
       - backend
 

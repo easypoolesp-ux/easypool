@@ -99,7 +99,7 @@ jobs:
             -e MQTT_BROKER=localhost \
             -e MQTT_USER=${{ secrets.MQTT_USER }} \
             -e MQTT_PASSWORD=${{ secrets.MQTT_PASSWORD }} \
-            -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/update \
+            -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
             -e GPS_SERVICE_API_KEY=${{ secrets.GPS_SERVICE_API_KEY }} \
             --network host \
             ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
