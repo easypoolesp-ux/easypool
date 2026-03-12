@@ -44,6 +44,7 @@ class BusDetailSerializer(serializers.ModelSerializer):
     cameras = CameraSerializer(many=True, read_only=True)
     lat = serializers.SerializerMethodField()
     lng = serializers.SerializerMethodField()
+    last_heartbeat = serializers.SerializerMethodField()
     
     class Meta:
         model = Bus
@@ -58,3 +59,8 @@ class BusDetailSerializer(serializers.ModelSerializer):
     def get_lng(self, obj):
         latest = obj.gps_points.first()
         return latest.lng if latest else None
+
+    @extend_schema_field(serializers.DateTimeField())
+    def get_last_heartbeat(self, obj):
+        latest = obj.gps_points.first()
+        return latest.timestamp if latest else None

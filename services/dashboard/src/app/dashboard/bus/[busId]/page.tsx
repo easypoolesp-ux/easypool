@@ -61,6 +61,26 @@ export default function BusDetailPage({ params }: Props) {
     if (loading) return <div className="p-6 text-center">Loading monitor...</div>
     if (!bus) return <div className="p-6 text-center text-red-500">Bus not found</div>
 
+    const getStatusInfo = (lastHeartbeat: string | null) => {
+        if (!lastHeartbeat) return { label: 'NO DATA', color: 'text-slate-300', dot: 'bg-slate-200' }
+        const last = new Date(lastHeartbeat).getTime()
+        const now = new Date().getTime()
+        const diffMinutes = (now - last) / (1000 * 60)
+
+        if (diffMinutes < 2) return { label: 'LIVE', color: 'text-green-600', dot: 'bg-green-500 animate-pulse' }
+        
+        if (diffMinutes < 60) {
+            return { label: `${Math.round(diffMinutes)}m AGO`, color: 'text-amber-500', dot: 'bg-amber-400' }
+        }
+        
+        const diffHours = Math.round(diffMinutes / 60)
+        if (diffHours < 24) {
+            return { label: `${diffHours}h AGO`, color: 'text-orange-500', dot: 'bg-orange-400' }
+        }
+
+        return { label: `${Math.round(diffHours / 24)}d AGO`, color: 'text-slate-400', dot: 'bg-slate-300' }
+    }
+
     const busMapData = {
         id: (bus as any).id,
         internal_id: bus.internal_id,
@@ -106,12 +126,15 @@ export default function BusDetailPage({ params }: Props) {
                     </h1>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${bus.status === 'online' ? 'bg-green-500/10 text-green-600' : 'bg-slate-500/10 text-slate-600'
-                        }`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${bus.status === 'online' ? 'bg-green-500' : 'bg-slate-400'
-                            }`} />
-                        {bus.status === 'online' ? 'Live' : 'Offline'}
-                    </div>
+                    {(() => {
+                        const status = getStatusInfo((bus as any).last_heartbeat)
+                        return (
+                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border shadow-sm text-xs font-bold uppercase tracking-wider ${status.color}`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                                {status.label}
+                            </div>
+                        )
+                    })()}
                 </div>
             </div>
 
