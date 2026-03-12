@@ -34,11 +34,12 @@ interface GPSPoint {
 interface Props {
     buses: Bus[]
     isFullscreen?: boolean
+    initialBusId?: string | null
 }
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://easypool-backend-222076803846.asia-south1.run.app'
 
-export default function FleetMap({ buses, isFullscreen }: Props) {
+export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     const mapContainer = useRef<HTMLDivElement>(null)
     const map = useRef<L.Map | null>(null)
     const markersLayer = useRef<L.LayerGroup | null>(null)
@@ -46,11 +47,34 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
 
     // History Mode State
     const [isHistoryMode, setIsHistoryMode] = useState(false)
-    const [selectedBusId, setSelectedBusId] = useState<string | null>(null)
+    const [selectedBusId, setSelectedBusId] = useState<string | null>(initialBusId || null)
+    
+    // Timezone-aware "Today" for Kolkata
+    const getKolkataDate = () => {
+        return new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(new Date())
+    }
+    
+    const [playbackDate, setPlaybackDate] = useState(getKolkataDate())
     const [historyPoints, setHistoryPoints] = useState<GPSPoint[]>([])
     const [playbackIndex, setPlaybackIndex] = useState(0)
     const [isPlaying, setIsPlaying] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+
+    // Handle initialBusId changes
+    useEffect(() => {
+        if (initialBusId && !isHistoryMode) {
+            setSelectedBusId(initialBusId)
+            // Auto-trigger history mode if we have an initial bus
+            setTimeout(() => {
+              toggleHistoryMode(initialBusId)
+            }, 500)
+        }
+    }, [initialBusId])
 
     useEffect(() => {
         if (!mapContainer.current || map.current) return
@@ -82,25 +106,12 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
         }
     }, [isFullscreen])
 
-    // Toggle History Mode
-    const toggleHistoryMode = useCallback(async () => {
-        if (isHistoryMode) {
-            setIsHistoryMode(false)
-            setHistoryPoints([])
-            historyLayer.current?.clearLayers()
-            return
-        }
-
-        if (buses.length === 0) return
-
-        const busId = buses[0].id // Default to first bus
-        setSelectedBusId(busId)
+    // Load History Data
+    const loadHistory = async (busId: string, date: string) => {
+        if (!busId) return
         setIsLoading(true)
-        setIsHistoryMode(true)
-
         try {
-            const today = new Date().toISOString().split('T')[0]
-            const res = await fetch(`${BACKEND_URL}/api/gps/playback/?bus=${busId}&date=${today}`)
+            const res = await fetch(`${BACKEND_URL}/api/gps/playback/?bus=${busId}&date=${date}`)
             const data = await res.json()
             setHistoryPoints(data)
             setPlaybackIndex(0)
@@ -118,13 +129,32 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
                 }).addTo(historyLayer.current!)
 
                 map.current.fitBounds(L.polyline(polylinePoints).getBounds(), { padding: [50, 50] })
+            } else {
+                historyLayer.current?.clearLayers()
             }
         } catch (e) {
             console.error('Failed to fetch history:', e)
         } finally {
             setIsLoading(false)
         }
-    }, [isHistoryMode, buses])
+    }
+
+    // Toggle History Mode
+    const toggleHistoryMode = useCallback(async (busIdOverride?: string) => {
+        if (isHistoryMode && !busIdOverride) {
+            setIsHistoryMode(false)
+            setHistoryPoints([])
+            historyLayer.current?.clearLayers()
+            return
+        }
+
+        const busId = busIdOverride || selectedBusId || (buses.length > 0 ? buses[0].id : null)
+        if (!busId) return
+
+        setSelectedBusId(busId)
+        setIsHistoryMode(true)
+        loadHistory(busId, playbackDate)
+    }, [isHistoryMode, buses, selectedBusId, playbackDate])
 
     // Update Live Markers (Only if NOT in history mode)
     useEffect(() => {
@@ -142,12 +172,12 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
                 const position: [number, number] = [bus.lat, bus.lng]
                 bounds.push(position)
 
-                L.marker(position)
+                const marker = L.marker(position)
                     .bindPopup(`
             <div style="font-family: sans-serif; padding: 4px;">
               <b style="font-size: 14px;">${bus.id}</b><br/>
               <span style="font-size: 11px; color: #666;">${bus.plate}</span><br/>
-              <a href="/dashboard/bus/${bus.id}" style="color: #2563eb; font-size: 10px; font-weight: bold; text-decoration: none; margin-top: 5px; display: block;">View Live Feed</a>
+              <button onclick="window.dispatchEvent(new CustomEvent('map:viewHistory', {detail: '${bus.id}'}))" style="background: #2563eb; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; margin-top: 5px;">View History</button>
             </div>
           `)
                     .addTo(markersLayer.current!)
@@ -158,6 +188,15 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
             map.current.fitBounds(latLngBounds, { padding: [50, 50], maxZoom: 15 })
         }
     }, [buses, isHistoryMode])
+
+    // Listen for custom "View History" events from popups
+    useEffect(() => {
+        const handler = (e: any) => {
+            toggleHistoryMode(e.detail)
+        }
+        window.addEventListener('map:viewHistory', handler)
+        return () => window.removeEventListener('map:viewHistory', handler)
+    }, [toggleHistoryMode])
 
     // Playback Logic
     useEffect(() => {
@@ -176,11 +215,10 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
     useEffect(() => {
         if (!isHistoryMode || historyPoints.length === 0 || !historyLayer.current) return
 
-        // Remove old marker if any (simple way: keep last child as marker)
+        // Remove old marker if any
         const currentPoint = historyPoints[playbackIndex]
         if (!currentPoint) return
 
-        // Clear only the marker, keep the polyline
         historyLayer.current.eachLayer((layer) => {
             if (layer instanceof L.Marker) {
                 historyLayer.current?.removeLayer(layer)
@@ -198,7 +236,7 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
 
         marker.bindTooltip(`
       <div style="font-size: 11px;">
-        <b>${new Date(currentPoint.timestamp).toLocaleTimeString()}</b><br/>
+        <b>${new Date(currentPoint.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</b><br/>
         Speed: ${currentPoint.speed} km/h
       </div>
     `, { permanent: true, direction: 'top', offset: [0, -10] })
@@ -209,48 +247,71 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
         <div className="relative w-full h-full rounded-xl overflow-hidden border border-border shadow-inner bg-slate-100 group">
             <div ref={mapContainer} className="w-full h-full z-0" />
 
-            {/* Float Toggle Button */}
+            {/* Float Toggle Button - Moved to Right (below expand) to avoid zoom overlap */}
             <button
-                onClick={toggleHistoryMode}
-                className={`absolute top-4 right-4 z-[1000] p-2 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2 text-xs font-bold ${isHistoryMode ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}
+                onClick={() => toggleHistoryMode()}
+                className={`absolute top-16 right-4 z-[1000] p-2.5 rounded-xl shadow-premium transition-all duration-300 flex items-center gap-2 text-xs font-bold ${isHistoryMode ? 'bg-blue-600 text-white' : 'bg-white/90 backdrop-blur-sm text-slate-700 hover:bg-white'}`}
             >
                 {isHistoryMode ? <X size={16} /> : <History size={16} />}
-                {isHistoryMode ? 'Back to Live' : 'History'}
+                {isHistoryMode ? 'Back to Live' : 'View History'}
             </button>
 
             {/* Playback Control Bar */}
             {isHistoryMode && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white/80 backdrop-blur-md border border-white/20 p-4 rounded-2xl shadow-2xl flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[95%] max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="bg-white/90 backdrop-blur-xl border border-white/20 p-5 rounded-3xl shadow-2xl flex flex-col gap-4">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
                                 <button
                                     onClick={() => setIsPlaying(!isPlaying)}
                                     disabled={isLoading || historyPoints.length === 0}
-                                    className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                    className="p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                                 >
-                                    {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+                                    {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
                                 </button>
                                 <div>
-                                    <h4 className="text-sm font-bold text-slate-800">Route Playback</h4>
-                                    <p className="text-[10px] text-slate-500">
-                                        {isLoading ? 'Loading path...' : historyPoints.length > 0 ? `${new Date(historyPoints[playbackIndex].timestamp).toLocaleTimeString()}` : 'No data for today'}
+                                    <div className="flex items-center gap-2">
+                                      <select 
+                                        value={selectedBusId || ''} 
+                                        onChange={(e) => {
+                                          setSelectedBusId(e.target.value)
+                                          loadHistory(e.target.value, playbackDate)
+                                        }}
+                                        className="text-sm font-bold bg-transparent border-none focus:ring-0 p-0 text-slate-800 cursor-pointer hover:text-blue-600 transition-colors"
+                                      >
+                                        {buses.map(bus => (
+                                          <option key={bus.id} value={bus.id}>{bus.id}</option>
+                                        ))}
+                                      </select>
+                                      <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                      <input 
+                                        type="date" 
+                                        value={playbackDate}
+                                        onChange={(e) => {
+                                          setPlaybackDate(e.target.value)
+                                          if (selectedBusId) loadHistory(selectedBusId, e.target.value)
+                                        }}
+                                        className="text-[11px] font-medium text-slate-500 bg-transparent border-none focus:ring-0 p-0 cursor-pointer"
+                                      />
+                                    </div>
+                                    <p className="text-[10px] text-blue-500 font-mono font-bold mt-0.5">
+                                        {isLoading ? 'Fetching path...' : historyPoints.length > 0 ? `${new Date(historyPoints[playbackIndex].timestamp).toLocaleTimeString()}` : 'No logs for this date'}
                                     </p>
                                 </div>
                             </div>
-                            <div className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            <div className="text-[10px] font-black text-blue-600 bg-blue-50/50 px-3 py-1.5 rounded-full border border-blue-100/50">
                                 {playbackIndex + 1} / {historyPoints.length}
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-4">
+                        <div className="relative flex items-center group/slider">
                             <input
                                 type="range"
                                 min="0"
                                 max={Math.max(0, historyPoints.length - 1)}
                                 value={playbackIndex}
                                 onChange={(e) => setPlaybackIndex(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                className="w-full h-2 bg-slate-100 rounded-full appearance-none cursor-pointer accent-blue-600"
                             />
                         </div>
                     </div>

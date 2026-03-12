@@ -252,8 +252,11 @@ export default function BusDetailPage({ params }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="aspect-square bg-muted rounded-xl overflow-hidden border border-border shadow-inner">
-                                <FleetMap buses={[busMapData]} />
+                            <div className="aspect-square bg-muted rounded-xl overflow-hidden border border-border shadow-inner relative group">
+                                <FleetMap 
+                                    buses={[busMapData]} 
+                                    initialBusId={bus.internal_id}
+                                />
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between text-xs">

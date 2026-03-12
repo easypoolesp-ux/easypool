@@ -47,8 +47,10 @@ export default function PlaybackCamera({ hlsUrl, title }: Props) {
 
             <video
                 ref={videoRef}
+                autoPlay
+                muted
                 controls
-                className="w-full h-full"
+                className="w-full h-full object-cover"
                 poster="/api/placeholder/1280/720"
             />
 

@@ -19,11 +19,19 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         if start and end:
             qs = qs.filter(timestamp__range=[start, end])
             
-        return qs[:1000] # Limit trail points
-
-        return response.Response(latest_points)
+        return qs[:1000]
 
     @decorators.action(detail=False, methods=['get'])
+    def latest(self, request):
+        """Return latest GPS point for every bus in the school."""
+        buses = self.request.user.school.buses.all()
+        latest_points = []
+        for bus in buses:
+            # We use first() because for each bus, we want the most recent point (ordered by -timestamp)
+            point = GPSPoint.objects.filter(bus=bus).first()
+            if point:
+                latest_points.append(GPSLatestSerializer(point).data)
+        return response.Response(latest_points)
     def playback(self, request):
         """Return historical points for a bus on a specific date."""
         bus_id = request.query_params.get('bus')
