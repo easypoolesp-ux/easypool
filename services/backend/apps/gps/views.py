@@ -70,7 +70,6 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         try:
             from apps.buses.models import Bus
             from django.utils import timezone
-            import datetime
             
             bus = Bus.objects.get(gps_imei=imei) # Lookup by IMEI
             lat = request.data.get('lat')
@@ -96,6 +95,54 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             return response.Response({'error': 'Bus not found'}, status=404)
         except Exception as e:
             return response.Response({'error': str(e)}, status=400)
+
+    @decorators.action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def seed_history(self, request):
+        """Seed realistic GPS history for today's playback demo."""
+        api_key = request.headers.get('X-API-KEY')
+        if api_key != "easypool_gps_secret_2026":
+            return response.Response({'error': 'Unauthorized'}, status=401)
+
+        from apps.buses.models import Bus
+        from django.utils import timezone
+        import random
+        from datetime import datetime, timedelta
+
+        buses = Bus.objects.all()
+        today = timezone.now().date()
+        
+        # Start at 8 AM local time
+        start_time = datetime.combine(today, datetime.min.time()).replace(hour=8, minute=0)
+        start_time = timezone.make_aware(start_time, timezone.get_current_timezone())
+
+        total_points = 0
+        for i, bus in enumerate(buses):
+            # Clear existing data for today to avoid duplicates
+            GPSPoint.objects.filter(bus=bus, timestamp__date=today).delete()
+
+            points = []
+            cur_lat, cur_lng = 22.5726 + (i * 0.005), 88.3639 + (i * 0.005)
+            
+            # Generate 150 points (2.5 hours, 1 per min)
+            for j in range(150):
+                ts = start_time + timedelta(minutes=j)
+                cur_lat += random.uniform(-0.0006, 0.0006)
+                cur_lng += random.uniform(-0.0006, 0.0006)
+                points.append(GPSPoint(
+                    bus=bus,
+                    lat=cur_lat,
+                    lng=cur_lng,
+                    speed=random.uniform(15, 40),
+                    timestamp=ts
+                ))
+            
+            GPSPoint.objects.bulk_create(points)
+            total_points += len(points)
+            
+        return response.Response({
+            'status': 'success',
+            'message': f'Seeded {total_points} points across {buses.count()} buses for {today}'
+        })
 
 class AlertViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Alert.objects.all()
