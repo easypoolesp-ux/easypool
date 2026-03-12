@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ShieldAlert, ExternalLink, Camera, Download, Loader2 } from 'lucide-react'
+import Hls from 'hls.js'
+import { ShieldAlert, ExternalLink, Camera, Loader2 } from 'lucide-react'
 
 interface Props {
-    streamUrl: string // e.g., http://localhost:8889/bus101 (WHEP endpoint)
+    streamUrl: string // e.g., http://localhost:8889/bus101 (WHEP) or https://.../stream.m3u8 (HLS)
     title?: string
 }
 
@@ -15,64 +16,81 @@ export default function LiveCamera({ streamUrl, title }: Props) {
     const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
     const isStreamHttp = streamUrl.startsWith('http://')
     const isBlocked = isHttps && isStreamHttp
+    const isHls = streamUrl.toLowerCase().includes('.m3u8')
 
     useEffect(() => {
         if (!streamUrl || isBlocked || !videoRef.current) return
 
         let peerConnection: RTCPeerConnection | null = null
+        let hls: Hls | null = null
 
-        const startWhep = async () => {
-            try {
-                setIsLoading(true)
-                setError(null)
-                
-                peerConnection = new RTCPeerConnection()
-                
-                // Set up handlers before adding transceiver
-                peerConnection.ontrack = (event) => {
-                    if (videoRef.current) {
-                        videoRef.current.srcObject = event.streams[0]
-                    }
+        const startStream = async () => {
+            setIsLoading(true)
+            setError(null)
+
+            if (isHls) {
+                // HLS MODE
+                if (Hls.isSupported()) {
+                    hls = new Hls()
+                    hls.loadSource(streamUrl)
+                    hls.attachMedia(videoRef.current!)
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        setIsLoading(false)
+                        videoRef.current?.play().catch(() => {})
+                    })
+                    hls.on(Hls.Events.ERROR, (_, data) => {
+                        if (data.fatal) {
+                            setError("HLS playback failed")
+                            setIsLoading(false)
+                        }
+                    })
+                } else if (videoRef.current?.canPlayType('application/vnd.apple.mpegurl')) {
+                    videoRef.current.src = streamUrl
+                    setIsLoading(false)
                 }
-
-                peerConnection.addTransceiver('video', { direction: 'recvonly' })
-                peerConnection.addTransceiver('audio', { direction: 'recvonly' })
-
-                const offer = await peerConnection.createOffer()
-                await peerConnection.setLocalDescription(offer)
-
-                const response = await fetch(streamUrl, {
-                    method: 'POST',
-                    body: offer.sdp,
-                    headers: {
-                        'Content-Type': 'application/sdp'
+            } else {
+                // WHEP (WebRTC) MODE
+                try {
+                    peerConnection = new RTCPeerConnection()
+                    
+                    peerConnection.ontrack = (event) => {
+                        if (videoRef.current) {
+                            videoRef.current.srcObject = event.streams[0]
+                        }
                     }
-                })
 
-                if (!response.ok) throw new Error(`WHEP error: ${response.statusText}`)
-                
-                const answerSdp = await response.text()
-                await peerConnection.setRemoteDescription({
-                    type: 'answer',
-                    sdp: answerSdp
-                })
-                
-                setIsLoading(false)
-            } catch (err) {
-                console.error("WHEP Setup Failed:", err)
-                setError("Stream connection failed")
-                setIsLoading(false)
+                    peerConnection.addTransceiver('video', { direction: 'recvonly' })
+                    peerConnection.addTransceiver('audio', { direction: 'recvonly' })
+
+                    const offer = await peerConnection.createOffer()
+                    await peerConnection.setLocalDescription(offer)
+
+                    const response = await fetch(streamUrl, {
+                        method: 'POST',
+                        body: offer.sdp,
+                        headers: { 'Content-Type': 'application/sdp' }
+                    })
+
+                    if (!response.ok) throw new Error(`WHEP error: ${response.statusText}`)
+                    
+                    const answerSdp = await response.text()
+                    await peerConnection.setRemoteDescription({ type: 'answer', sdp: answerSdp })
+                    setIsLoading(false)
+                } catch (err) {
+                    console.error("WHEP Setup Failed:", err)
+                    setError("Stream connection failed")
+                    setIsLoading(false)
+                }
             }
         }
 
-        startWhep()
+        startStream()
 
         return () => {
-            if (peerConnection) {
-                peerConnection.close()
-            }
+            if (peerConnection) peerConnection.close()
+            if (hls) hls.destroy()
         }
-    }, [streamUrl, isBlocked])
+    }, [streamUrl, isBlocked, isHls])
 
     const takeSnapshot = () => {
         if (!videoRef.current) return

@@ -100,7 +100,7 @@ export default function BusDetailPage({ params }: Props) {
     ]
 
     // Dynamic Media Gateway URL (Cloud or Local)
-    const MEDIA_GATEWAY_URL = process.env.NEXT_PUBLIC_MEDIA_GATEWAY_URL || 'http://localhost'
+    const MEDIA_GATEWAY_URL = process.env.NEXT_PUBLIC_MEDIA_GATEWAY_URL
     const WHEP_PORT = '8889'
     const HLS_PORT = '8888'
 
@@ -109,13 +109,17 @@ export default function BusDetailPage({ params }: Props) {
     // PUBLIC TEST STREAM (Zero-Install fallback)
     const TEST_LIVE_URL = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
 
-    // Live URL points to the WHEP (WebRTC) endpoint on the Gateway
-    const liveUrl = activeCamera?.stream_url || TEST_LIVE_URL
-
-    // HLS URL points to the HLS endpoint on the Gateway
-    const hlsUrl = selectedRecording
-        ? `${MEDIA_GATEWAY_URL}:${HLS_PORT}/${busId}/recordings/${selectedRecording}.m3u8`
+    // Live URL: Prioritize Gateway WHEP, then internal stream_url, then fallback
+    const liveUrl = activeCamera?.stream_slug && MEDIA_GATEWAY_URL
+        ? `${MEDIA_GATEWAY_URL}:${WHEP_PORT}/${activeCamera.stream_slug}`
         : activeCamera?.stream_url || TEST_LIVE_URL
+
+    // HLS URL: Prioritize Recordings, then Gateway HLS, then fallback
+    const hlsUrl = selectedRecording && MEDIA_GATEWAY_URL
+        ? `${MEDIA_GATEWAY_URL}:${HLS_PORT}/${busId}/recordings/${selectedRecording}.m3u8`
+        : activeCamera?.stream_slug && MEDIA_GATEWAY_URL
+            ? `${MEDIA_GATEWAY_URL}:${HLS_PORT}/${activeCamera.stream_slug}`
+            : activeCamera?.stream_url || TEST_LIVE_URL
 
     const handleRecordingClick = (recId: string) => {
         setSelectedRecording(recId)
