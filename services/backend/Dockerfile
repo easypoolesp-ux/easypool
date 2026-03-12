@@ -21,5 +21,5 @@ RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
-# We use gunicorn for prod. Listen on the dynamic PORT system variable.
-CMD ["sh", "-c", "gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --threads 4 --worker-class gthread"]
+# We run migrations before starting the web server
+CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --threads 4 --worker-class gthread"]
