@@ -202,6 +202,7 @@ export default function BusDetailPage({ params }: Props) {
                                 <>
                                     <PlaybackCamera
                                         hlsUrl={hlsUrl}
+                                        busId={busId}
                                         title={selectedRecording
                                             ? `Recording: ${selectedDate} ${recordings.find(r => r.id === selectedRecording)?.time}`
                                             : "Select a recording to play"}

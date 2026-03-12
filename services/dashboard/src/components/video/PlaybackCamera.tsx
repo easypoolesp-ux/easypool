@@ -7,9 +7,10 @@ import { Camera, Download, Loader2 } from 'lucide-react'
 interface Props {
     hlsUrl: string // e.g., http://localhost:8888/bus101/index.m3u8
     title?: string
+    busId: string
 }
 
-export default function PlaybackCamera({ hlsUrl, title }: Props) {
+export default function PlaybackCamera({ hlsUrl, title, busId }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null)
     const [isReady, setIsReady] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -70,9 +71,12 @@ export default function PlaybackCamera({ hlsUrl, title }: Props) {
         try {
             // Extraction of time from title or hlsUrl would be real logic
             // For demo, we use current timestamp
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/buses/request_evidence/`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/buses/${busId}/request_evidence/`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
                 body: JSON.stringify({
                     start_time: new Date().toLocaleTimeString('en-GB').slice(0, 5),
                     duration: 60
