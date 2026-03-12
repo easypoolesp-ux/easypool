@@ -11,11 +11,16 @@ class RouteSerializer(serializers.ModelSerializer):
 class BusListSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
     lng = serializers.SerializerMethodField()
-    route_name = serializers.CharField(source='route.name', read_only=True)
+    last_heartbeat = serializers.SerializerMethodField()
     
     class Meta:
         model = Bus
-        fields = ('id', 'internal_id', 'plate_number', 'status', 'lat', 'lng', 'route_name', 'driver_name', 'gps_imei')
+        fields = ('id', 'internal_id', 'plate_number', 'status', 'lat', 'lng', 'route_name', 'driver_name', 'gps_imei', 'last_heartbeat')
+
+    @extend_schema_field(serializers.DateTimeField())
+    def get_last_heartbeat(self, obj):
+        latest = obj.gps_points.first()
+        return latest.timestamp if latest else None
 
     @extend_schema_field(serializers.FloatField())
     def get_lat(self, obj):

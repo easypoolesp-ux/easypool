@@ -63,6 +63,18 @@ export default function DashboardPage() {
 
     if (!mounted || loading) return <div className="p-6 text-center">Loading Dashboard...</div>
 
+    const getStatusInfo = (lastHeartbeat: string | null) => {
+        if (!lastHeartbeat) return { label: 'OFFLINE', color: 'text-slate-400', dot: 'bg-slate-300' }
+        const last = new Date(lastHeartbeat).getTime()
+        const now = new Date().getTime()
+        const diffMinutes = (now - last) / (1000 * 60)
+
+        if (diffMinutes < 2) return { label: 'LIVE', color: 'text-green-600', dot: 'bg-green-500 animate-pulse' }
+        if (diffMinutes < 10) return { label: `${Math.round(diffMinutes)}m AGO`, color: 'text-amber-500', dot: 'bg-amber-400' }
+        if (diffMinutes < 60) return { label: `${Math.round(diffMinutes)}m AGO`, color: 'text-orange-500', dot: 'bg-orange-400' }
+        return { label: 'OFFLINE', color: 'text-slate-400', dot: 'bg-slate-300' }
+    }
+
     const filteredBuses = buses.filter(bus =>
         bus.internal_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         bus.plate_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -204,14 +216,15 @@ export default function DashboardPage() {
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 text-[10px]">
-                                                    {bus.status === 'online' ? (
-                                                        <span className="text-green-600 flex items-center gap-1.5 font-bold uppercase tracking-wider">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                                                            LIVE
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-400 uppercase font-bold text-[9px]">Offline</span>
-                                                    )}
+                                                    {(() => {
+                                                        const status = getStatusInfo((bus as any).last_heartbeat)
+                                                        return (
+                                                            <span className={`${status.color} flex items-center gap-1.5 font-bold uppercase tracking-wider`}>
+                                                                <div className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                                                                {status.label}
+                                                            </span>
+                                                        )
+                                                    })()}
                                                 </div>
                                             </CardContent>
                                         </Card>
