@@ -64,32 +64,41 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
         }
     }, [isFullscreen])
 
-    // Update Markers
-    useEffect(() => {
-        if (!map.current || !markersLayer.current) return
+    if (!map.current || !markersLayer.current) return
 
-        markersLayer.current.clearLayers()
+    markersLayer.current.clearLayers()
 
-        // Only show markers for buses with valid GPS data
-        buses
-            .filter(bus => bus.lat != null && bus.lng != null)
-            .forEach(bus => {
-                const marker = L.marker([bus.lat, bus.lng])
-                    .bindPopup(`
+    const bounds: L.LatLngExpression[] = []
+
+    // Only show markers for buses with valid GPS data
+    buses
+        .filter(bus => bus.lat != null && bus.lng != null)
+        .forEach(bus => {
+            const position: [number, number] = [bus.lat, bus.lng]
+            bounds.push(position)
+
+            const marker = L.marker(position)
+                .bindPopup(`
           <div style="font-family: sans-serif; padding: 4px;">
             <b style="font-size: 14px;">${bus.id}</b><br/>
             <span style="font-size: 11px; color: #666;">${bus.plate}</span><br/>
             <a href="/dashboard/bus/${bus.id}" style="color: #2563eb; font-size: 10px; font-weight: bold; text-decoration: none; margin-top: 5px; display: block;">View Live Feed</a>
           </div>
         `)
-                    .addTo(markersLayer.current!)
-            })
-    }, [buses])
+                .addTo(markersLayer.current!)
+        })
 
-    return (
-        <div className="w-full h-full rounded-xl overflow-hidden border border-border shadow-inner bg-slate-100">
-            <div ref={mapContainer} className="w-full h-full z-0" />
-            <style jsx global>{`
+    // Auto-center map if we have points
+    if (bounds.length > 0 && map.current) {
+        const latLngBounds = L.latLngBounds(bounds)
+        map.current.fitBounds(latLngBounds, { padding: [50, 50], maxZoom: 15 })
+    }
+}, [buses])
+
+return (
+    <div className="w-full h-full rounded-xl overflow-hidden border border-border shadow-inner bg-slate-100">
+        <div ref={mapContainer} className="w-full h-full z-0" />
+        <style jsx global>{`
         .leaflet-container {
           width: 100%;
           height: 100%;
@@ -99,6 +108,6 @@ export default function FleetMap({ buses, isFullscreen }: Props) {
           font-size: 8px !important;
         }
       `}</style>
-        </div>
-    )
+    </div>
+)
 }
