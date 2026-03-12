@@ -11,7 +11,6 @@ import FleetMap from '@/components/map/FleetMap'
 import { components } from '@/types/api'
 
 import UserProfile from '@/components/layout/UserProfile'
-import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
 interface Props {
     params: {
@@ -152,7 +151,6 @@ export default function BusDetailPage({ params }: Props) {
                             </div>
                         )
                     })()}
-                    <ThemeToggle />
                     <UserProfile />
                 </div>
             </div>

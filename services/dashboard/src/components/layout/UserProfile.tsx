@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { User, LogOut, Settings, ShieldCheck, ChevronDown } from 'lucide-react'
+import { User, LogOut, Settings, ShieldCheck, ChevronDown, Sun, Moon, Laptop } from 'lucide-react'
+import { useTheme } from 'next-themes'
 
 interface UserData {
     id: string
@@ -14,6 +15,7 @@ interface UserData {
 }
 
 export default function UserProfile() {
+    const { theme, setTheme } = useTheme()
     const router = useRouter()
     const [user, setUser] = useState<UserData | null>(null)
     const [isOpen, setIsOpen] = useState(false)
@@ -100,11 +102,40 @@ export default function UserProfile() {
                         )}
                     </div>
                     
-                    <div className="p-2">
+                    <div className="p-2 space-y-1">
                         <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                             <Settings className="w-4 h-4" />
                             Account Settings
                         </button>
+                        
+                        <div className="h-[1px] bg-slate-100 dark:bg-slate-800 my-1" />
+                        
+                        <div className="px-3 py-2">
+                            <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400 mb-2">Interface Theme</p>
+                            <div className="flex bg-slate-50 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <button 
+                                    onClick={() => setTheme('light')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg text-[10px] font-bold transition-all ${theme === 'light' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    <Sun className="w-3 h-3" /> Light
+                                </button>
+                                <button 
+                                    onClick={() => setTheme('dark')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg text-[10px] font-bold transition-all ${theme === 'dark' ? 'bg-slate-900 shadow-lg text-white' : 'text-slate-500 hover:text-slate-400'}`}
+                                >
+                                    <Moon className="w-3 h-3" /> Dark
+                                </button>
+                                <button 
+                                    onClick={() => setTheme('system')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg text-[10px] font-bold transition-all ${theme === 'system' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary dark:text-blue-400' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    <Laptop className="w-3 h-3" /> Auto
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="h-[1px] bg-slate-100 dark:bg-slate-800 my-1" />
+
                         <button
                             onClick={handleLogout}
                             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
