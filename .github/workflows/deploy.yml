@@ -12,6 +12,7 @@ env:
   PROJECT_ID: project-05588bf2-f685-4769-a37
   REGION: asia-south1
   REPO_NAME: easypool-repo
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-backend:
