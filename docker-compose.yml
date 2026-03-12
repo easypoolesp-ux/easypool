@@ -71,5 +71,17 @@ services:
     depends_on:
       - backend
 
+  gps-mqtt:
+    build:
+      context: ./services/gps-mqtt
+    container_name: gps-mqtt
+    restart: always
+    environment:
+      - MQTT_BROKER=localhost
+      - BACKEND_API_URL=http://backend:8000/api/gps/update
+      - GPS_SERVICE_API_KEY=your-secure-api-key
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:

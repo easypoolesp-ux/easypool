@@ -32,6 +32,44 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                 latest_points.append(GPSLatestSerializer(point).data)
         return response.Response(latest_points)
 
+    @decorators.action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def update(self, request):
+        """Update GPS point for a bus (called by MQTT subscriber)."""
+        api_key = request.headers.get('X-API-KEY')
+        if api_key != "easypool_gps_secret_2026": # Should match GH Secret
+            return response.Response({'error': 'Unauthorized'}, status=401)
+
+        imei = request.data.get('imei')
+        try:
+            from apps.buses.models import Bus
+            from django.utils import timezone
+            import datetime
+            
+            bus = Bus.objects.get(gps_imei=imei) # Lookup by IMEI
+            lat = request.data.get('lat')
+            lng = request.data.get('lng')
+            speed = request.data.get('speed', 0)
+            
+            # Create the point
+            GPSPoint.objects.create(
+                bus=bus,
+                lat=lat,
+                lng=lng,
+                speed=speed,
+                timestamp=timezone.now()
+            )
+            
+            # Optionally update bus status to online if we are getting GPS
+            if bus.status == 'offline':
+                bus.status = 'online'
+                bus.save()
+                
+            return response.Response({'status': 'success'})
+        except Bus.DoesNotExist:
+            return response.Response({'error': 'Bus not found'}, status=404)
+        except Exception as e:
+            return response.Response({'error': str(e)}, status=400)
+
 class AlertViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Alert.objects.all()
     serializer_class = AlertSerializer

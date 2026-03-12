@@ -59,8 +59,8 @@ export default function BusDetailPage({ params }: Props) {
     const busMapData = {
         id: bus.internal_id,
         status: bus.status || 'offline',
-        lat: bus.current_lat || 22.5726,
-        lng: bus.current_lng || 88.3639,
+        lat: (bus as any).lat || 22.5726,
+        lng: (bus as any).lng || 88.3639,
         plate: bus.plate_number
     }
 
@@ -140,7 +140,17 @@ export default function BusDetailPage({ params }: Props) {
                             )}
                         </CardHeader>
                         <CardContent className="p-0 bg-black aspect-video relative">
-                            {activeTab === 'live' ? (
+                            {(!bus.cameras || bus.cameras.length === 0) ? (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 z-10 text-center p-6 space-y-4">
+                                    <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center">
+                                        <Camera className="w-8 h-8 text-slate-600" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h3 className="text-white font-bold">No Cameras Configured</h3>
+                                        <p className="text-slate-400 text-sm max-w-[280px]">This vehicle does not have any active camera streams assigned.</p>
+                                    </div>
+                                </div>
+                            ) : activeTab === 'live' ? (
                                 <LiveCamera streamUrl={liveUrl} title={activeCamera?.name || "Bus Camera"} />
                             ) : (
                                 <>
@@ -202,13 +212,34 @@ export default function BusDetailPage({ params }: Props) {
                         </Card>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="aspect-video bg-muted/40 rounded-lg flex items-center justify-center border border-dashed border-border text-muted-foreground text-xs uppercase font-bold tracking-tighter opacity-50">
-                            Camera 2 (Interior) - Offline
-                        </div>
-                        <div className="aspect-video bg-muted/40 rounded-lg flex items-center justify-center border border-dashed border-border text-muted-foreground text-xs uppercase font-bold tracking-tighter opacity-50">
-                            Camera 3 (Rear) - Offline
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {(bus.cameras || []).length > 1 ? (
+                            bus.cameras.filter(c => c.stream_slug !== selectedCamera).map(cam => (
+                                <div key={cam.id} className="aspect-video bg-slate-900 rounded-lg flex flex-col items-center justify-center border border-border group relative overflow-hidden">
+                                    <div className="absolute top-2 left-2 z-10 bg-black/60 px-2 py-0.5 rounded text-[10px] text-white font-medium uppercase tracking-wider">
+                                        {cam.name}
+                                    </div>
+                                    <div className="text-center space-y-2">
+                                        <Camera className="w-6 h-6 text-slate-700 mx-auto" />
+                                        <button
+                                            onClick={() => setSelectedCamera(cam.stream_slug!)}
+                                            className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase"
+                                        >
+                                            Switch to this view
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <>
+                                <div className="aspect-video bg-muted/40 rounded-lg flex items-center justify-center border border-dashed border-border text-muted-foreground text-[10px] uppercase font-bold tracking-tighter opacity-50">
+                                    Secondary View - Not Configured
+                                </div>
+                                <div className="aspect-video bg-muted/40 rounded-lg flex items-center justify-center border border-dashed border-border text-muted-foreground text-[10px] uppercase font-bold tracking-tighter opacity-50">
+                                    Rear View - Not Configured
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -235,7 +266,7 @@ export default function BusDetailPage({ params }: Props) {
                                 </div>
                                 <div className="flex justify-between text-xs">
                                     <span className="text-muted-foreground uppercase font-bold">Route</span>
-                                    <span className="font-bold">{bus.route_name || 'Unassigned'}</span>
+                                    <span className="font-bold">{bus.route?.name || 'Unassigned'}</span>
                                 </div>
                             </div>
                         </CardContent>

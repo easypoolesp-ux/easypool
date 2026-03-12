@@ -1,11 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bus, Eye, EyeOff, Loader2, Shield } from 'lucide-react'
 
 export default function LoginPage() {
     const router = useRouter()
+
+    // Clear any existing tokens on mount
+    useEffect(() => {
+        localStorage.removeItem('token')
+        localStorage.removeItem('refresh_token')
+        document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+    }, [])
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)

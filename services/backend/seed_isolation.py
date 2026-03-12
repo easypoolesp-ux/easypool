@@ -60,7 +60,11 @@ def seed_isolation():
         internal_id="OAK-101",
         school=school1,
         transporter=t1_s1,
-        defaults={"plate_number": "TS09EX1234", "driver_name": "Ravi"}
+        defaults={
+            "plate_number": "TS09EX1234", 
+            "driver_name": "Ravi",
+            "gps_imei": "123456789012345"
+        }
     )
     # Add Cameras for OAK-101
     from apps.buses.models import Camera
@@ -71,7 +75,11 @@ def seed_isolation():
         internal_id="OAK-201",
         school=school1,
         transporter=t2_s1,
-        defaults={"plate_number": "TS09EX5678", "driver_name": "Suresh"}
+        defaults={
+            "plate_number": "TS09EX5678", 
+            "driver_name": "Suresh",
+            "gps_imei": "223344556677889"
+        }
     )
     # Add Camera for OAK-201
     Camera.objects.get_or_create(bus=b2_s1, name="Driver Cam", defaults={"stream_slug": "driver"})
@@ -106,7 +114,11 @@ def seed_isolation():
         internal_id="GLEN-501",
         school=school2,
         transporter=t1_s2,
-        defaults={"plate_number": "TS07AZ9999", "driver_name": "Ahmed"}
+        defaults={
+            "plate_number": "TS07AZ9999", 
+            "driver_name": "Ahmed",
+            "gps_imei": "998877665544332"
+        }
     )
     # No cameras for GLEN-501 to test 0-camera case
 

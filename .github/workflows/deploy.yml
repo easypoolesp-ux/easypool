@@ -61,6 +61,15 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+    - name: Build and Push GPS-MQTT Image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./services/gps-mqtt
+        push: true
+        tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/gps-mqtt:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
     - name: Update Backend Cloud Run Service
       run: |
         gcloud run deploy easypool-backend \
@@ -78,3 +87,20 @@ jobs:
           --set-env-vars "BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app,NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app" \
           --allow-unauthenticated \
           --quiet
+
+    - name: Deploy GPS-MQTT to VM
+      run: |
+        gcloud compute ssh camera-relay-server --zone asia-south1-a --project ${PROJECT_ID} --command "
+          gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+          docker pull ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
+          docker stop gps-mqtt || true
+          docker rm gps-mqtt || true
+          docker run -d --name gps-mqtt \
+            -e MQTT_BROKER=localhost \
+            -e MQTT_USER=${{ secrets.MQTT_USER }} \
+            -e MQTT_PASSWORD=${{ secrets.MQTT_PASSWORD }} \
+            -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/update \
+            -e GPS_SERVICE_API_KEY=${{ secrets.GPS_SERVICE_API_KEY }} \
+            --network host \
+            ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
+        "

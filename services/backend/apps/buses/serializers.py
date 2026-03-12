@@ -15,7 +15,7 @@ class BusListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Bus
-        fields = ('id', 'internal_id', 'plate_number', 'status', 'lat', 'lng', 'route_name', 'driver_name')
+        fields = ('id', 'internal_id', 'plate_number', 'status', 'lat', 'lng', 'route_name', 'driver_name', 'gps_imei')
 
     @extend_schema_field(serializers.FloatField())
     def get_lat(self, obj):
@@ -36,7 +36,19 @@ class BusDetailSerializer(serializers.ModelSerializer):
     route = RouteSerializer(read_only=True)
     school = SchoolSerializer(read_only=True)
     cameras = CameraSerializer(many=True, read_only=True)
+    lat = serializers.SerializerMethodField()
+    lng = serializers.SerializerMethodField()
     
     class Meta:
         model = Bus
         fields = '__all__'
+
+    @extend_schema_field(serializers.FloatField())
+    def get_lat(self, obj):
+        latest = obj.gps_points.first()
+        return latest.lat if latest else 22.5726
+
+    @extend_schema_field(serializers.FloatField())
+    def get_lng(self, obj):
+        latest = obj.gps_points.first()
+        return latest.lng if latest else 88.3639

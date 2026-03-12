@@ -3,8 +3,9 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search } from 'lucide-react'
+import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import nextDynamic from 'next/dynamic'
 import { components } from '@/types/api'
@@ -14,6 +15,7 @@ const FleetMap = nextDynamic(() => import('@/components/map/FleetMap'), { ssr: f
 type BusType = components['schemas']['BusList']
 
 export default function DashboardPage() {
+    const router = useRouter()
     const [mounted, setMounted] = useState(false)
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
@@ -61,11 +63,27 @@ export default function DashboardPage() {
         (bus.route_name || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
 
+    const handleLogout = () => {
+        localStorage.removeItem('token')
+        localStorage.removeItem('refresh_token')
+        document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+        router.push('/login')
+    }
+
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6 bg-slate-50/50 dark:bg-transparent min-h-screen">
-            <header className="flex flex-col gap-2">
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Fleet Overview</h1>
-                <p className="text-muted-foreground">Monitor real-time status of all active school buses in Kolkata.</p>
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Fleet Overview</h1>
+                    <p className="text-muted-foreground">Monitor real-time status of all active school buses in Kolkata.</p>
+                </div>
+                <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 hover:border-red-500/30 transition-all font-medium text-sm shadow-sm"
+                >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                </button>
             </header>
 
             {/* Top Stats */}
