@@ -242,33 +242,22 @@ export default function BusDetailPage({ params }: Props) {
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(bus.cameras || []).length > 1 ? (
-                            bus.cameras.filter(c => c.stream_slug !== selectedCamera).map(cam => (
-                                <div key={cam.id} className="aspect-video bg-slate-900 rounded-lg flex flex-col items-center justify-center border border-border group relative overflow-hidden">
-                                    <div className="absolute top-2 left-2 z-10 bg-black/60 px-2 py-0.5 rounded text-[10px] text-white font-medium uppercase tracking-wider">
-                                        {cam.name}
-                                    </div>
-                                    <div className="text-center space-y-2">
-                                        <Camera className="w-6 h-6 text-slate-700 mx-auto" />
-                                        <button
-                                            onClick={() => setSelectedCamera(cam.stream_slug!)}
-                                            className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase"
-                                        >
-                                            Switch to this view
-                                        </button>
-                                    </div>
+                        {(bus.cameras || []).filter(c => c.stream_slug !== selectedCamera).map(cam => (
+                            <div key={cam.id} className="aspect-video bg-slate-900 rounded-lg flex flex-col items-center justify-center border border-border group relative overflow-hidden">
+                                <div className="absolute top-2 left-2 z-10 bg-black/60 px-2 py-0.5 rounded text-[10px] text-white font-medium uppercase tracking-wider">
+                                    {cam.name}
                                 </div>
-                            ))
-                        ) : (
-                            <>
-                                <div className="aspect-video bg-muted/40 rounded-lg flex items-center justify-center border border-dashed border-border text-muted-foreground text-[10px] uppercase font-bold tracking-tighter opacity-50">
-                                    Secondary View - Not Configured
+                                <div className="text-center space-y-2">
+                                    <Camera className="w-6 h-6 text-slate-700 mx-auto" />
+                                    <button
+                                        onClick={() => setSelectedCamera(cam.stream_slug!)}
+                                        className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase"
+                                    >
+                                        Switch to this view
+                                    </button>
                                 </div>
-                                <div className="aspect-video bg-muted/40 rounded-lg flex items-center justify-center border border-dashed border-border text-muted-foreground text-[10px] uppercase font-bold tracking-tighter opacity-50">
-                                    Rear View - Not Configured
-                                </div>
-                            </>
-                        )}
+                            </div>
+                        ))}
                     </div>
                 </div>
 
