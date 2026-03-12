@@ -14,122 +14,113 @@ env:
   REPO_NAME: easypool-repo
 
 jobs:
-  build-and-deploy:
+  build-backend:
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
       id-token: 'write'
-    
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
+          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
+      - name: Configure Docker Auth
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and Push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/backend
+          push: true
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
-        service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
+  build-dashboard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
+          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
+      - name: Configure Docker Auth
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and Push Dashboard
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/dashboard
+          push: true
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/dashboard:latest
+          build-args: |
+            BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
+            NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v2
+  deploy:
+    needs: [build-backend, build-dashboard]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
+          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      
+      - name: Deploy Backend
+        run: |
+          gcloud run deploy easypool-backend \
+            --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
+            --region ${REGION} \
+            --project ${PROJECT_ID} \
+            --cpu-boost \
+            --quiet
 
-    - name: Configure Docker Auth
-      run: |
-        gcloud auth configure-docker ${REGION}-docker.pkg.dev
+      - name: Deploy Dashboard
+        run: |
+          gcloud run deploy easypool-dashboard-schools \
+            --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/dashboard:latest \
+            --region ${REGION} \
+            --project ${PROJECT_ID} \
+            --set-env-vars "BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app,NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app" \
+            --allow-unauthenticated \
+            --cpu-boost \
+            --quiet
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build and Push Backend Image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./services/backend
-        push: true
-        tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-    - name: Build and Push Dashboard Image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./services/dashboard
-        push: true
-        tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/dashboard:latest
-        build-args: |
-          BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
-          NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-    - name: Build and Push GPS-MQTT Image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./services/gps-mqtt
-        push: true
-        tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/gps-mqtt:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-    - name: Update Backend Cloud Run Service
-      run: |
-        gcloud run deploy easypool-backend \
-          --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
-          --region ${REGION} \
-          --project ${PROJECT_ID} \
-          --cpu-boost \
-          --quiet
-
-    - name: Update Dashboard Cloud Run Service
-      run: |
-        gcloud run deploy easypool-dashboard-schools \
-          --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/dashboard:latest \
-          --region ${REGION} \
-          --project ${PROJECT_ID} \
-          --set-env-vars "BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app,NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app" \
-          --allow-unauthenticated \
-          --cpu-boost \
-          --quiet
-
-    - name: Deploy GPS-MQTT to VM
-      # Only run if GPS-MQTT or Workflow files changed
-      if: contains(github.event.head_commit.modified, 'services/gps-mqtt/') || contains(github.event.head_commit.added, 'services/gps-mqtt/') || contains(github.event.head_commit.modified, '.github/workflows/')
-      run: |
-        # Generate a short-lived access token for the remote VM to use
-        ACCESS_TOKEN=$(gcloud auth print-access-token)
-        
-        gcloud compute ssh camera-relay-server \
-          --zone asia-south1-a \
-          --project ${PROJECT_ID} \
-          --tunnel-through-iap \
-          --quiet \
-          --command "
-          # Login to Docker using the short-lived token (The Industrial Way)
-          echo '${ACCESS_TOKEN}' | docker login -u oauth2accesstoken --password-stdin https://${REGION}-docker.pkg.dev
-          
-          # Pull latest image
-          docker pull ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
-          
-          # Stop and remove existing container
-          docker stop gps-mqtt || true
-          docker rm gps-mqtt || true
-          
-          # Start the new container with industrial safeguards
-          docker run -d --name gps-mqtt \
-            --restart always \
-            -e MQTT_BROKER=localhost \
-            -e MQTT_USER='${{ secrets.MQTT_USER }}' \
-            -e MQTT_PASSWORD='${{ secrets.MQTT_PASSWORD }}' \
-            -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
-            -e GPS_SERVICE_API_KEY='${{ secrets.GPS_SERVICE_API_KEY }}' \
-            --network host \
-            ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
-          
-          # Industrial Cleanup: Remove old/unused images to save VM disk space
-          docker image prune -a -f --filter \"until=24h\"
-          
-          # Health Check: Verify container is actually running
-          docker ps | grep gps-mqtt
-          
-          # Logout for security
-          docker logout https://${REGION}-docker.pkg.dev
-        "
+      - name: Deploy GPS-MQTT to VM
+        if: contains(github.event.head_commit.modified, 'services/gps-mqtt/') || contains(github.event.head_commit.added, 'services/gps-mqtt/') || contains(github.event.head_commit.modified, '.github/workflows/')
+        run: |
+          ACCESS_TOKEN=$(gcloud auth print-access-token)
+          gcloud compute ssh camera-relay-server \
+            --zone asia-south1-a \
+            --project ${PROJECT_ID} \
+            --tunnel-through-iap \
+            --quiet \
+            --command "
+            echo '${ACCESS_TOKEN}' | docker login -u oauth2accesstoken --password-stdin https://${REGION}-docker.pkg.dev
+            docker pull ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
+            docker stop gps-mqtt || true
+            docker rm gps-mqtt || true
+            docker run -d --name gps-mqtt \
+              --restart always \
+              -e MQTT_BROKER=localhost \
+              -e MQTT_USER='${{ secrets.MQTT_USER }}' \
+              -e MQTT_PASSWORD='${{ secrets.MQTT_PASSWORD }}' \
+              -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
+              -e GPS_SERVICE_API_KEY='${{ secrets.GPS_SERVICE_API_KEY }}' \
+              --network host \
+              ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
+            docker image prune -a -f --filter \"until=24h\"
+            docker logout https://${REGION}-docker.pkg.dev
+          "
