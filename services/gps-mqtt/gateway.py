@@ -80,24 +80,45 @@ def forward_to_backend(imei, data):
         print(f"Failed to connect to backend: {e}")
 
 def handle_client(conn, addr):
-    print(f"Connection from {addr}")
+    print(f"New connection from {addr}")
     try:
-        # 1. Handshake: Receive IMEI
-        # Teltonika sends: [2 bytes length] [IMEI string]
-        header = conn.recv(2)
-        if not header: return
-        imei_len = struct.unpack('>H', header)[0]
-        imei = conn.recv(imei_len).decode()
-        print(f"Device IMEI: {imei}")
+        # 1. Smart Handshake: Receive IMEI
+        # Some devices send [2 bytes length] [IMEI], others send just [15 digits]
+        first_chunk = conn.recv(1024)
+        if not first_chunk: return
+        
+        # Log the raw handshake for debugging
+        print(f"Raw handshake hex: {first_chunk.hex()}")
+        
+        if len(first_chunk) == 15 and first_chunk.isdigit():
+            # Raw IMEI format
+            imei = first_chunk.decode()
+        elif len(first_chunk) > 2:
+            # Check if it has a 2-byte length prefix
+            imei_len = struct.unpack('>H', first_chunk[:2])[0]
+            if imei_len == len(first_chunk) - 2:
+                imei = first_chunk[2:].decode()
+            else:
+                # Fallback: maybe it's just the IMEI starting with some weird bytes
+                # or the length prefix is just the first 2 digits
+                imei = first_chunk.decode()[-15:]
+        else:
+            print("Incomplete handshake.")
+            return
+
+        print(f"Detected Device IMEI: {imei}")
         
         # Accept connection (Send 0x01)
         conn.send(b'\x01')
         
         while True:
             # 2. Receive Data Packet
-            # [4 bytes 0] [4 bytes length] [DATA...] [4 bytes CRC]
             prefix = conn.recv(8)
             if not prefix: break
+            
+            if len(prefix) < 8:
+                print(f"Incomplete prefix: {prefix.hex()}")
+                break
             
             data_len = struct.unpack('>I', prefix[4:8])[0]
             # Receive the data + 4 bytes CRC
