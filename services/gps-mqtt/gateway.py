@@ -16,17 +16,21 @@ def parse_codec8_data(packet):
     Extracts the first GPS record from a packet.
     """
     try:
-        # Minimum packet size check (Header + 1 Record + CRC)
-        if len(packet) < 45:
+        # Minimum packet size check (CodecID + Count + Timestamp + Lat/Lng + Count)
+        # 1 + 1 + 8 + 4 + 4 + 1 = 19 bytes is an absolute minimum
+        if len(packet) < 19:
+            print(f"Packet too short: {len(packet)}")
             return None
 
         # Basic Codec 8 structure check
         codec_id = packet[0] # Usually 0x08
         if codec_id != 8:
+            print(f"Invalid Codec ID: {codec_id}")
             return None
             
         num_records = packet[1]
         if num_records == 0:
+            print("No records in packet")
             return None
 
         # AVL Data starts at index 2
@@ -66,7 +70,8 @@ def forward_to_backend(imei, data):
     }
     headers = {"X-API-KEY": API_KEY}
     try:
-        response = requests.post(BACKEND_API_URL, json=payload, headers=headers)
+        print(f"Forwarding to backend: IMEI={imei}, Lat={data['lat']}, Lng={data['lng']}")
+        response = requests.post(BACKEND_API_URL, json=payload, headers=headers, timeout=5)
         if response.status_code == 200:
             print(f"Successfully updated GPS for IMEI: {imei}")
         else:
@@ -110,9 +115,13 @@ def handle_client(conn, addr):
             num_records = data_content[1] # For Codec 8, index 1 is record count
             conn.send(struct.pack('>I', num_records))
             
+            print(f"Received data content length: {len(data_content)}")
             parsed = parse_codec8_data(data_content)
             if parsed:
+                print(f"Parsed data: {parsed}")
                 forward_to_backend(imei, parsed)
+            else:
+                print("Failed to parse packet.")
             
     except Exception as e:
         print(f"Client error: {e}")
