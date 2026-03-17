@@ -23,8 +23,8 @@ def parse_codec8_data(packet):
             return None
 
         # Basic Codec 8 structure check
-        codec_id = packet[0] # Usually 0x08
-        if codec_id != 8:
+        codec_id = packet[0] # 0x08 (Codec 8) or 0x8E (Codec 8 Extended)
+        if codec_id not in [8, 142]:
             print(f"Invalid Codec ID: {codec_id}")
             return None
             
