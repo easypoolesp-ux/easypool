@@ -39,14 +39,39 @@ const BACKEND_URL =
 
 const MAP_CENTER = { lat: 22.5726, lng: 88.3639 } // Kolkata
 
+// 🔵 COOL BLUE DARK MODE STYLE
+const MAP_STYLES_BLUE_DARK: google.maps.MapTypeStyle[] = [
+    { elementType: "geometry", stylers: [{ color: "#1d2c4d" }] },
+    { elementType: "labels.text.fill", stylers: [{ color: "#8ec3b9" }] },
+    { elementType: "labels.text.stroke", stylers: [{ color: "#1a3646" }] },
+    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+    { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+    { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
+    { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
+    { featureType: "road", elementType: "geometry", stylers: [{ color: "#304a7d" }] },
+    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#2b3544" }] },
+    { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#2c6675" }] },
+    { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
+    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
+    { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+    { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+    { featureType: "water", elementType: "geometry", stylers: [{ color: "#0e1626" }] },
+    { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4e6d70" }] },
+    { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] },
+]
+
+// ⚪ CLEAN LIGHT MODE STYLE
+const MAP_STYLES_LIGHT: google.maps.MapTypeStyle[] = [
+    { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
+    { featureType: "transit", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+]
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
-    // 📚 Load required libraries for 2026 guidelines
     const libraries = useMemo<("marker" | "maps" | "places")[]>(() => ["marker"], []);
-    
-    // 🔑 API Key Environment Variable Check
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID'; // Using default if not provided
+    const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
 
     const { isLoaded, loadError } = useJsApiLoader({
         googleMapsApiKey: apiKey!,
@@ -59,7 +84,6 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     const markerRefs = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map())
     const historyMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
 
-    // History Mode State
     const [isHistoryMode, setIsHistoryMode] = useState(false)
     const [selectedBusId, setSelectedBusId] = useState<string | null>(initialBusId || null)
     const [playbackDate, setPlaybackDate] = useState(() => 
@@ -72,18 +96,17 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     const [isSmall, setIsSmall] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
 
-    // ── Markers Management (2026 Advanced Markers) ──────────────────────────
+    // Apply the "Cool Blue" style if dark mode
+    const currentStyles = theme === 'dark' ? MAP_STYLES_BLUE_DARK : MAP_STYLES_LIGHT
+
     const updateMarkers = useCallback(() => {
         if (!mapRef.current || isHistoryMode) {
-            // Remove all live markers if in history mode
             markerRefs.current.forEach(m => { m.map = null });
             markerRefs.current.clear();
             return;
         }
 
         const currentBusIds = new Set(buses.map(b => b.id));
-
-        // 1. Remove markers for buses no longer in the list
         markerRefs.current.forEach((marker, id) => {
             if (!currentBusIds.has(id)) {
                 marker.map = null;
@@ -91,18 +114,17 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
             }
         });
 
-        // 2. Add or Update markers
         buses.forEach(bus => {
             if (!bus.lat || !bus.lng) return;
-
             let marker = markerRefs.current.get(bus.id);
             const position = { lat: bus.lat, lng: bus.lng };
 
             if (!marker) {
-                // Create custom pin content
                 const pinElement = document.createElement('div');
+                // Premium marker with subtle pulse/shadow
                 pinElement.innerHTML = `
-                    <div style="background: ${bus.status === 'active' ? '#2563eb' : '#64748b'}; color: white; padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); transform: translate(-50%, -100%);">
+                    <div style="background: ${bus.status === 'active' ? '#3b82f6' : '#94a3b8'}; color: white; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 800; border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.4); transform: translate(-50%, -50%); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap;">
+                        <span style="display: inline-block; width: 6px; height: 6px; background: white; border-radius: 50%; margin-right: 6px; vertical-align: middle; ${bus.status === 'active' ? 'animation: pulse 1.5s infinite;' : ''}"></span>
                         ${bus.internal_id}
                     </div>
                 `;
@@ -115,7 +137,6 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 });
 
                 marker.addListener("click", () => {
-                    // Custom event for View History
                     window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: bus.id }));
                 });
 
@@ -126,7 +147,6 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         });
     }, [buses, isHistoryMode]);
 
-    // ── Update History Marker ────────────────────────────────────────────────
     useEffect(() => {
         if (!isHistoryMode || !historyPoints[playbackIndex] || !mapRef.current) {
             if (historyMarkerRef.current) {
@@ -141,12 +161,12 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
 
         if (!historyMarkerRef.current) {
             const dot = document.createElement('div');
-            dot.style.background = '#2563eb';
-            dot.style.width = '14px';
-            dot.style.height = '14px';
+            dot.style.background = '#60a5fa';
+            dot.style.width = '16px';
+            dot.style.height = '16px';
             dot.style.borderRadius = '50%';
-            dot.style.border = '2px solid white';
-            dot.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+            dot.style.border = '3px solid white';
+            dot.style.boxShadow = '0 0 15px rgba(59, 130, 246, 0.8)';
 
             historyMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
                 map: mapRef.current!,
@@ -159,12 +179,10 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         }
     }, [isHistoryMode, historyPoints, playbackIndex]);
 
-    // ── Trigger Marker Update ────────────────────────────────────────────────
     useEffect(() => {
         if (isLoaded) updateMarkers();
     }, [isLoaded, updateMarkers, buses, isHistoryMode]);
 
-    // ── Resizing ─────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!containerRef.current) return
         const observer = new ResizeObserver(entries => {
@@ -176,7 +194,6 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         return () => observer.disconnect()
     }, [])
 
-    // Fit bounds
     useEffect(() => {
         if (!mapRef.current || isHistoryMode) return
         const valid = buses.filter(b => b.lat != null && b.lng != null)
@@ -186,17 +203,13 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         mapRef.current.fitBounds(bounds, 60)
     }, [buses, isHistoryMode])
 
-    // ── History Sync ──────────────────────────────────────────────────────────
     const loadHistory = async (busId: string, date: string) => {
         if (!busId) return
         setIsLoading(true)
         try {
             const token = localStorage.getItem('token')
             const res = await fetch(`${BACKEND_URL}/api/gps/playback?bus=${busId}&date=${date}`, { headers: { Authorization: `Bearer ${token}` } })
-            if (!res.ok) {
-                setHistoryPoints([])
-                return
-            }
+            if (!res.ok) { setHistoryPoints([]); return; }
             const data: GPSPoint[] = await res.json()
             setHistoryPoints(data)
             setPlaybackIndex(0)
@@ -209,11 +222,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     }
 
     const toggleHistoryMode = useCallback(async (busIdOverride?: string) => {
-        if (isHistoryMode && !busIdOverride) {
-            setIsHistoryMode(false)
-            setHistoryPoints([])
-            return
-        }
+        if (isHistoryMode && !busIdOverride) { setIsHistoryMode(false); setHistoryPoints([]); return; }
         const busId = busIdOverride || selectedBusId || (buses.length > 0 ? buses[0].id : null)
         if (!busId) return
         setSelectedBusId(busId)
@@ -227,29 +236,25 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         return () => window.removeEventListener('map:viewHistory', handler)
     }, [toggleHistoryMode])
 
-    // Playback
     useEffect(() => {
         if (!isPlaying) return
-        if (playbackIndex >= historyPoints.length - 1) {
-            setIsPlaying(false)
-            return
-        }
+        if (playbackIndex >= historyPoints.length - 1) { setIsPlaying(false); return; }
         const timer = setInterval(() => setPlaybackIndex(p => p + 1), 500)
         return () => clearInterval(timer)
     }, [isPlaying, playbackIndex, historyPoints])
 
-    if (loadError) return <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-xl text-red-400 p-8 text-center">⚠️ Maps Load Error: ApiProjectMapError. Check billing and Maps JavaScript API enablement.</div>
-    if (!isLoaded) return <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-xl"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /><p className="ml-3 text-slate-400">Loading Map…</p></div>
-    if (!apiKey) return <div className="w-full h-full flex items-center justify-center bg-red-950/20 text-red-500 rounded-xl">Error: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY missing.</div>
+    if (loadError) return <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-xl text-red-400 p-8 text-center font-bold">⚠️ Maps API Error. Use Build Args to pass API Key.</div>
+    if (!isLoaded) return <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-xl"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
 
     return (
-        <div ref={containerRef} className="relative w-full h-full rounded-xl overflow-hidden border border-border shadow-inner">
+        <div ref={containerRef} className="relative w-full h-full rounded-xl overflow-hidden border border-white/10 shadow-2xl">
             <GoogleMap
                 mapContainerStyle={{ width: '100%', height: '100%' }}
                 center={MAP_CENTER}
                 zoom={12}
                 options={{
-                    mapId: mapId, // REQUIRED for Advanced Markers in 2026
+                    mapId: mapId,
+                    styles: currentStyles,
                     disableDefaultUI: false,
                     zoomControl: true,
                     mapTypeControl: false,
@@ -259,43 +264,48 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 onLoad={map => { mapRef.current = map }}
                 onUnmount={() => { mapRef.current = null }}
             >
-                {/* ── Polyline for Route ── */}
                 {isHistoryMode && historyPoints.length > 1 && (
                     <Polyline
                         path={historyPoints.map(p => ({ lat: p.lat, lng: p.lng }))}
-                        options={{ strokeColor: '#3b82f6', strokeOpacity: 0.6, strokeWeight: 4 }}
+                        options={{ strokeColor: '#60a5fa', strokeOpacity: 0.8, strokeWeight: 5 }}
                     />
                 )}
             </GoogleMap>
 
-            {/* ── Toggle UI ── */}
             <button
                 onClick={() => toggleHistoryMode()}
-                className={`absolute top-4 right-4 z-[1000] p-2.5 rounded-lg shadow-lg border ${isHistoryMode ? 'bg-blue-600 text-white' : 'bg-white text-slate-700'}`}
+                className={`absolute top-4 right-4 z-[1000] p-3 rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 ${isHistoryMode ? 'bg-blue-600 text-white' : 'bg-white/90 text-slate-700 hover:bg-white'}`}
             >
                 {isHistoryMode ? <X size={20} /> : <Route size={20} />}
             </button>
 
-            {/* ── Playback Controls ── */}
             {isHistoryMode && (
-                <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] ${isSmall ? 'w-full px-2' : 'w-[90%] max-w-lg'}`}>
-                    <div className="bg-white/90 backdrop-blur-xl p-3 rounded-2xl shadow-2xl flex flex-col gap-2 border border-slate-200">
+                <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] ${isSmall ? 'w-full px-4' : 'w-[90%] max-w-md'}`}>
+                    <div className="bg-slate-900/80 backdrop-blur-2xl p-4 rounded-3xl shadow-2xl flex flex-col gap-3 border border-white/10">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <button onClick={() => setIsPlaying(!isPlaying)} className="p-2 bg-blue-600 text-white rounded-lg">
-                                    {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setIsPlaying(!isPlaying)} className="p-3 bg-blue-500 text-white rounded-2xl hover:bg-blue-400 shadow-lg shadow-blue-500/30">
+                                    {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
                                 </button>
                                 <div>
-                                    <p className="text-[10px] text-blue-600 font-bold">{historyPoints.length > 0 ? new Date(historyPoints[playbackIndex].timestamp).toLocaleTimeString() : 'No Logs'}</p>
-                                    <p className="text-[9px] text-slate-500 uppercase tracking-wider">{historyPoints[playbackIndex]?.speed || 0} km/h</p>
+                                    <p className="text-xs text-blue-300 font-black tracking-widest">{historyPoints[playbackIndex]?.timestamp ? new Date(historyPoints[playbackIndex].timestamp).toLocaleTimeString() : 'LIVE'}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{historyPoints[playbackIndex]?.speed || 0} KM / H</p>
                                 </div>
                             </div>
-                            <div className="text-[10px] font-black bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full">{playbackIndex + 1}/{historyPoints.length}</div>
+                            <div className="text-[11px] font-black bg-white/10 text-white px-4 py-1.5 rounded-full border border-white/5">{playbackIndex + 1} <span className="text-white/30 px-1">/</span> {historyPoints.length}</div>
                         </div>
-                        <input type="range" min="0" max={Math.max(0, historyPoints.length - 1)} value={playbackIndex} onChange={e => setPlaybackIndex(parseInt(e.target.value))} className="w-full accent-blue-600" />
+                        <input type="range" min="0" max={Math.max(0, historyPoints.length - 1)} value={playbackIndex} onChange={e => setPlaybackIndex(parseInt(e.target.value))} className="w-full accent-blue-500 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer" />
                     </div>
                 </div>
             )}
+
+            <style jsx global>{`
+                @keyframes pulse {
+                    0% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.5); opacity: 0.5; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+            `}</style>
         </div>
     )
 }
