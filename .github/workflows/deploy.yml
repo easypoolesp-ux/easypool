@@ -86,6 +86,8 @@ jobs:
             --region ${REGION} \
             --project ${PROJECT_ID} \
             --command "python,manage.py,migrate" \
+            --set-env-vars "DB_NAME=bustrak,DB_USER=admin,DB_PASSWORD=adminpassword,DB_HOST=/cloudsql/project-05588bf2-f685-4769-a37:asia-south1:easypool-postgres,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings" \
+            --set-cloudsql-instances "project-05588bf2-f685-4769-a37:asia-south1:easypool-postgres" \
             --quiet
           gcloud run jobs execute backend-migrate \
             --region ${REGION} \
