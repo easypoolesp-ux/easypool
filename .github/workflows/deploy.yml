@@ -164,9 +164,9 @@ jobs:
             --command "
             echo '${ACCESS_TOKEN}' | docker login -u oauth2accesstoken --password-stdin https://${REGION}-docker.pkg.dev
             docker pull ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
-            docker stop gps-mqtt || true
-            docker rm gps-mqtt || true
-            docker run -d --name gps-mqtt \
+            docker stop gps_gateway gps-mqtt || true
+            docker rm gps_gateway gps-mqtt || true
+            docker run -d --name gps_gateway \
               --restart always \
               -e MQTT_BROKER=localhost \
               -e MQTT_USER='${{ secrets.MQTT_USER }}' \
