@@ -76,9 +76,11 @@ services:
       context: ./services/gps-mqtt
     container_name: gps-mqtt
     restart: always
+    ports:
+      - "5027:5027"
     environment:
       - MQTT_BROKER=localhost
-      - BACKEND_API_URL=http://backend:8000/api/gps/telemetry
+      - BACKEND_API_URL=http://backend:8000/api/gps/telemetry/
       - GPS_SERVICE_API_KEY=easypool_gps_secret_2026
     depends_on:
       - backend

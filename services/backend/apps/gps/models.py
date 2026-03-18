@@ -12,6 +12,7 @@ class GPSPoint(models.Model):
     heading = models.FloatField(default=0)
     accuracy = models.FloatField(null=True, blank=True)
     timestamp = models.DateTimeField(db_index=True)
+    ignition = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-timestamp']

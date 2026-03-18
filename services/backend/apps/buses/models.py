@@ -22,9 +22,10 @@ class Route(models.Model):
 
 class Bus(models.Model):
     STATUS_CHOICES = (
-        ('online', 'Online'),
-        ('offline', 'Offline'),
-        ('idle', 'Idle'),
+        ('moving', 'Moving'),        # Green
+        ('idle', 'Idle'),           # Grey
+        ('ignition_off', 'Ignition Off'), # Red
+        ('offline', 'Offline'),        # Black
     )
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

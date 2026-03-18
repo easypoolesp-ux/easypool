@@ -76,10 +76,11 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             from apps.buses.models import Bus
             from django.utils import timezone
             
-            bus = Bus.objects.get(gps_imei=imei) # Lookup by IMEI
+            bus = Bus.objects.get(gps_imei=imei)
             lat = request.data.get('lat')
             lng = request.data.get('lng')
-            speed = request.data.get('speed', 0)
+            speed = float(request.data.get('speed', 0))
+            ignition = request.data.get('ignition', False)
             
             # Create the point
             GPSPoint.objects.create(
@@ -87,14 +88,19 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                 lat=lat,
                 lng=lng,
                 speed=speed,
+                ignition=ignition,
                 timestamp=timezone.now()
             )
             
-            # Optionally update bus status to online if we are getting GPS
-            if bus.status == 'offline':
-                bus.status = 'online'
-                bus.save()
+            # Update bus status based on telemetry
+            if not ignition:
+                bus.status = 'ignition_off' # Red
+            elif speed > 5: # Threshold for moving
+                bus.status = 'moving'       # Green
+            else:
+                bus.status = 'idle'         # Grey
                 
+            bus.save()
             return response.Response({'status': 'success'})
         except Bus.DoesNotExist:
             return response.Response({'error': 'Bus not found'}, status=404)

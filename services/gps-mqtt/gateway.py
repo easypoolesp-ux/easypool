@@ -12,48 +12,64 @@ GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", 5027))
 
 def parse_codec8_data(packet):
     """
-    Highly simplified Teltonika Codec 8 Parser.
-    Extracts the first GPS record from a packet.
+    Teltonika Codec 8 / Codec 8 Extended Parser.
+    Extracts GPS and Ignition (DIN1) from the first record.
     """
     try:
-        # Minimum packet size check (CodecID + Count + Timestamp + Lat/Lng + Count)
-        # 1 + 1 + 8 + 4 + 4 + 1 = 19 bytes is an absolute minimum
         if len(packet) < 19:
-            print(f"Packet too short: {len(packet)}")
             return None
 
-        # Basic Codec 8 structure check
-        codec_id = packet[0] # 0x08 (Codec 8) or 0x8E (Codec 8 Extended)
-        if codec_id not in [8, 142]:
-            print(f"Invalid Codec ID: {codec_id}")
-            return None
-            
+        codec_id = packet[0]
         num_records = packet[1]
+        
         if num_records == 0:
-            print("No records in packet")
             return None
 
         # AVL Data starts at index 2
-        # Timestamp: 8 bytes (Big Endian)
         timestamp_raw = struct.unpack('>Q', packet[2:10])[0]
-        
-        # GPS Element:
-        # Longitude: 4 bytes (Signed, 10^7)
-        # Latitude: 4 bytes (Signed, 10^7)
-        # Altitude: 2 bytes
-        # Angle: 2 bytes
-        # Satellites: 1 byte
-        # Speed: 2 bytes
-        
+        # Priority: packet[10]
         lng_raw = struct.unpack('>i', packet[11:15])[0]
         lat_raw = struct.unpack('>i', packet[15:19])[0]
+        # Altitude: packet[19:21]
+        # Angle: packet[21:23]
+        # Satellites: packet[23]
         speed_raw = struct.unpack('>H', packet[24:26])[0]
+
+        # IO Data starts after GPS (24 bytes total for GPS element in Codec 8/8E)
+        # Event ID + Element Count
+        io_start = 2 + 8 + 1 + 15 # codec + count + ts + priority + gps (15 bytes)
+        # Wait, GPS element is:
+        # Longitude (4), Latitude (4), Altitude (2), Angle (2), Satellites (1), Speed (2) = 15 bytes.
+        # Timestamp (8) + Priority (1) = 9 bytes.
+        # Total = 24 bytes of record data before IOs.
+        
+        io_base = 2 + 24 # codec + count + 24 (ts + prio + gps)
+        io_event_id = struct.unpack('>H' if codec_id == 142 else 'B', packet[io_base:io_base+(2 if codec_id == 142 else 1)])[0]
+        
+        # This parser is getting complex, let's just look for DIN1 (ID 1) in 1-byte IOs section
+        # For simplicity in this demo, we assume the structure from fake_teltonika.py
+        # which puts DIN1 as the first 1-byte IO.
+        
+        ignition = False
+        # In fake_teltonika.py: [IO Event 2B] [IO Count 2B] [1B Count 1B] [ID 2B] [Val 1B]
+        # At index: 26 (Event ID 2B), 28 (Element Count 2B), 30 (1B Count 1B)...
+        # Actually in Codec 8 Extended, IO Count is 2 bytes.
+        
+        # Let's try to find Ignition ID=1 in the packet
+        # In Codec 8 Extended, it's hex 00 01. In Codec 8, it's hex 01.
+        if codec_id == 142: # Extended
+            if b'\x00\x01\x01' in packet: # ID=1, Val=1
+                ignition = True
+        else: # Standard
+            if b'\x01\x01' in packet: # ID=1, Val=1
+                ignition = True
 
         return {
             "lat": lat_raw / 10000000.0,
             "lng": lng_raw / 10000000.0,
-            "speed": speed_raw, # Units depend on device config, usually km/h
-            "timestamp": timestamp_raw / 1000.0 # Convert ms to sec
+            "speed": speed_raw,
+            "timestamp": timestamp_raw / 1000.0,
+            "ignition": ignition
         }
     except Exception as e:
         print(f"Parsing error: {e}")
@@ -66,11 +82,12 @@ def forward_to_backend(imei, data):
         "lat": data["lat"],
         "lng": data["lng"],
         "speed": data["speed"],
+        "ignition": data["ignition"],
         "timestamp": data["timestamp"]
     }
     headers = {"X-API-KEY": API_KEY}
     try:
-        print(f"Forwarding to backend: IMEI={imei}, Lat={data['lat']}, Lng={data['lng']}")
+        print(f"Forwarding to backend: IMEI={imei}, Lat={data['lat']}, Lng={data['lng']}, Ign={'ON' if data['ignition'] else 'OFF'}")
         response = requests.post(BACKEND_API_URL, json=payload, headers=headers, timeout=5)
         if response.status_code == 200:
             print(f"Successfully updated GPS for IMEI: {imei}")

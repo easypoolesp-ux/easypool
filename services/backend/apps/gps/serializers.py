@@ -10,12 +10,12 @@ class GPSPointSerializer(serializers.ModelSerializer):
 class GPSLatestSerializer(serializers.ModelSerializer):
     class Meta:
         model = GPSPoint
-        fields = ('bus', 'lat', 'lng', 'speed', 'heading', 'timestamp')
+        fields = ('bus', 'lat', 'lng', 'speed', 'heading', 'timestamp', 'ignition')
 
 class GPSPlaybackSerializer(serializers.ModelSerializer):
     class Meta:
         model = GPSPoint
-        fields = ('lat', 'lng', 'speed', 'timestamp')
+        fields = ('lat', 'lng', 'speed', 'timestamp', 'ignition')
 
 class AlertSerializer(serializers.ModelSerializer):
     bus = BusListSerializer(read_only=True)
