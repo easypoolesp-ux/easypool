@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut } from 'lucide-react'
@@ -16,6 +16,8 @@ const FleetMap = nextDynamic(() => import('@/components/map/FleetMap'), { ssr: f
 
 type BusType = components['schemas']['BusList']
 
+import StatusPieChart from '@/components/dashboard/StatusPieChart'
+
 export default function DashboardPage() {
     const router = useRouter()
     const [mounted, setMounted] = useState(false)
@@ -25,6 +27,17 @@ export default function DashboardPage() {
     const [alerts, setAlerts] = useState<components['schemas']['Alert'][]>([])
     const [loading, setLoading] = useState(true)
     const [transporters, setTransporters] = useState<any[]>([])
+
+    // Calculate status distribution
+    const statusDistribution = useMemo(() => {
+        const dist = { moving: 0, idle: 0, ignition_off: 0, offline: 0 }
+        buses.forEach(b => {
+            const status = b.status || 'offline'
+            if (status in dist) dist[status as keyof typeof dist]++
+            else dist.offline++
+        })
+        return dist
+    }, [buses])
 
     useEffect(() => {
         setMounted(true)
@@ -101,60 +114,41 @@ export default function DashboardPage() {
                 <UserProfile />
             </header>
 
-            {/* Top Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="border-none shadow-sm bg-primary text-primary-foreground transition-all hover:scale-[1.02]">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase opacity-90">Total Buses</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold italic">{buses.length}</div>
-                    </CardContent>
+            {/* Top Layout: Stats + Pie Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4 lg:col-span-1">
+                    <Card className="border-none shadow-sm bg-primary text-primary-foreground transform transition hover:scale-[1.02] cursor-default">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-[10px] font-black uppercase opacity-60 tracking-widest">Total Fleet</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0">
+                            <div className="text-4xl font-black italic">{buses.length}</div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Unresolved Alerts</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0">
+                            <div className={`text-4xl font-black font-mono tracking-tighter ${alerts.filter(a => !a.is_resolved).length > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                {alerts.filter(a => !a.is_resolved).length}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <Card className="lg:col-span-1 border-none shadow-sm bg-white dark:bg-slate-900 p-4 border border-border flex flex-col justify-center">
+                    <StatusPieChart data={statusDistribution} />
                 </Card>
 
-                <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Company Groups</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold text-blue-500 font-mono tracking-tighter">
-                            {transporters.length}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Active Now</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold text-green-500 font-mono tracking-tighter">
-                            {buses.filter(b => b.status === 'online').length}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">System Alerts</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className={`text-3xl font-bold font-mono tracking-tighter ${alerts.length > 0 ? 'text-red-500' : 'text-slate-400'}`}>
-                            {alerts.length}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className={`grid grid-cols-1 ${isFullscreen ? 'lg:grid-cols-1' : 'lg:grid-cols-3'} gap-6 transition-all duration-500`}>
-                {/* Main Fleet Map with Fullscreen Toggle */}
-                <div className={`${isFullscreen ? 'lg:col-span-1 fixed inset-4 z-50 bg-background shadow-2xl' : 'lg:col-span-2 min-h-[500px] bg-muted relative shadow-inner'} rounded-xl overflow-hidden border border-border`}>
+                <div className="lg:col-span-2 min-h-[250px] bg-muted relative shadow-inner rounded-xl overflow-hidden border border-border">
                     <button
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="absolute top-4 right-14 z-10 p-2.5 bg-white/90 dark:bg-slate-800/90 rounded-lg shadow-premium hover:bg-white transition-colors border border-border group"
+                        className="absolute top-4 right-14 z-10 p-2 bg-white/90 dark:bg-slate-800/90 rounded-lg shadow-premium hover:bg-white transition-colors border border-border"
                         title={isFullscreen ? "Exit Fullscreen" : "See Map in Fullscreen"}
                     >
-                        {isFullscreen ? <Minimize2 className="w-5 h-5 group-hover:scale-110 transition-transform" /> : <Maximize2 className="w-5 h-5 group-hover:scale-110 transition-transform" />}
+                        {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                     </button>
                     <FleetMap
                         buses={filteredBuses.map(b => ({
@@ -166,11 +160,36 @@ export default function DashboardPage() {
                             plate: b.plate_number,
                             route: b.route_name
                         }))}
-                        isFullscreen={isFullscreen}
+                        isFullscreen={false}
                     />
                 </div>
+            </div>
 
-                {/* Bus Status List - Hide when map is fullscreen for focus */}
+            <div className={`grid grid-cols-1 ${isFullscreen ? 'lg:grid-cols-1' : 'lg:grid-cols-3'} gap-6 transition-all duration-500`}>
+                {isFullscreen && (
+                    <div className="fixed inset-4 z-[60] bg-background shadow-2xl rounded-2xl overflow-hidden border border-border">
+                        <button
+                            onClick={() => setIsFullscreen(false)}
+                            className="absolute top-6 right-6 z-10 p-4 bg-white/90 dark:bg-slate-800/90 rounded-2xl shadow-premium hover:bg-white transition-all scale-110"
+                        >
+                            <Minimize2 className="w-6 h-6" />
+                        </button>
+                        <FleetMap
+                            buses={filteredBuses.map(b => ({
+                                id: (b as any).id,
+                                internal_id: b.internal_id,
+                                status: b.status || 'offline',
+                                lat: b.lat,
+                                lng: b.lng,
+                                plate: b.plate_number,
+                                route: b.route_name
+                            }))}
+                            isFullscreen={true}
+                        />
+                    </div>
+                )}
+                
+                {/* Main List */}
                 {!isFullscreen && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500 flex flex-col h-[500px]">
                         <div className="flex items-center justify-between">
