@@ -52,6 +52,13 @@ jobs:
       - name: Configure Docker Auth
         run: gcloud auth configure-docker ${REGION}-docker.pkg.dev
       - uses: docker/setup-buildx-action@v3
+      - name: Fetch Secrets from Secret Manager
+        id: 'secrets'
+        uses: 'google-github-actions/get-secretmanager-secrets@v2'
+        with:
+          secrets: |-
+            GOOGLE_MAPS_API_KEY:${{ env.PROJECT_ID }}/GOOGLE_MAPS_API_KEY
+            GOOGLE_MAPS_MAP_ID:${{ env.PROJECT_ID }}/GOOGLE_MAPS_MAP_ID
       - name: Build and Push Dashboard
         uses: docker/build-push-action@v5
         with:
@@ -61,6 +68,9 @@ jobs:
           build-args: |
             BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
             NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
+            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ steps.secrets.outputs.GOOGLE_MAPS_API_KEY }}
+            NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=${{ steps.secrets.outputs.GOOGLE_MAPS_MAP_ID }}
+
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
