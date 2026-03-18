@@ -6,7 +6,7 @@ import {
     useJsApiLoader,
     Polyline,
 } from '@react-google-maps/api'
-import { History, Play, Pause, X, Route } from 'lucide-react'
+import { History, Play, Pause, X, Route, Calendar } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -50,15 +50,9 @@ const MAP_STYLES_NIGHT: google.maps.MapTypeStyle[] = [
     { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
     { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
     { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-    { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
     { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
     { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
-    { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
-    { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
-    { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
     { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-    { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
-    { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] },
 ]
 
 // ⚪ OFFICIAL GOOGLE "SILVER" STYLE (Light)
@@ -66,20 +60,8 @@ const MAP_STYLES_SILVER: google.maps.MapTypeStyle[] = [
    { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
    { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
    { elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
-   { elementType: "labels.text.stroke", stylers: [{ color: "#f5f5f5" }] },
-   { featureType: "administrative.land_parcel", elementType: "labels.text.fill", stylers: [{ color: "#bdbdbd" }] },
-   { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
-   { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#e5e5e5" }] },
-   { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
    { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
-   { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
-   { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#dadada" }] },
-   { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
-   { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
-   { featureType: "transit.line", elementType: "geometry", stylers: [{ color: "#e5e5e5" }] },
-   { featureType: "transit.station", elementType: "geometry", stylers: [{ color: "#eeeeee" }] },
    { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9c9c9" }] },
-   { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
 ]
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -94,11 +76,8 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         libraries: libraries,
     })
 
-    const { theme } = useTheme()
-    const mapRef = useRef<google.maps.Map | null>(null)
-    const markerRefs = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map())
-    const historyMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
-
+    const { theme, systemTheme } = useTheme()
+    const [mounted, setMounted] = useState(false)
     const [isHistoryMode, setIsHistoryMode] = useState(false)
     const [selectedBusId, setSelectedBusId] = useState<string | null>(initialBusId || null)
     const [playbackDate, setPlaybackDate] = useState(() => 
@@ -109,9 +88,30 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     const [isPlaying, setIsPlaying] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [isSmall, setIsSmall] = useState(false)
+    
+    const mapRef = useRef<google.maps.Map | null>(null)
+    const markerRefs = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map())
+    const historyMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
-    const currentStyles = theme === 'dark' ? MAP_STYLES_NIGHT : MAP_STYLES_SILVER
+    // Handle Hydration and Dynamic Theme
+    useEffect(() => setMounted(true), [])
+    
+    const currentTheme = useMemo(() => {
+        if (!mounted) return 'light'
+        return theme === 'system' ? systemTheme : theme
+    }, [mounted, theme, systemTheme])
+
+    const mapOptions = useMemo<google.maps.MapOptions>(() => ({
+        mapId: mapId,
+        styles: currentTheme === 'dark' ? MAP_STYLES_NIGHT : MAP_STYLES_SILVER,
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        backgroundColor: currentTheme === 'dark' ? '#242f3e' : '#f5f5f5'
+    }), [currentTheme, mapId])
 
     const updateMarkers = useCallback(() => {
         if (!mapRef.current || isHistoryMode) {
@@ -257,7 +257,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     }, [isPlaying, playbackIndex, historyPoints])
 
     if (loadError) return <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-xl text-red-400 p-8 text-center font-bold">⚠️ Maps API Error. Use Build Args to pass API Key.</div>
-    if (!isLoaded) return <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-xl"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
+    if (!isLoaded || !mounted) return <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-xl"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
 
     return (
         <div ref={containerRef} className="relative w-full h-full rounded-xl overflow-hidden border border-white/10 shadow-2xl">
@@ -265,15 +265,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 mapContainerStyle={{ width: '100%', height: '100%' }}
                 center={MAP_CENTER}
                 zoom={12}
-                options={{
-                    mapId: mapId,
-                    styles: currentStyles, // Using OFFICIAL Google "Night" or "Silver" themes
-                    disableDefaultUI: false,
-                    zoomControl: true,
-                    mapTypeControl: false,
-                    streetViewControl: false,
-                    fullscreenControl: false,
-                }}
+                options={mapOptions}
                 onLoad={map => { mapRef.current = map }}
                 onUnmount={() => { mapRef.current = null }}
             >
@@ -285,16 +277,50 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 )}
             </GoogleMap>
 
-            <button
-                onClick={() => toggleHistoryMode()}
-                className={`absolute top-4 right-4 z-[1000] p-3 rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 ${isHistoryMode ? 'bg-blue-600 text-white' : 'bg-white/90 text-slate-700 hover:bg-white'}`}
-            >
-                {isHistoryMode ? <X size={20} /> : <Route size={20} />}
-            </button>
+            {/* Top Controls Overlay */}
+            <div className="absolute top-4 left-4 right-4 flex justify-between pointer-events-none">
+                {isHistoryMode && (
+                    <div className="pointer-events-auto flex items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-white/10">
+                         <div className="px-3 py-1.5 flex items-center gap-2 border-r border-slate-200 dark:border-slate-800">
+                            <Calendar size={14} className="text-blue-500" />
+                            <input 
+                                type="date" 
+                                value={playbackDate}
+                                onChange={e => {
+                                    setPlaybackDate(e.target.value)
+                                    if(selectedBusId) loadHistory(selectedBusId, e.target.value)
+                                }}
+                                className="bg-transparent text-xs font-bold border-none focus:ring-0 p-0 text-slate-800 dark:text-white cursor-pointer"
+                            />
+                        </div>
+                        <select 
+                            value={selectedBusId || ''} 
+                            onChange={e => {
+                                setSelectedBusId(e.target.value)
+                                loadHistory(e.target.value, playbackDate)
+                            }}
+                            className="bg-transparent text-xs font-bold border-none focus:ring-0 py-1.5 pl-2 pr-8 text-slate-800 dark:text-white cursor-pointer"
+                        >
+                            {buses.map(b => (
+                                <option key={b.id} value={b.id}>{b.internal_id}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                
+                <div className="ml-auto pointer-events-auto">
+                    <button
+                        onClick={() => toggleHistoryMode()}
+                        className={`p-3 rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 ${isHistoryMode ? 'bg-blue-600 text-white' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white'}`}
+                    >
+                        {isHistoryMode ? <X size={20} /> : <Route size={20} />}
+                    </button>
+                </div>
+            </div>
 
             {isHistoryMode && (
                 <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] ${isSmall ? 'w-full px-4' : 'w-[90%] max-w-md'}`}>
-                    <div className="bg-slate-900/80 backdrop-blur-2xl p-4 rounded-3xl shadow-2xl flex flex-col gap-3 border border-white/10">
+                    <div className="bg-slate-900/80 dark:bg-slate-900/95 backdrop-blur-2xl p-4 rounded-3xl shadow-2xl flex flex-col gap-3 border border-white/10">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <button onClick={() => setIsPlaying(!isPlaying)} className="p-3 bg-blue-500 text-white rounded-2xl hover:bg-blue-400 shadow-lg shadow-blue-500/30">
@@ -302,7 +328,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                                 </button>
                                 <div>
                                     <p className="text-xs text-blue-300 font-black tracking-widest">{historyPoints[playbackIndex]?.timestamp ? new Date(historyPoints[playbackIndex].timestamp).toLocaleTimeString() : 'LIVE'}</p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{historyPoints[playbackIndex]?.speed || 0} KM / H</p>
+                                    <p className="text-[10px] text-slate-200 font-bold uppercase tracking-tighter">{historyPoints[playbackIndex]?.speed || 0} KM / H</p>
                                 </div>
                             </div>
                             <div className="text-[11px] font-black bg-white/10 text-white px-4 py-1.5 rounded-full border border-white/5">{playbackIndex + 1} <span className="text-white/30 px-1">/</span> {historyPoints.length}</div>
