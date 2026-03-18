@@ -91,6 +91,16 @@ jobs:
             --cpu-boost \
             --quiet
 
+      - name: Run Migrations
+        run: |
+          gcloud run deploy easypool-backend-migrate \
+            --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
+            --region ${REGION} \
+            --project ${PROJECT_ID} \
+            --command "python,manage.py,migrate" \
+            --quiet \
+            --no-traffic
+
       - name: Deploy Dashboard
         run: |
           gcloud run deploy easypool-dashboard-schools \
@@ -121,7 +131,7 @@ jobs:
               -e MQTT_BROKER=localhost \
               -e MQTT_USER='${{ secrets.MQTT_USER }}' \
               -e MQTT_PASSWORD='${{ secrets.MQTT_PASSWORD }}' \
-              -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
+              -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry/ \
               -e GPS_SERVICE_API_KEY='${{ secrets.GPS_SERVICE_API_KEY }}' \
               --network host \
               ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
