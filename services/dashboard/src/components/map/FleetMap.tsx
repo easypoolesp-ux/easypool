@@ -9,6 +9,7 @@ import {
     InfoWindow,
 } from '@react-google-maps/api'
 import { History, Play, Pause, X, Route } from 'lucide-react'
+import { useTheme } from 'next-themes'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface Bus {
@@ -40,8 +41,40 @@ const BACKEND_URL =
 
 const MAP_CENTER = { lat: 22.5726, lng: 88.3639 } // Kolkata
 
+// Premium light-style Google Maps styling (standard but cleaner)
+const MAP_STYLES_LIGHT: google.maps.MapTypeStyle[] = [
+    {
+        featureType: 'administrative.land_parcel',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+    },
+    {
+        featureType: 'poi',
+        elementType: 'labels.text',
+        stylers: [{ visibility: 'off' }],
+    },
+    {
+        featureType: 'poi.business',
+        stylers: [{ visibility: 'off' }],
+    },
+    {
+        featureType: 'road',
+        elementType: 'labels.icon',
+        stylers: [{ visibility: 'off' }],
+    },
+    {
+        featureType: 'road.local',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+    },
+    {
+        featureType: 'transit',
+        stylers: [{ visibility: 'off' }],
+    },
+]
+
 // Premium dark-style Google Maps styling
-const MAP_STYLES: google.maps.MapTypeStyle[] = [
+const MAP_STYLES_DARK: google.maps.MapTypeStyle[] = [
     { elementType: 'geometry', stylers: [{ color: '#1a1f2e' }] },
     { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1f2e' }] },
     { elementType: 'labels.text.fill', stylers: [{ color: '#8a9bb5' }] },
@@ -144,6 +177,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         id: 'google-map-script',
     })
 
+    const { theme } = useTheme()
     const mapRef = useRef<google.maps.Map | null>(null)
 
     // History Mode State
@@ -159,6 +193,8 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     const [activePopupBusId, setActivePopupBusId] = useState<string | null>(null)
     const [isSmall, setIsSmall] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
+
+    const currentMapStyles = theme === 'dark' ? MAP_STYLES_DARK : MAP_STYLES_LIGHT
 
     // Detect small container for adaptive UI
     useEffect(() => {
@@ -297,7 +333,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 center={MAP_CENTER}
                 zoom={12}
                 options={{
-                    styles: MAP_STYLES,
+                    styles: currentMapStyles,
                     disableDefaultUI: false,
                     zoomControl: true,
                     mapTypeControl: false,
