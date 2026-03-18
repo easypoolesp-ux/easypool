@@ -63,35 +63,23 @@ jobs:
             NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
             NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
             NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=${{ secrets.GOOGLE_MAPS_MAP_ID }}
-
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    needs: [build-backend, build-dashboard]
+  run-migrations:
+    needs: build-backend
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
       id-token: 'write'
     steps:
-      - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
           service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
-      
-      - name: Deploy Backend
-        run: |
-          gcloud run deploy easypool-backend \
-            --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
-            --region ${REGION} \
-            --project ${PROJECT_ID} \
-            --cpu-boost \
-            --quiet
-
-      - name: Run Migrations
+      - name: Execute Migration Job
         run: |
           gcloud run jobs deploy backend-migrate \
             --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
@@ -104,7 +92,42 @@ jobs:
             --project ${PROJECT_ID} \
             --wait
 
-      - name: Deploy Dashboard
+  deploy-backend:
+    needs: run-migrations
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
+          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy Backend to Cloud Run
+        run: |
+          gcloud run deploy easypool-backend \
+            --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
+            --region ${REGION} \
+            --project ${PROJECT_ID} \
+            --cpu-boost \
+            --quiet
+
+  deploy-dashboard:
+    needs: build-dashboard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
+          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy Dashboard to Cloud Run
         run: |
           gcloud run deploy easypool-dashboard-schools \
             --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/dashboard:latest \
@@ -115,8 +138,20 @@ jobs:
             --cpu-boost \
             --quiet
 
-      - name: Deploy GPS-MQTT to VM
-        if: contains(github.event.head_commit.modified, 'services/gps-mqtt/') || contains(github.event.head_commit.added, 'services/gps-mqtt/') || contains(github.event.head_commit.modified, '.github/workflows/')
+  deploy-vm-gateway:
+    needs: build-backend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
+          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Update VM Gateway
         run: |
           ACCESS_TOKEN=$(gcloud auth print-access-token)
           gcloud compute ssh camera-relay-server \
@@ -138,6 +173,5 @@ jobs:
               -e GPS_SERVICE_API_KEY='${{ secrets.GPS_SERVICE_API_KEY }}' \
               --network host \
               ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
-            docker image prune -a -f --filter \"until=24h\"
             docker logout https://${REGION}-docker.pkg.dev
           "
