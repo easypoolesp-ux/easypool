@@ -98,8 +98,7 @@ jobs:
             --region ${REGION} \
             --project ${PROJECT_ID} \
             --command "python,manage.py,migrate" \
-            --quiet \
-            --no-traffic
+            --quiet
 
       - name: Deploy Dashboard
         run: |
