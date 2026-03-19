@@ -1,269 +1,251 @@
-"use client"
+'use client'
 
-import { useEffect, useState, useMemo } from 'react'
-import { Card, CardContent } from "@/components/ui/card"
-import { 
-    Bus, 
-    Map as MapIcon, 
-    ShieldAlert, 
-    RefreshCcw, 
-    Maximize2, 
-    Minimize2, 
-    Activity,
-    Clock,
-    PowerOff,
-    Search,
-    PieChart as PieChartIcon
-} from "lucide-react"
-import dynamic from 'next/dynamic'
+export const dynamic = "force-dynamic";
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut } from 'lucide-react'
 import Link from 'next/link'
-import StatusPieChart from '@/components/dashboard/StatusPieChart'
+import nextDynamic from 'next/dynamic'
+import { components } from '@/types/api'
 
-const FleetMap = dynamic(() => import('@/components/map/FleetMap'), { 
-    ssr: false,
-    loading: () => <div className="w-full h-full bg-slate-100 dark:bg-slate-900 animate-pulse flex items-center justify-center font-bold text-xs uppercase tracking-widest opacity-50">Map Engine Initializing...</div>
-})
+import UserProfile from '@/components/layout/UserProfile'
 
-interface BusData {
-    id: string;
-    internal_id: string;
-    plate_number: string;
-    status: 'moving' | 'idle' | 'ignition_off' | 'offline';
-    lat: number;
-    lng: number;
-    driver_name?: string;
-    route_name?: string;
-    last_heartbeat?: string;
-}
+const FleetMap = nextDynamic(() => import('@/components/map/FleetMap'), { ssr: false })
+
+type BusType = components['schemas']['BusList']
 
 export default function DashboardPage() {
-    const [buses, setBuses] = useState<BusData[]>([])
-    const [loading, setLoading] = useState(true)
-    const [searchQuery, setSearchQuery] = useState('')
+    const router = useRouter()
+    const [mounted, setMounted] = useState(false)
     const [isFullscreen, setIsFullscreen] = useState(false)
-    const [selectedBusId, setSelectedBusId] = useState<string | null>(null)
+    const [searchQuery, setSearchQuery] = useState('')
+    const [buses, setBuses] = useState<BusType[]>([])
+    const [alerts, setAlerts] = useState<components['schemas']['Alert'][]>([])
+    const [loading, setLoading] = useState(true)
+    const [transporters, setTransporters] = useState<any[]>([])
 
-    const fetchBuses = async () => {
+    useEffect(() => {
+        setMounted(true)
+        fetchData()
+        const interval = setInterval(fetchData, 10000) // Poll every 10s
+        return () => clearInterval(interval)
+    }, [])
+
+    const fetchData = async () => {
         try {
-            const ts = new Date().getTime()
-            const response = await fetch(`/api/buses?_t=${ts}`)
-            const data = await response.json()
-            setBuses(data.results || [])
-        } catch (error) {
-            console.error('Error fetching buses:', error)
+            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+            const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+            const ts = Date.now()
+            const [busRes, alertRes, transRes] = await Promise.all([
+                fetch(`/api/buses?_t=${ts}`, { headers }),
+                fetch(`/api/alerts?_t=${ts}`, { headers }),
+                fetch(`/api/transporters?_t=${ts}`, { headers })
+            ])
+
+            if (busRes.ok) {
+                const data = await busRes.json()
+                setBuses(data.results || data)
+            }
+            if (alertRes.ok) {
+                const data = await alertRes.json()
+                setAlerts(data.results || data)
+            }
+            if (transRes.ok) {
+                const data = await transRes.json()
+                setTransporters(data.results || data)
+            }
+        } catch (err) {
+            console.error("Failed to fetch dashboard data:", err)
         } finally {
             setLoading(false)
         }
     }
 
-    useEffect(() => {
-        fetchBuses()
-        const interval = setInterval(fetchBuses, 10000)
-        return () => clearInterval(interval)
-    }, [])
+    if (!mounted || loading) return <div className="p-6 text-center">Loading Dashboard...</div>
 
-    const handleRefresh = (manual = false) => {
-        if (manual) setLoading(true)
-        fetchBuses()
+    const getStatusInfo = (lastHeartbeat: string | null) => {
+        if (!lastHeartbeat) return { label: 'NO DATA', color: 'text-slate-300', dot: 'bg-slate-200' }
+        const last = new Date(lastHeartbeat).getTime()
+        const now = new Date().getTime()
+        const diffMinutes = (now - last) / (1000 * 60)
+
+        if (diffMinutes < 2) return { label: 'LIVE', color: 'text-green-600', dot: 'bg-green-500 animate-pulse' }
+        
+        if (diffMinutes < 60) {
+            return { label: `${Math.round(diffMinutes)}m AGO`, color: 'text-amber-500', dot: 'bg-amber-400' }
+        }
+        
+        const diffHours = Math.round(diffMinutes / 60)
+        if (diffHours < 24) {
+            return { label: `${diffHours}h AGO`, color: 'text-orange-500', dot: 'bg-orange-400' }
+        }
+
+        return { label: `${Math.round(diffHours / 24)}d AGO`, color: 'text-slate-400', dot: 'bg-slate-300' }
     }
 
-    const filteredBuses = useMemo(() => {
-        return buses.filter(bus => 
-            bus.internal_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            bus.plate_number.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-    }, [buses, searchQuery])
-
-    const statusStats = useMemo(() => {
-        return {
-            moving: buses.filter(b => b.status === 'moving').length,
-            idle: buses.filter(b => b.status === 'idle').length,
-            ignition_off: buses.filter(b => b.status === 'ignition_off').length,
-            offline: buses.filter(b => b.status === 'offline').length
-        }
-    }, [buses])
-
-    const onlineCount = statusStats.moving + statusStats.idle
-
-    // Premium common scrollbar class
-    const scrollbarStyles = "scrollbar-thin scrollbar-thumb-indigo-500/20 scrollbar-track-transparent hover:scrollbar-thumb-indigo-500/40"
+    const filteredBuses = buses.filter(bus =>
+        bus.internal_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        bus.plate_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (bus.route_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
 
     return (
-        <div className="max-w-[1700px] mx-auto space-y-8 p-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            {/* 1. Dashboard Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-border/40 pb-6 gap-4">
+        <div className="p-6 max-w-7xl mx-auto space-y-6 bg-slate-50/50 dark:bg-transparent min-h-screen">
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="text-4xl font-extrabold tracking-tighter bg-gradient-to-br from-slate-950 via-indigo-600 to-indigo-400 dark:from-white dark:via-indigo-400 dark:to-indigo-300 bg-clip-text text-transparent">
-                        Fleet Operations
-                    </h1>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-60">
-                        Real-time Asset Intelligence & Diagnostics
-                    </p>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Fleet Overview</h1>
+                    <p className="text-muted-foreground">Monitor real-time status of all active school buses in Kolkata.</p>
                 </div>
-                <div className="flex items-center gap-6">
-                    <div className="text-right">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 leading-none">Last Sync</p>
-                        <p className="text-xs font-mono font-bold text-indigo-500">{new Date().toLocaleTimeString()}</p>
-                    </div>
-                </div>
+                <UserProfile />
+            </header>
+
+            {/* Top Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="border-none shadow-sm bg-primary text-primary-foreground transition-all hover:scale-[1.02]">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-semibold uppercase opacity-90">Total Buses</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold italic">{buses.length}</div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Company Groups</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-blue-500 font-mono tracking-tighter">
+                            {transporters.length}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Active Now</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-green-500 font-mono tracking-tighter">
+                            {buses.filter(b => b.status === 'online').length}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">System Alerts</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className={`text-3xl font-bold font-mono tracking-tighter ${alerts.length > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                            {alerts.length}
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
-            {/* 2. Top Stats Overview (4 Columns) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {[
-                    { label: 'Moving Fleet', val: statusStats.moving, icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-                    { label: 'Idle State', val: statusStats.idle, icon: Clock, color: 'text-slate-500', bg: 'bg-slate-500/10' },
-                    { label: 'Ignition Off', val: statusStats.ignition_off, icon: PowerOff, color: 'text-rose-500', bg: 'bg-rose-500/10' },
-                    { label: 'Total Assets', val: buses.length, icon: Bus, color: 'text-indigo-500', bg: 'bg-indigo-500/10' }
-                ].map((s, idx) => (
-                    <Card key={idx} className="border-none shadow-premium bg-card/10 backdrop-blur-md overflow-hidden relative group">
-                        <div className={`absolute top-0 left-0 w-1 h-full ${s.color.replace('text', 'bg')}`} />
-                        <CardContent className="p-6 flex items-center justify-between">
-                            <div>
-                                <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground mb-1">{s.label}</p>
-                                <h3 className="text-3xl font-black tracking-tight">{s.val}</h3>
-                            </div>
-                            <div className={`p-4 rounded-2xl ${s.bg} transition-all group-hover:scale-110 duration-500`}>
-                                <s.icon className={`w-6 h-6 ${s.color}`} />
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-
-            {/* 3. Main Dashboard Layout (Map/Sidebar) */}
-            <div className={`grid grid-cols-1 ${isFullscreen ? 'lg:grid-cols-1' : 'lg:grid-cols-3'} gap-8 transition-all duration-700`}>
-                
-                {/* Map Area (2/3 width on Left) */}
-                <div className={`${isFullscreen ? 'fixed inset-0 z-[100] bg-background' : 'lg:col-span-2 min-h-[650px] shadow-3xl rounded-[2.5rem] overflow-hidden border border-border/20'}`}>
-                    <div className="relative w-full h-full group/map">
-                        {/* Map Overlay Controls */}
-                        <div className="absolute top-6 right-6 z-[10] flex flex-col gap-3">
-                             <button 
-                                onClick={() => handleRefresh(true)}
-                                disabled={loading}
-                                className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white/95 dark:bg-slate-900/95 shadow-premium border border-border/40 hover:bg-white text-foreground transition-all active:scale-95 disabled:opacity-50"
-                             >
-                                <RefreshCcw className={`w-5 h-5 ${loading ? 'animate-spin text-indigo-500' : ''}`} />
-                             </button>
-                             <button 
-                                onClick={() => setIsFullscreen(!isFullscreen)}
-                                className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white/95 dark:bg-slate-900/95 shadow-premium border border-border/40 hover:bg-white text-foreground transition-all active:scale-95"
-                             >
-                                {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-                             </button>
-                        </div>
-
-                        {/* Map Status indicator */}
-                        <div className="absolute top-6 left-6 z-[10] flex items-center bg-white/95 dark:bg-slate-900/95 px-5 py-3 rounded-2xl shadow-premium border border-border/40 gap-3">
-                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
-                            <span className="text-[11px] font-black uppercase tracking-widest text-foreground">Global Monitor</span>
-                        </div>
-
-                        <FleetMap 
-                            buses={buses.map(b => ({
-                                id: b.id,
-                                internal_id: b.internal_id,
-                                status: b.status,
-                                lat: b.lat,
-                                lng: b.lng,
-                                plate: b.plate_number
-                            }))} 
-                            initialBusId={selectedBusId}
-                            isFullscreen={isFullscreen}
-                        />
-                    </div>
+            <div className={`grid grid-cols-1 ${isFullscreen ? 'lg:grid-cols-1' : 'lg:grid-cols-3'} gap-6 transition-all duration-500`}>
+                {/* Main Fleet Map with Fullscreen Toggle */}
+                <div className={`${isFullscreen ? 'lg:col-span-1 fixed inset-4 z-50 bg-background shadow-2xl' : 'lg:col-span-2 min-h-[500px] bg-muted relative shadow-inner'} rounded-xl overflow-hidden border border-border`}>
+                    <button
+                        onClick={() => setIsFullscreen(!isFullscreen)}
+                        className="absolute top-4 right-14 z-10 p-2.5 bg-white/90 dark:bg-slate-800/90 rounded-lg shadow-premium hover:bg-white transition-colors border border-border group"
+                        title={isFullscreen ? "Exit Fullscreen" : "See Map in Fullscreen"}
+                    >
+                        {isFullscreen ? <Minimize2 className="w-5 h-5 group-hover:scale-110 transition-transform" /> : <Maximize2 className="w-5 h-5 group-hover:scale-110 transition-transform" />}
+                    </button>
+                    <FleetMap
+                        buses={filteredBuses.map(b => ({
+                            id: (b as any).id,
+                            internal_id: b.internal_id,
+                            status: b.status || 'offline',
+                            lat: b.lat,
+                            lng: b.lng,
+                            plate: b.plate_number,
+                            route: b.route_name
+                        }))}
+                        isFullscreen={isFullscreen}
+                    />
                 </div>
 
-                {/* Sidebar Area (1/3 width on Right) */}
+                {/* Bus Status List - Hide when map is fullscreen for focus */}
                 {!isFullscreen && (
-                    <div className="lg:col-span-1 space-y-8 flex flex-col min-h-[650px]">
-                        {/* Distribution Chart */}
-                        <Card className="border-none shadow-premium bg-card/20 backdrop-blur-lg rounded-[2.5rem] p-8">
-                            <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-8 flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500">
-                                    <PieChartIcon className="w-3.5 h-3.5" />
-                                </div>
-                                Fleet Connectivity
-                            </h4>
-                            <div className="h-44">
-                                <StatusPieChart data={statusStats} />
-                            </div>
-                        </Card>
-
-                        {/* Searchable Asset List */}
-                        <div className="flex-1 flex flex-col bg-card/30 backdrop-blur-2xl rounded-[2.5rem] border border-border/40 overflow-hidden shadow-premium">
-                             <div className="p-6 border-b border-border/20 space-y-4 bg-gradient-to-br from-white/5 to-transparent">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Live Registry</h4>
-                                    <div className="flex items-center gap-2 px-3 py-1 bg-indigo-500/10 text-indigo-500 rounded-full text-[9px] font-black tracking-widest border border-indigo-500/20">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
-                                        SYNCED
-                                    </div>
-                                </div>
-                                <div className="relative">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground opacity-50" />
-                                    <input
-                                        type="text"
-                                        placeholder="Identification Search..."
-                                        className="w-full bg-background/50 border border-border/40 rounded-2xl pl-11 pr-4 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all font-bold placeholder:text-[10px] placeholder:font-black placeholder:uppercase placeholder:tracking-widest placeholder:opacity-40"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Bus Items List */}
-                            <div className={`flex-1 overflow-y-auto px-4 py-6 space-y-3 ${scrollbarStyles} max-h-[420px]`}>
-                                {filteredBuses.map((bus) => (
-                                    <div 
-                                        key={bus.id}
-                                        onClick={() => setSelectedBusId(bus.id)}
-                                        className={`p-5 rounded-[1.5rem] border transition-all duration-500 flex items-center justify-between cursor-pointer group/item ${
-                                            selectedBusId === bus.id 
-                                                ? 'bg-indigo-500/15 border-indigo-500/30 shadow-indigo-500/10 shadow-lg' 
-                                                : 'bg-card/40 border-border/10 hover:border-border/40 hover:bg-card/70'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className={`p-3 rounded-2xl ${
-                                                bus.status === 'moving' ? 'bg-emerald-500/15 text-emerald-500' :
-                                                bus.status === 'idle' ? 'bg-slate-500/15 text-slate-500' :
-                                                bus.status === 'ignition_off' ? 'bg-rose-500/15 text-rose-500' :
-                                                'bg-zinc-100 text-slate-400'
-                                            } transition-transform group-hover/item:scale-110`}>
-                                                <Bus className="w-5 h-5" />
-                                            </div>
-                                            <div className="space-y-0.5">
-                                                <h5 className="font-bold text-sm tracking-tight">{bus.internal_id}</h5>
-                                                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest flex items-center gap-1.5 opacity-50">
-                                                    {bus.plate_number}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col items-end gap-1.5">
-                                            <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_12px] ${
-                                                bus.status === 'moving' ? 'bg-emerald-500 shadow-emerald-500/60 animate-pulse' :
-                                                bus.status === 'idle' ? 'bg-slate-400 shadow-slate-400/60' :
-                                                bus.status === 'ignition_off' ? 'bg-rose-500 shadow-rose-500/60' :
-                                                'bg-zinc-800'
-                                            }`} />
-                                            <span className="text-[8px] font-black uppercase tracking-[0.15em] opacity-40">
-                                                {bus.status.replace('_', ' ')}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                                {filteredBuses.length === 0 && (
-                                    <div className="py-24 text-center">
-                                        <div className="inline-block p-4 rounded-full bg-slate-100 dark:bg-slate-900 mb-4">
-                                            <Search className="w-6 h-6 opacity-20" />
-                                        </div>
-                                        <p className="text-xs font-black uppercase tracking-widest opacity-20">No Assets Matched</p>
-                                    </div>
-                                )}
-                            </div>
+                    <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500 flex flex-col h-[500px]">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-bold flex items-center gap-2">
+                                <Bus className="w-5 h-5 text-primary" />
+                                Fleet Status
+                            </h2>
                         </div>
+
+                        {/* Search Bar */}
+                        <div className="relative group">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                            <input
+                                type="text"
+                                placeholder="Search Plate, ID, or Route..."
+                                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                            {filteredBuses.length > 0 ? (
+                                filteredBuses.map((bus) => (
+                                    <Link href={`/dashboard/bus/${bus.id}`} key={bus.id} className="block group">
+                                        <Card className="hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer border-none shadow-sm bg-white dark:bg-slate-900">
+                                            <CardContent className="p-4 flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`p-2.5 rounded-xl ${bus.status === 'online' ? 'bg-green-500/10 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                        <Bus className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-sm font-bold truncate flex items-center gap-1.5 tracking-tight">
+                                                            {bus.internal_id}
+                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono font-normal">
+                                                                {bus.plate_number}
+                                                            </span>
+                                                        </h3>
+                                                        <p className="text-[11px] text-muted-foreground truncate italic">{bus.route_name || 'No Route assigned'}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-[10px]">
+                                                    {(() => {
+                                                        const status = getStatusInfo((bus as any).last_heartbeat)
+                                                        return (
+                                                            <span className={`${status.color} flex items-center gap-1.5 font-bold uppercase tracking-wider`}>
+                                                                <div className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                                                                {status.label}
+                                                            </span>
+                                                        )
+                                                    })()}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </Link>
+                                ))
+                            ) : (
+                                <div className="text-center py-10 text-muted-foreground text-xs italic">
+                                    No buses matching "{searchQuery}"
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Emergency Alert Card - Dynamic from API */}
+                        {alerts.filter(a => !a.is_resolved).slice(0, 1).map(alert => (
+                            <Card key={alert.id} className="bg-red-50/50 dark:bg-red-900/10 border-red-100 dark:border-red-900/10 border-none shadow-sm outline outline-1 outline-red-200 dark:outline-red-900/20 mt-auto animate-pulse">
+                                <CardContent className="p-4 flex gap-3 text-red-700 dark:text-red-400">
+                                    <AlertTriangle className="w-5 h-5 shrink-0" />
+                                    <div className="text-[10px]">
+                                        <p className="font-bold uppercase tracking-tighter text-red-600">Urgent: {alert.type} - {alert.bus.internal_id}</p>
+                                        <p className="opacity-80 font-medium leading-tight">{alert.message}</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
                     </div>
                 )}
             </div>

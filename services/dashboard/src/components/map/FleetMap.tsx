@@ -134,19 +134,10 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
             const position = { lat: bus.lat, lng: bus.lng };
 
             if (!marker) {
-                const colors = {
-                    moving: '#22c55e',       // Green
-                    idle: '#94a3b8',         // Grey
-                    ignition_off: '#ef4444', // Red
-                    offline: '#0f172a'        // Black
-                }
-                const color = colors[bus.status as keyof typeof colors] || '#94a3b8'
-                const isPulse = bus.status === 'moving'
-
                 const pinElement = document.createElement('div');
                 pinElement.innerHTML = `
-                    <div style="background: ${color}; color: white; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 800; border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.4); transform: translate(-50%, -50%); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap;">
-                        <span style="display: inline-block; width: 6px; height: 6px; background: white; border-radius: 50%; margin-right: 6px; vertical-align: middle; ${isPulse ? 'animation: pulse 1.5s infinite;' : ''}"></span>
+                    <div style="background: ${bus.status === 'active' ? '#3b82f6' : '#94a3b8'}; color: white; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 800; border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.4); transform: translate(-50%, -50%); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap;">
+                        <span style="display: inline-block; width: 6px; height: 6px; background: white; border-radius: 50%; margin-right: 6px; vertical-align: middle; ${bus.status === 'active' ? 'animation: pulse 1.5s infinite;' : ''}"></span>
                         ${bus.internal_id}
                     </div>
                 `;
@@ -271,7 +262,6 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     return (
         <div ref={containerRef} className="relative w-full h-full rounded-xl overflow-hidden border border-white/10 shadow-2xl">
             <GoogleMap
-                key={mounted ? currentTheme : 'initial'} // FORCES re-mount on theme change
                 mapContainerStyle={{ width: '100%', height: '100%' }}
                 center={MAP_CENTER}
                 zoom={12}

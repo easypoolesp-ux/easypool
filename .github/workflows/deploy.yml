@@ -179,27 +179,38 @@ jobs:
       - name: Update VM Gateway
         run: |
           IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-gateway:latest"
-          ACCESS_TOKEN=$(gcloud auth print-access-token)
+          GPS_API_KEY="${{ secrets.GPS_SERVICE_API_KEY }}"
 
-          # Write a self-contained deploy script and pipe it over SSH so that
-          # shell variable quoting inside --command strings can't corrupt the token.
+          # The VM authenticates Docker using its own attached GCP Service Account
+          # via the gcloud credential helper — the correct GCP-native IAM pattern.
+          # No ephemeral tokens are passed over SSH.
           gcloud compute ssh camera-relay-server \
             --zone asia-south1-a \
             --project ${PROJECT_ID} \
             --tunnel-through-iap \
             --quiet \
             -- bash -s <<EOF
-          set -e
-          echo "${ACCESS_TOKEN}" | docker login -u oauth2accesstoken --password-stdin https://${REGION}-docker.pkg.dev
-          docker pull ${IMAGE}
+          set -euo pipefail
+
+          REGION="${REGION}"
+          IMAGE="${IMAGE}"
+          GPS_API_KEY="${GPS_API_KEY}"
+
+          # Refresh docker credentials using the VM's attached service account
+          gcloud auth configure-docker \${REGION}-docker.pkg.dev --quiet
+
+          docker pull \${IMAGE}
+
           docker stop gps_gateway 2>/dev/null || true
           docker rm   gps_gateway 2>/dev/null || true
+
           docker run -d --name gps_gateway \
             --restart always \
             -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
-            -e GPS_SERVICE_API_KEY=${{ secrets.GPS_SERVICE_API_KEY }} \
+            -e GPS_SERVICE_API_KEY=\${GPS_API_KEY} \
             -e GATEWAY_PORT=5027 \
             --network host \
-            ${IMAGE}
-          echo "Container started: \$(docker ps --filter name=gps_gateway --format '{{.Status}}')"
+            \${IMAGE}
+
+          echo "Deployment complete. gps_gateway status: \$(docker ps --filter name=gps_gateway --format '{{.Status}}')"
           EOF
