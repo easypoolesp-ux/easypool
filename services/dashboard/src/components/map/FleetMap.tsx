@@ -68,6 +68,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
 
     // ── UI state ───────────────────────────────────────────────────────────────
     const [isHistoryMode, setIsHistoryMode] = useState(false)
+    const [isMapReady, setIsMapReady] = useState(false) // triggers theme effect after map loads
     const [selectedBusId, setSelectedBusId] = useState<string | null>(initialBusId || null)
     const [playbackDate, setPlaybackDate] = useState(() =>
         new Intl.DateTimeFormat('en-CA', {
@@ -105,12 +106,14 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         fullscreenControl: false,
     }), [mapId]) // mapId is env var — stable for the lifetime of the app
 
-    // ── Apply colorScheme imperatively (no map re-mount) ──────────────────────
+    // ── Apply colorScheme imperatively when theme or map readiness changes ──────
+    // Using isMapReady state (not a ref) ensures the effect re-runs reliably
+    // once the map instance exists AND the correct theme is known post-hydration.
     useEffect(() => {
-        if (!mapRef.current || !mounted) return
-        // @ts-ignore — colorScheme is supported but not yet in @types/google.maps
+        if (!mapRef.current || !isMapReady) return
+        // @ts-ignore — colorScheme is a valid option, not yet in @types/google.maps
         mapRef.current.setOptions({ colorScheme: currentTheme === 'dark' ? 'DARK' : 'LIGHT' })
-    }, [currentTheme, mounted])
+    }, [currentTheme, isMapReady])
 
     // ── Marker management ──────────────────────────────────────────────────────
     // Imperative: runs against the map directly. Never touches React state.
@@ -145,38 +148,56 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 // Smooth position update — no DOM rebuild
                 existing.position = position
             } else {
-                // Create new marker element
+                // Create new circular marker — Google Fleet / Uber style
                 const color = getBusColor(bus.status)
                 const live  = isLive(bus.status)
+                const SIZE  = 36 // outer container px
 
                 const el = document.createElement('div')
-                el.style.cssText = 'position:relative; cursor:pointer;'
+                el.style.cssText = `
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 3px;
+                    cursor: pointer;
+                    width: ${SIZE}px;
+                `
                 el.innerHTML = `
-                    <div style="
-                        background: ${color};
-                        color: white;
-                        padding: 5px 12px;
-                        border-radius: 20px;
-                        font-size: 11px;
-                        font-weight: 800;
-                        letter-spacing: 0.05em;
-                        border: 2.5px solid white;
-                        box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-                        white-space: nowrap;
-                        display: flex;
-                        align-items: center;
-                        gap: 6px;
-                    ">
-                        <span style="
-                            display:inline-block;
-                            width:7px; height:7px;
-                            background:white;
-                            border-radius:50%;
-                            flex-shrink:0;
-                            ${live ? 'animation: ep-pulse 1.5s infinite;' : 'opacity:0.5;'}
-                        "></span>
-                        ${bus.internal_id}
+                    <div style="position:relative; width:${SIZE}px; height:${SIZE}px;">
+                        ${live ? `
+                        <div style="
+                            position: absolute; inset: -4px;
+                            border-radius: 50%;
+                            border: 2.5px solid ${color};
+                            opacity: 0.4;
+                            animation: ep-ring 2s ease-out infinite;
+                        "></div>` : ''}
+                        <div style="
+                            position: absolute; inset: 0;
+                            background: ${color};
+                            border-radius: 50%;
+                            border: 3px solid white;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        ">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M4 16c0 1.1.9 2 2 2h1v1a1 1 0 0 0 2 0v-1h6v1a1 1 0 0 0 2 0v-1h1c1.1 0 2-.9 2-2V8c0-2.2-1.79-4-4-4H8C5.79 4 4 5.8 4 8v8zm3.5-1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM8 6h8l1.5 4H6.5L8 6z"/>
+                            </svg>
+                        </div>
                     </div>
+                    <div style="
+                        background: rgba(0,0,0,0.7);
+                        color: white;
+                        font-size: 9px;
+                        font-weight: 800;
+                        padding: 2px 6px;
+                        border-radius: 10px;
+                        white-space: nowrap;
+                        letter-spacing: 0.04em;
+                        backdrop-filter: blur(4px);
+                    ">${bus.internal_id}</div>
                 `
 
                 const marker = new google.maps.marker.AdvancedMarkerElement({
@@ -218,17 +239,12 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         }
     }, [isHistoryMode]) // only re-created when history mode changes — buses read from ref
 
-    // ── onLoad: initialise map state imperatively, then draw markers immediately
+    // ── onLoad: set map ready state → triggers theme effect → draws markers ─────
     const onMapLoad = useCallback((map: google.maps.Map) => {
         mapRef.current = map
-
-        // Apply correct colorScheme right after creation
-        // @ts-ignore
-        map.setOptions({ colorScheme: currentTheme === 'dark' ? 'DARK' : 'LIGHT' })
-
-        // Draw cached/available bus markers immediately — no waiting for next render
-        updateMarkers()
-    }, [updateMarkers, currentTheme])
+        setIsMapReady(true) // this triggers the colorScheme useEffect with correct theme
+        updateMarkers()     // draw cached buses immediately
+    }, [updateMarkers])
 
     const onMapUnmount = useCallback(() => {
         mapRef.current = null
@@ -478,9 +494,10 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
             )}
 
             <style jsx global>{`
-                @keyframes ep-pulse {
-                    0%, 100% { transform: scale(1); opacity: 1; }
-                    50% { transform: scale(1.6); opacity: 0.6; }
+                @keyframes ep-ring {
+                    0%   { transform: scale(1);    opacity: 0.5; }
+                    70%  { transform: scale(1.6);  opacity: 0; }
+                    100% { transform: scale(1.6);  opacity: 0; }
                 }
                 @keyframes ep-ping {
                     75%, 100% { transform: scale(2); opacity: 0; }
