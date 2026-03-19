@@ -12,207 +12,221 @@ env:
   PROJECT_ID: project-05588bf2-f685-4769-a37
   REGION: asia-south1
   REPO_NAME: easypool-repo
+  REGISTRY: asia-south1-docker.pkg.dev
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# ── Path filters ──────────────────────────────────────────────────────────────
+# Each build job only runs when its own service files change.
+# This is the single biggest time saver: changing dashboard CSS
+# no longer triggers a backend rebuild + migration run.
+
 jobs:
+  # ── Detect which services changed ─────────────────────────────────────────
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      dashboard: ${{ steps.filter.outputs.dashboard }}
+      gateway: ${{ steps.filter.outputs.gateway }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'services/backend/**'
+            dashboard:
+              - 'services/dashboard/**'
+            gateway:
+              - 'services/gps-gateway/**'
+
+  # ── Backend ───────────────────────────────────────────────────────────────
   build-backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
-          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
-      - name: Configure Docker Auth
-        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
       - uses: docker/setup-buildx-action@v3
       - name: Build and Push Backend
         uses: docker/build-push-action@v5
         with:
           context: ./services/backend
           push: true
-          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  build-dashboard:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
-          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
-      - name: Configure Docker Auth
-        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev
-      - uses: docker/setup-buildx-action@v3
-      - name: Build and Push Dashboard
-        uses: docker/build-push-action@v5
-        with:
-          context: ./services/dashboard
-          push: true
-          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/dashboard:latest
-          build-args: |
-            BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
-            NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
-            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
-            NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=${{ secrets.GOOGLE_MAPS_MAP_ID }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  build-gateway:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
-          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
-      - name: Configure Docker Auth
-        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev
-      - uses: docker/setup-buildx-action@v3
-      - name: Build and Push Gateway
-        uses: docker/build-push-action@v5
-        with:
-          context: ./services/gps-gateway
-          push: true
-          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/gps-gateway:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest
+          # Service-scoped cache key prevents cross-service cache pollution
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
 
   run-migrations:
     needs: build-backend
     runs-on: ubuntu-latest
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: read
+      id-token: write
     steps:
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
-          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-      - name: Execute Migration Job
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Run Migrations
         run: |
+          # Deploy job definition only if image hash changed (gcloud handles idempotency)
           gcloud run jobs deploy backend-migrate \
-            --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
-            --region ${REGION} \
-            --project ${PROJECT_ID} \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
             --command "python,manage.py,migrate" \
-            --set-env-vars "DB_NAME=bustrak,DB_USER=admin,DB_PASSWORD=adminpassword,DB_HOST=/cloudsql/project-05588bf2-f685-4769-a37:asia-south1:easypool-postgres,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings" \
-            --set-cloudsql-instances "project-05588bf2-f685-4769-a37:asia-south1:easypool-postgres" \
+            --set-env-vars "DB_NAME=bustrak,DB_USER=admin,DB_PASSWORD=adminpassword,DB_HOST=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings" \
+            --set-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
             --quiet
           gcloud run jobs execute backend-migrate \
-            --region ${REGION} \
-            --project ${PROJECT_ID} \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
             --wait
 
   deploy-backend:
     needs: run-migrations
     runs-on: ubuntu-latest
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: read
+      id-token: write
     steps:
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
-          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
       - name: Deploy Backend to Cloud Run
         run: |
           gcloud run deploy easypool-backend \
-            --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/backend:latest \
-            --region ${REGION} \
-            --project ${PROJECT_ID} \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
             --cpu-boost \
             --quiet
+
+  # ── Dashboard ─────────────────────────────────────────────────────────────
+  build-dashboard:
+    needs: changes
+    if: needs.changes.outputs.dashboard == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and Push Dashboard
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/dashboard
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/dashboard:latest
+          build-args: |
+            BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
+            NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
+            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
+            NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=${{ secrets.GOOGLE_MAPS_MAP_ID }}
+          cache-from: type=gha,scope=dashboard
+          cache-to: type=gha,scope=dashboard,mode=max
 
   deploy-dashboard:
     needs: build-dashboard
     runs-on: ubuntu-latest
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: read
+      id-token: write
     steps:
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
-          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
       - name: Deploy Dashboard to Cloud Run
         run: |
           gcloud run deploy easypool-dashboard-schools \
-            --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/dashboard:latest \
-            --region ${REGION} \
-            --project ${PROJECT_ID} \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/dashboard:latest \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
             --set-env-vars "BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app,NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app" \
             --allow-unauthenticated \
             --cpu-boost \
             --quiet
 
+  # ── GPS Gateway (VM) ──────────────────────────────────────────────────────
+  build-gateway:
+    needs: changes
+    if: needs.changes.outputs.gateway == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and Push Gateway
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/gps-gateway
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/gps-gateway:latest
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,scope=gateway,mode=max
+
   deploy-vm-gateway:
     needs: build-gateway
     runs-on: ubuntu-latest
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: read
+      id-token: write
     steps:
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: '${{ secrets.WIF_PROVIDER }}'
-          service_account: '${{ secrets.WIF_SERVICE_ACCOUNT }}'
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
       - name: Update VM Gateway
         run: |
-          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-gateway:latest"
-          REGISTRY="${REGION}-docker.pkg.dev"
+          IMAGE="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/gps-gateway:latest"
           ACCESS_TOKEN=$(gcloud auth print-access-token)
           GPS_API_KEY="${{ secrets.GPS_SERVICE_API_KEY }}"
 
-          # Deploy the gateway container on the VM.
-          #
-          # Problem: The 'runner' user on the VM has a Docker credential helper
-          # (credHelpers -> gcloud) in ~/.docker/config.json that overrides all
-          # docker login tokens. That helper calls 'gcloud auth print-access-token'
-          # on the VM, which fails because the runner user's gcloud has no active
-          # account.
-          #
-          # Solution: Create an isolated DOCKER_CONFIG temp directory with a clean
-          # config.json (no credential helpers). Authenticate with the WIF access
-          # token from the GitHub Actions runner, which is injected into the heredoc
-          # at expansion time (before SSH). This guarantees docker pull uses our
-          # token, not the broken credential helper.
           gcloud compute ssh camera-relay-server \
-            --zone asia-south1-a \
-            --project ${PROJECT_ID} \
+            --zone ${{ env.REGION }}-a \
+            --project ${{ env.PROJECT_ID }} \
             --tunnel-through-iap \
             --quiet \
             -- bash -s <<DEPLOY_SCRIPT
           set -euo pipefail
 
-          # Isolated Docker auth context — bypasses VM's credential helper entirely
           export DOCKER_CONFIG=\$(mktemp -d)
           trap "rm -rf \${DOCKER_CONFIG}" EXIT
           echo '{"auths":{}}' > \${DOCKER_CONFIG}/config.json
 
-          echo "${ACCESS_TOKEN}" | docker login -u oauth2accesstoken --password-stdin https://${REGISTRY}
+          echo "${ACCESS_TOKEN}" | docker login -u oauth2accesstoken --password-stdin https://${{ env.REGISTRY }}
 
           docker pull ${IMAGE}
-
           docker stop gps_gateway 2>/dev/null || true
           docker rm   gps_gateway 2>/dev/null || true
 
@@ -224,5 +238,5 @@ jobs:
             --network host \
             ${IMAGE}
 
-          echo "Deployment complete. gps_gateway status: \$(docker ps --filter name=gps_gateway --format '{{.Status}}')"
+          echo "Deployment complete. Status: \$(docker ps --filter name=gps_gateway --format '{{.Status}}')"
           DEPLOY_SCRIPT
