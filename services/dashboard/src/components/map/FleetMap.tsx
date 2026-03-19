@@ -152,12 +152,24 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
 
         if (!historyMarkerRef.current) {
             const dot = document.createElement('div');
-            dot.style.background = '#60a5fa';
-            dot.style.width = '16px';
-            dot.style.height = '16px';
-            dot.style.borderRadius = '50%';
-            dot.style.border = '3px solid white';
-            dot.style.boxShadow = '0 0 15px rgba(59, 130, 246, 0.8)';
+            dot.style.position = 'relative';
+            dot.style.width = '24px';
+            dot.style.height = '24px';
+            dot.innerHTML = `
+                <div style="
+                    position: absolute; inset: 0;
+                    background: rgba(59, 130, 246, 0.25);
+                    border-radius: 50%;
+                    animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+                "></div>
+                <div style="
+                    position: absolute; inset: 4px;
+                    background: #3b82f6;
+                    border-radius: 50%;
+                    border: 3px solid white;
+                    box-shadow: 0 0 12px rgba(59, 130, 246, 0.8), 0 2px 8px rgba(0,0,0,0.3);
+                "></div>
+            `;
 
             historyMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
                 map: mapRef.current!,
@@ -207,7 +219,14 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
             if (data.length > 0 && mapRef.current) {
                 const bounds = new window.google.maps.LatLngBounds()
                 data.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }))
-                mapRef.current.fitBounds(bounds, 60)
+                mapRef.current.fitBounds(bounds, 40)
+                // Cap max zoom so short routes don't over-zoom
+                const listener = mapRef.current.addListener('idle', () => {
+                    if (mapRef.current && mapRef.current.getZoom()! > 16) {
+                        mapRef.current.setZoom(16)
+                    }
+                    google.maps.event.removeListener(listener)
+                })
             }
         } catch (e) { console.error(e) } finally { setIsLoading(false) }
     }
@@ -240,6 +259,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     return (
         <div ref={containerRef} className="relative w-full h-full rounded-xl overflow-hidden border border-white/10 shadow-2xl">
             <GoogleMap
+                key={currentTheme}
                 mapContainerStyle={{ width: '100%', height: '100%' }}
                 center={MAP_CENTER}
                 zoom={12}
@@ -250,7 +270,22 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 {isHistoryMode && historyPoints.length > 1 && (
                     <Polyline
                         path={historyPoints.map(p => ({ lat: p.lat, lng: p.lng }))}
-                        options={{ strokeColor: '#60a5fa', strokeOpacity: 0.8, strokeWeight: 5 }}
+                        options={{
+                            strokeColor: '#60a5fa',
+                            strokeOpacity: 0,
+                            strokeWeight: 0,
+                            icons: [{
+                                icon: {
+                                    path: 'M 0,-1 0,1',
+                                    strokeOpacity: 0.9,
+                                    strokeColor: '#60a5fa',
+                                    strokeWeight: 4,
+                                    scale: 5,
+                                },
+                                offset: '0',
+                                repeat: '20px',
+                            }],
+                        }}
                     />
                 )}
             </GoogleMap>
@@ -321,6 +356,9 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                     0% { transform: scale(1); opacity: 1; }
                     50% { transform: scale(1.5); opacity: 0.5; }
                     100% { transform: scale(1); opacity: 1; }
+                }
+                @keyframes ping {
+                    75%, 100% { transform: scale(2); opacity: 0; }
                 }
             `}</style>
         </div>
