@@ -28,6 +28,13 @@ export default function DashboardPage() {
 
     useEffect(() => {
         setMounted(true)
+        
+        // Load cached data for instant show
+        const cachedBuses = typeof window !== 'undefined' ? localStorage.getItem('cached_buses') : null
+        if (cachedBuses) {
+            try { setBuses(JSON.parse(cachedBuses)) } catch (e) {}
+        }
+
         fetchData()
         const interval = setInterval(fetchData, 10000) // Poll every 10s
         return () => clearInterval(interval)
@@ -46,7 +53,10 @@ export default function DashboardPage() {
 
             if (busRes.ok) {
                 const data = await busRes.json()
-                setBuses(data.results || data)
+                const results = data.results || data
+                setBuses(results)
+                // Cache data for next refresh
+                localStorage.setItem('cached_buses', JSON.stringify(results))
             }
             if (alertRes.ok) {
                 const data = await alertRes.json()
