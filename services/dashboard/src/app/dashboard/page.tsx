@@ -63,7 +63,7 @@ export default function DashboardPage() {
         }
     }
 
-    if (!mounted || loading) return <div className="p-6 text-center">Loading Dashboard...</div>
+    if (!mounted) return <div className="p-6 text-center">Loading Dashboard...</div>
 
     const getStatusInfo = (lastHeartbeat: string | null) => {
         if (!lastHeartbeat) return { label: 'NO DATA', color: 'text-slate-300', dot: 'bg-slate-200' }
