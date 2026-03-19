@@ -20,16 +20,23 @@ class BusListSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.DateTimeField())
     def get_last_heartbeat(self, obj):
+        # Prefer the annotated field from the optimized view query
+        if hasattr(obj, 'latest_heartbeat'):
+            return obj.latest_heartbeat
         latest = obj.gps_points.first()
         return latest.timestamp if latest else None
 
     @extend_schema_field(serializers.FloatField())
     def get_lat(self, obj):
+        if hasattr(obj, 'latest_lat'):
+            return obj.latest_lat
         latest = obj.gps_points.first()
         return latest.lat if latest else None
 
     @extend_schema_field(serializers.FloatField())
     def get_lng(self, obj):
+        if hasattr(obj, 'latest_lng'):
+            return obj.latest_lng
         latest = obj.gps_points.first()
         return latest.lng if latest else None
 
