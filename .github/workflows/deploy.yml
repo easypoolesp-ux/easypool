@@ -179,27 +179,39 @@ jobs:
       - name: Update VM Gateway
         run: |
           IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-gateway:latest"
+          REGISTRY="${REGION}-docker.pkg.dev"
+          ACCESS_TOKEN=$(gcloud auth print-access-token)
           GPS_API_KEY="${{ secrets.GPS_SERVICE_API_KEY }}"
 
-          # The VM authenticates Docker using its own attached GCP Service Account
-          # via the gcloud credential helper — the correct GCP-native IAM pattern.
-          # No ephemeral tokens are passed over SSH.
+          # Deploy the gateway container on the VM.
+          #
+          # Problem: The 'runner' user on the VM has a Docker credential helper
+          # (credHelpers -> gcloud) in ~/.docker/config.json that overrides all
+          # docker login tokens. That helper calls 'gcloud auth print-access-token'
+          # on the VM, which fails because the runner user's gcloud has no active
+          # account.
+          #
+          # Solution: Create an isolated DOCKER_CONFIG temp directory with a clean
+          # config.json (no credential helpers). Authenticate with the WIF access
+          # token from the GitHub Actions runner, which is injected into the heredoc
+          # at expansion time (before SSH). This guarantees docker pull uses our
+          # token, not the broken credential helper.
           gcloud compute ssh camera-relay-server \
             --zone asia-south1-a \
             --project ${PROJECT_ID} \
             --tunnel-through-iap \
             --quiet \
-            -- bash -s <<EOF
+            -- bash -s <<DEPLOY_SCRIPT
           set -euo pipefail
 
-          REGION="${REGION}"
-          IMAGE="${IMAGE}"
-          GPS_API_KEY="${GPS_API_KEY}"
+          # Isolated Docker auth context — bypasses VM's credential helper entirely
+          export DOCKER_CONFIG=\$(mktemp -d)
+          trap "rm -rf \${DOCKER_CONFIG}" EXIT
+          echo '{"auths":{}}' > \${DOCKER_CONFIG}/config.json
 
-          # Refresh docker credentials using the VM's attached service account
-          gcloud auth configure-docker \${REGION}-docker.pkg.dev --quiet
+          echo "${ACCESS_TOKEN}" | docker login -u oauth2accesstoken --password-stdin https://${REGISTRY}
 
-          docker pull \${IMAGE}
+          docker pull ${IMAGE}
 
           docker stop gps_gateway 2>/dev/null || true
           docker rm   gps_gateway 2>/dev/null || true
@@ -207,10 +219,10 @@ jobs:
           docker run -d --name gps_gateway \
             --restart always \
             -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
-            -e GPS_SERVICE_API_KEY=\${GPS_API_KEY} \
+            -e GPS_SERVICE_API_KEY=${GPS_API_KEY} \
             -e GATEWAY_PORT=5027 \
             --network host \
-            \${IMAGE}
+            ${IMAGE}
 
           echo "Deployment complete. gps_gateway status: \$(docker ps --filter name=gps_gateway --format '{{.Status}}')"
-          EOF
+          DEPLOY_SCRIPT
