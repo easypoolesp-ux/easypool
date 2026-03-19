@@ -2,8 +2,6 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { 
     Bus, 
     Map as MapIcon, 
@@ -43,7 +41,7 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
     const [isFullscreen, setIsFullscreen] = useState(false)
-    const [selectedBus, setSelectedBus] = useState<BusData | null>(null)
+    const [selectedBusId, setSelectedBusId] = useState<string | null>(null)
 
     const fetchBuses = async () => {
         try {
@@ -77,22 +75,22 @@ export default function DashboardPage() {
         )
     }, [buses, searchQuery])
 
-    const statusDistribution = useMemo(() => {
-        const dist = [
-            { name: 'Moving', value: 0, color: '#10b981' },
-            { name: 'Idle', value: 0, color: '#94a3b8' },
-            { name: 'Off', value: 0, color: '#f43f5e' },
-            { name: 'Offline', value: 0, color: '#18181b' },
-        ]
+    const statusDistributionData = useMemo(() => {
+        const stats = {
+            moving: 0,
+            idle: 0,
+            ignition_off: 0,
+            offline: 0
+        }
 
         buses.forEach(bus => {
-            if (bus.status === 'moving') dist[0].value++
-            else if (bus.status === 'idle') dist[1].value++
-            else if (bus.status === 'ignition_off') dist[2].value++
-            else dist[3].value++
+            if (bus.status === 'moving') stats.moving++
+            else if (bus.status === 'idle') stats.idle++
+            else if (bus.status === 'ignition_off') stats.ignition_off++
+            else stats.offline++
         })
 
-        return dist
+        return stats
     }, [buses])
 
     const onlineCount = buses.filter(b => b.status === 'moving' || b.status === 'idle').length
@@ -171,23 +169,19 @@ export default function DashboardPage() {
                 <div className={`${isFullscreen ? 'fixed inset-0 z-[100] bg-background' : 'lg:col-span-2 min-h-[600px] shadow-2xl rounded-3xl overflow-hidden border border-border/40'}`}>
                     <div className="relative w-full h-full">
                         <div className="absolute top-4 right-4 z-[10] flex gap-2">
-                             <Button 
-                                variant="secondary" 
-                                size="icon" 
-                                className="rounded-xl shadow-premium backdrop-blur-md bg-white/80 dark:bg-slate-800/80 hover:bg-white text-foreground"
+                             <button 
+                                className="h-9 w-9 flex items-center justify-center rounded-xl shadow-premium backdrop-blur-md bg-white/80 dark:bg-slate-800/80 hover:bg-white text-foreground transition-all active:scale-95 disabled:opacity-50"
                                 onClick={() => handleRefresh(true)}
                                 disabled={loading}
                              >
                                 <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                             </Button>
-                             <Button 
-                                variant="secondary" 
-                                size="icon" 
-                                className="rounded-xl shadow-premium backdrop-blur-md bg-white/80 dark:bg-slate-800/80 hover:bg-white text-foreground"
+                             </button>
+                             <button 
+                                className="h-9 w-9 flex items-center justify-center rounded-xl shadow-premium backdrop-blur-md bg-white/80 dark:bg-slate-800/80 hover:bg-white text-foreground transition-all active:scale-95"
                                 onClick={() => setIsFullscreen(!isFullscreen)}
                              >
                                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                             </Button>
+                             </button>
                         </div>
                         <div className="absolute top-4 left-4 z-[10] bg-background/80 backdrop-blur-md border border-border/40 px-4 py-2 rounded-2xl shadow-premium flex items-center gap-3">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -201,11 +195,9 @@ export default function DashboardPage() {
                                 status: b.status,
                                 lat: b.lat,
                                 lng: b.lng,
-                                plate: b.plate_number,
-                                route: b.route_name
+                                plate: b.plate_number
                             }))} 
-                            onBusSelect={setSelectedBus} 
-                            selectedBusId={selectedBus?.id}
+                            initialBusId={selectedBusId}
                             isFullscreen={isFullscreen}
                         />
                     </div>
@@ -222,15 +214,7 @@ export default function DashboardPage() {
                                     Fleet Connectivity
                                 </h4>
                                 <div className="h-40 flex items-center justify-center">
-                                    <StatusPieChart data={statusDistribution} />
-                                </div>
-                                <div className="mt-6 flex flex-wrap gap-3 justify-center">
-                                    {statusDistribution.map((item, idx) => (
-                                        <div key={idx} className="flex items-center gap-1.5 px-2 py-1 bg-background/50 rounded-lg border border-border/40">
-                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                                            <span className="text-[10px] font-bold uppercase tracking-tight opacity-70">{item.name}</span>
-                                        </div>
-                                    ))}
+                                    <StatusPieChart data={statusDistributionData} />
                                 </div>
                             </CardContent>
                         </Card>
@@ -255,52 +239,51 @@ export default function DashboardPage() {
                                     />
                                 </div>
                             </div>
-                            <ScrollArea className="flex-1">
-                                <div className="p-4 space-y-2 overflow-y-auto max-h-[400px]">
-                                    {filteredBuses.map((bus) => (
-                                        <div 
-                                            key={bus.id}
-                                            onClick={() => setSelectedBus(bus)}
-                                            className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between cursor-pointer group-hover:scale-[1.02] active:scale-[0.98] ${
-                                                selectedBus?.id === bus.id 
-                                                    ? 'bg-indigo-500/10 border-indigo-500/20 shadow-sm' 
-                                                    : 'bg-card/40 border-border/10 hover:border-border/40 hover:bg-card/70'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <div className={`p-2.5 rounded-xl ${
-                                                    bus.status === 'moving' ? 'bg-emerald-500/10 text-emerald-600' :
-                                                    bus.status === 'idle' ? 'bg-slate-400/10 text-slate-500' :
-                                                    bus.status === 'ignition_off' ? 'bg-rose-500/10 text-rose-600' :
-                                                    'bg-zinc-100 text-slate-400'
-                                                }`}>
-                                                    <Bus className="w-5 h-5" />
-                                                </div>
-                                                <div className="overflow-hidden max-w-[120px]">
-                                                    <h5 className="font-bold text-[13px] tracking-tight truncate">{bus.internal_id}</h5>
-                                                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider truncate">{bus.plate_number}</p>
-                                                </div>
+                            
+                            <div className="flex-1 overflow-y-auto max-h-[400px] p-4 space-y-2 custom-scrollbar">
+                                {filteredBuses.map((bus) => (
+                                    <div 
+                                        key={bus.id}
+                                        onClick={() => setSelectedBusId(bus.id)}
+                                        className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between cursor-pointer active:scale-[0.98] ${
+                                            selectedBusId === bus.id 
+                                                ? 'bg-indigo-500/10 border-indigo-500/20 shadow-sm' 
+                                                : 'bg-card/40 border-border/10 hover:border-border/40 hover:bg-card/70'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-2.5 rounded-xl ${
+                                                bus.status === 'moving' ? 'bg-emerald-500/10 text-emerald-600' :
+                                                bus.status === 'idle' ? 'bg-slate-400/10 text-slate-500' :
+                                                bus.status === 'ignition_off' ? 'bg-rose-500/10 text-rose-600' :
+                                                'bg-zinc-100 text-slate-400'
+                                            }`}>
+                                                <Bus className="w-5 h-5" />
                                             </div>
-                                            <div className="flex flex-col items-end gap-1">
-                                                <div className={`w-2 h-2 rounded-full shadow-[0_0_8px] ${
-                                                    bus.status === 'moving' ? 'bg-emerald-500 shadow-emerald-500/50 animate-pulse' :
-                                                    bus.status === 'idle' ? 'bg-slate-400 shadow-slate-400/50' :
-                                                    bus.status === 'ignition_off' ? 'bg-rose-500 shadow-rose-500/50' :
-                                                    'bg-zinc-800'
-                                                }`} />
-                                                <span className="text-[9px] font-black uppercase tracking-widest opacity-40">
-                                                    {bus.status.replace('_', ' ')}
-                                                </span>
+                                            <div className="overflow-hidden max-w-[120px]">
+                                                <h5 className="font-bold text-[13px] tracking-tight truncate">{bus.internal_id}</h5>
+                                                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider truncate">{bus.plate_number}</p>
                                             </div>
                                         </div>
-                                    ))}
-                                    {filteredBuses.length === 0 && (
-                                        <div className="text-center py-20 opacity-30 italic text-xs font-bold tracking-widest uppercase">
-                                            No Vehicles Found
+                                        <div className="flex flex-col items-end gap-1">
+                                            <div className={`w-2 h-2 rounded-full shadow-[0_0_8px] ${
+                                                bus.status === 'moving' ? 'bg-emerald-500 shadow-emerald-500/50 animate-pulse' :
+                                                bus.status === 'idle' ? 'bg-slate-400 shadow-slate-400/50' :
+                                                bus.status === 'ignition_off' ? 'bg-rose-500 shadow-rose-500/50' :
+                                                'bg-zinc-800'
+                                            }`} />
+                                            <span className="text-[9px] font-black uppercase tracking-widest opacity-40">
+                                                {bus.status.replace('_', ' ')}
+                                            </span>
                                         </div>
-                                    )}
-                                </div>
-                            </ScrollArea>
+                                    </div>
+                                ))}
+                                {filteredBuses.length === 0 && (
+                                    <div className="text-center py-20 opacity-30 italic text-xs font-bold tracking-widest uppercase">
+                                        No Vehicles Found
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
