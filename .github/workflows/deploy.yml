@@ -83,9 +83,9 @@ jobs:
       - name: Build and Push Gateway
         uses: docker/build-push-action@v5
         with:
-          context: ./services/gps-mqtt
+          context: ./services/gps-gateway
           push: true
-          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/gps-mqtt:latest
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/gps-gateway:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -178,24 +178,28 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
       - name: Update VM Gateway
         run: |
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-gateway:latest"
           ACCESS_TOKEN=$(gcloud auth print-access-token)
+
+          # Write a self-contained deploy script and pipe it over SSH so that
+          # shell variable quoting inside --command strings can't corrupt the token.
           gcloud compute ssh camera-relay-server \
             --zone asia-south1-a \
             --project ${PROJECT_ID} \
             --tunnel-through-iap \
             --quiet \
-            --command "
-            echo '${ACCESS_TOKEN}' | docker login -u oauth2accesstoken --password-stdin https://${REGION}-docker.pkg.dev
-            docker pull ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
-            docker stop gps_gateway gps-mqtt || true
-            docker rm gps_gateway gps-mqtt || true
-            docker run -d --name gps_gateway \
-              --restart always \
-              -e MQTT_BROKER=localhost \
-              -e MQTT_USER='${{ secrets.MQTT_USER }}' \
-              -e MQTT_PASSWORD='${{ secrets.MQTT_PASSWORD }}' \
-              -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
-              -e GPS_SERVICE_API_KEY='${{ secrets.GPS_SERVICE_API_KEY }}' \
-              --network host \
-              ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
-          "
+            -- bash -s <<EOF
+          set -e
+          echo "${ACCESS_TOKEN}" | docker login -u oauth2accesstoken --password-stdin https://${REGION}-docker.pkg.dev
+          docker pull ${IMAGE}
+          docker stop gps_gateway 2>/dev/null || true
+          docker rm   gps_gateway 2>/dev/null || true
+          docker run -d --name gps_gateway \
+            --restart always \
+            -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
+            -e GPS_SERVICE_API_KEY=${{ secrets.GPS_SERVICE_API_KEY }} \
+            -e GATEWAY_PORT=5027 \
+            --network host \
+            ${IMAGE}
+          echo "Container started: \$(docker ps --filter name=gps_gateway --format '{{.Status}}')"
+          EOF
