@@ -39,9 +39,8 @@ const BACKEND_URL =
 
 const MAP_CENTER = { lat: 22.5726, lng: 88.3639 } // Kolkata
 
-// Map theming is handled entirely by Cloud Map ID (configured in Google Cloud
-// Console with the deep blue / dark template). No custom styles array needed.
-// When mapId is set, the Maps JS API ignores any `styles` option.
+// Google Maps built-in dark theme via colorScheme: 'DARK' | 'LIGHT'
+// Gives the standard deep blue Night theme natively — no custom styles needed.
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
@@ -83,6 +82,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
 
     const mapOptions = useMemo<google.maps.MapOptions>(() => ({
         mapId: mapId,
+        colorScheme: currentTheme === 'dark' ? 'DARK' : 'LIGHT',
         disableDefaultUI: false,
         zoomControl: true,
         mapTypeControl: false,
