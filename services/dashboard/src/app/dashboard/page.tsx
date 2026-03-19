@@ -28,48 +28,58 @@ export default function DashboardPage() {
 
     useEffect(() => {
         setMounted(true)
-        
-        // Load cached data for instant show
+
+        // Load cached bus positions for instant display
         const cachedBuses = typeof window !== 'undefined' ? localStorage.getItem('cached_buses') : null
         if (cachedBuses) {
             try { setBuses(JSON.parse(cachedBuses)) } catch (e) {}
         }
 
-        fetchData()
-        const interval = setInterval(fetchData, 10000) // Poll every 10s
-        return () => clearInterval(interval)
+        // Buses: poll every 10s (live tracking)
+        fetchBuses()
+        const busInterval = setInterval(fetchBuses, 10000)
+
+        // Alerts + transporters: poll every 60s (rarely change)
+        fetchMeta()
+        const metaInterval = setInterval(fetchMeta, 60000)
+
+        return () => {
+            clearInterval(busInterval)
+            clearInterval(metaInterval)
+        }
     }, [])
 
-    const fetchData = async () => {
+    const fetchBuses = async () => {
+        try {
+            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+            const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+            const res = await fetch(`/api/buses?_t=${Date.now()}`, { headers })
+            if (res.ok) {
+                const data = await res.json()
+                const results = data.results || data
+                setBuses(results)
+                localStorage.setItem('cached_buses', JSON.stringify(results))
+            }
+        } catch (err) {
+            console.error('Bus fetch error:', err)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const fetchMeta = async () => {
         try {
             const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
             const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
             const ts = Date.now()
-            const [busRes, alertRes, transRes] = await Promise.all([
-                fetch(`/api/buses?_t=${ts}`, { headers }),
+            const [alertRes, transRes] = await Promise.all([
                 fetch(`/api/alerts?_t=${ts}`, { headers }),
                 fetch(`/api/transporters?_t=${ts}`, { headers })
             ])
-
-            if (busRes.ok) {
-                const data = await busRes.json()
-                const results = data.results || data
-                setBuses(results)
-                // Cache data for next refresh
-                localStorage.setItem('cached_buses', JSON.stringify(results))
-            }
-            if (alertRes.ok) {
-                const data = await alertRes.json()
-                setAlerts(data.results || data)
-            }
-            if (transRes.ok) {
-                const data = await transRes.json()
-                setTransporters(data.results || data)
-            }
+            if (alertRes.ok) { const d = await alertRes.json(); setAlerts(d.results || d) }
+            if (transRes.ok) { const d = await transRes.json(); setTransporters(d.results || d) }
         } catch (err) {
-            console.error("Failed to fetch dashboard data:", err)
-        } finally {
-            setLoading(false)
+            console.error('Meta fetch error:', err)
         }
     }
 
