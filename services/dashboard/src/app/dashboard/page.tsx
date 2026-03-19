@@ -151,7 +151,7 @@ export default function DashboardPage() {
                 <div className={`${isFullscreen ? 'lg:col-span-1 fixed inset-4 z-50 bg-background shadow-2xl' : 'lg:col-span-2 min-h-[500px] bg-muted relative shadow-inner'} rounded-xl overflow-hidden border border-border`}>
                     <button
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="absolute top-4 right-14 z-10 p-2.5 bg-white/90 dark:bg-slate-800/90 rounded-lg shadow-premium hover:bg-white transition-colors border border-border group"
+                        className="absolute top-4 right-[60px] z-10 p-3 bg-white/90 dark:bg-slate-800/90 rounded-xl shadow-2xl backdrop-blur-md hover:bg-white transition-all active:scale-95 border border-border group"
                         title={isFullscreen ? "Exit Fullscreen" : "See Map in Fullscreen"}
                     >
                         {isFullscreen ? <Minimize2 className="w-5 h-5 group-hover:scale-110 transition-transform" /> : <Maximize2 className="w-5 h-5 group-hover:scale-110 transition-transform" />}

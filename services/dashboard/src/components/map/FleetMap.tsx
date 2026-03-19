@@ -39,30 +39,9 @@ const BACKEND_URL =
 
 const MAP_CENTER = { lat: 22.5726, lng: 88.3639 } // Kolkata
 
-// 🌑 OFFICIAL GOOGLE "NIGHT" STYLE (Deep Blue/Navy)
-const MAP_STYLES_NIGHT: google.maps.MapTypeStyle[] = [
-    { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-    { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-    { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-    { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-    { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-    { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
-    { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
-    { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
-    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
-    { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
-    { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-]
-
-// ⚪ OFFICIAL GOOGLE "SILVER" STYLE (Light)
-const MAP_STYLES_SILVER: google.maps.MapTypeStyle[] = [
-   { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
-   { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-   { elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
-   { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
-   { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9c9c9" }] },
-]
+// Map theming is handled entirely by Cloud Map ID (configured in Google Cloud
+// Console with the deep blue / dark template). No custom styles array needed.
+// When mapId is set, the Maps JS API ignores any `styles` option.
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
@@ -104,13 +83,12 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
 
     const mapOptions = useMemo<google.maps.MapOptions>(() => ({
         mapId: mapId,
-        styles: currentTheme === 'dark' ? MAP_STYLES_NIGHT : MAP_STYLES_SILVER,
         disableDefaultUI: false,
         zoomControl: true,
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        backgroundColor: currentTheme === 'dark' ? '#242f3e' : '#f5f5f5'
+        backgroundColor: currentTheme === 'dark' ? '#1a1a2e' : '#f5f5f5'
     }), [currentTheme, mapId])
 
     const updateMarkers = useCallback(() => {
@@ -299,10 +277,10 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                                 setSelectedBusId(e.target.value)
                                 loadHistory(e.target.value, playbackDate)
                             }}
-                            className="bg-transparent text-xs font-bold border-none focus:ring-0 py-1.5 pl-2 pr-8 text-slate-800 dark:text-white cursor-pointer"
+                            className="bg-white dark:bg-slate-800 text-xs font-bold border-none focus:ring-0 py-1.5 pl-2 pr-8 text-slate-800 dark:text-white cursor-pointer rounded-lg"
                         >
                             {buses.map(b => (
-                                <option key={b.id} value={b.id}>{b.internal_id}</option>
+                                <option key={b.id} value={b.id} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white">{b.internal_id}</option>
                             ))}
                         </select>
                     </div>
