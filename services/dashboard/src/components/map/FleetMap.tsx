@@ -73,13 +73,16 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     const containerRef = useRef<HTMLDivElement>(null)
     const hasFittedBoundsRef = useRef(false)
 
-    // Handle Hydration and Dynamic Theme
+    // Hydration
     useEffect(() => setMounted(true), [])
-    
-    const currentTheme = useMemo(() => {
-        if (!mounted) return 'light'
-        return theme === 'system' ? systemTheme : theme
-    }, [mounted, theme, systemTheme])
+    const currentTheme = mounted ? (theme === 'system' ? systemTheme : theme) : 'light'
+
+    // Apply theme change imperatively on the existing map — no re-mount needed
+    useEffect(() => {
+        if (!mapRef.current || !mounted) return
+        // @ts-ignore — colorScheme is a valid Maps option but not in old typedefs
+        mapRef.current.set('colorScheme', currentTheme === 'dark' ? 'DARK' : 'LIGHT')
+    }, [currentTheme, mounted])
 
     const mapOptions = useMemo<google.maps.MapOptions>(() => ({
         mapId: mapId,
@@ -263,12 +266,11 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     }, [isPlaying, playbackIndex, historyPoints])
 
     if (loadError) return <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-xl text-red-400 p-8 text-center font-bold">⚠️ Maps API Error. Use Build Args to pass API Key.</div>
-    if (!isLoaded || !mounted) return <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-xl"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
+    if (!isLoaded) return <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-xl"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
 
     return (
         <div ref={containerRef} className="relative w-full h-full rounded-xl overflow-hidden border border-white/10 shadow-2xl">
             <GoogleMap
-                key={currentTheme}
                 mapContainerStyle={{ width: '100%', height: '100%' }}
                 center={MAP_CENTER}
                 zoom={12}
