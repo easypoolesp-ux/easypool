@@ -178,13 +178,14 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
       - name: Update VM Gateway
         run: |
+          ACCESS_TOKEN=$(gcloud auth print-access-token)
           gcloud compute ssh camera-relay-server \
             --zone asia-south1-a \
             --project ${PROJECT_ID} \
             --tunnel-through-iap \
             --quiet \
             --command "
-            gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+            echo '${ACCESS_TOKEN}' | docker login -u oauth2accesstoken --password-stdin https://${REGION}-docker.pkg.dev
             docker pull ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/gps-mqtt:latest
             docker stop gps_gateway gps-mqtt || true
             docker rm gps_gateway gps-mqtt || true
