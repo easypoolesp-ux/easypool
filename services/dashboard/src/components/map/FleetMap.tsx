@@ -71,6 +71,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     const markerRefs = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map())
     const historyMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
+    const hasFittedBoundsRef = useRef(false)
 
     // Handle Hydration and Dynamic Theme
     useEffect(() => setMounted(true), [])
@@ -198,12 +199,20 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
     }, [])
 
     useEffect(() => {
-        if (!mapRef.current || isHistoryMode) return
+        if (!mapRef.current || isHistoryMode || hasFittedBoundsRef.current) return
         const valid = buses.filter(b => b.lat != null && b.lng != null)
         if (valid.length === 0) return
+        hasFittedBoundsRef.current = true
         const bounds = new window.google.maps.LatLngBounds()
         valid.forEach(b => bounds.extend({ lat: b.lat, lng: b.lng }))
         mapRef.current.fitBounds(bounds, 60)
+        // Cap max zoom so close-together buses don't over-zoom
+        const listener = mapRef.current.addListener('idle', () => {
+            if (mapRef.current && mapRef.current.getZoom()! > 14) {
+                mapRef.current.setZoom(14)
+            }
+            google.maps.event.removeListener(listener)
+        })
     }, [buses, isHistoryMode])
 
     const loadHistory = async (busId: string, date: string) => {
