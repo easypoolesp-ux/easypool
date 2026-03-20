@@ -1,6 +1,6 @@
 from rest_framework import decorators, response, viewsets
 
-from core.permissions import IsSchoolAdmin, SchoolIsolationMixin
+from core.permissions import IsManager, SchoolIsolationMixin
 
 from .models import Attendance
 from .serializers import AttendanceSerializer
@@ -9,7 +9,7 @@ from .serializers import AttendanceSerializer
 class AttendanceViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Attendance.objects.all()
     serializer_class = AttendanceSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsManager]
     filterset_fields = {
         'student': ['exact'],
         'bus': ['exact'],

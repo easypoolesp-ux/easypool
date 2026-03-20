@@ -2,7 +2,7 @@ from django.db.models import OuterRef, Subquery
 from rest_framework import decorators, response, viewsets
 
 from apps.gps.models import GPSPoint
-from core.permissions import IsSchoolAdmin, IsSuperAdmin, IsTransporter, SchoolIsolationMixin
+from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin
 
 from .models import Bus, Route
 from .serializers import BusDetailSerializer, BusListSerializer, RouteSerializer
@@ -11,7 +11,7 @@ from .serializers import BusDetailSerializer, BusListSerializer, RouteSerializer
 class RouteViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Route.objects.all()
     serializer_class = RouteSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsManager]
 
     def perform_create(self, serializer):
         serializer.save(school=self.request.user.school)
@@ -34,7 +34,7 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
             .all()
         )
 
-    permission_classes = [IsSuperAdmin | IsSchoolAdmin | IsTransporter]
+    permission_classes = [IsAdmin | IsManager | IsViewer]
     filterset_fields = ['status', 'route', 'internal_id', 'transporter']
 
     def get_serializer_class(self):

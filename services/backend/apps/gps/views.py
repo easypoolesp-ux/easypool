@@ -1,6 +1,6 @@
 from rest_framework import decorators, permissions, response, viewsets
 
-from core.permissions import IsSchoolAdmin, IsSuperAdmin, IsTransporter, SchoolIsolationMixin
+from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin
 
 from .models import Alert, GPSPoint
 from .serializers import (
@@ -14,7 +14,7 @@ from .serializers import (
 class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
     queryset = GPSPoint.objects.all()
     serializer_class = GPSPointSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsManager]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -200,7 +200,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 class AlertViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Alert.objects.all()
     serializer_class = AlertSerializer
-    permission_classes = [IsSuperAdmin | IsSchoolAdmin | IsTransporter]
+    permission_classes = [IsAdmin | IsManager | IsViewer]
 
     @decorators.action(detail=True, methods=['post'])
     def resolve(self, request, pk=None):

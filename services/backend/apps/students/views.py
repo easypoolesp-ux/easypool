@@ -1,6 +1,6 @@
 from rest_framework import decorators, response, viewsets
 
-from core.permissions import IsSchoolAdmin, SchoolIsolationMixin
+from core.permissions import IsManager, SchoolIsolationMixin
 
 from .models import Parent, Student
 from .serializers import ParentSerializer, StudentDetailSerializer, StudentListSerializer
@@ -9,7 +9,7 @@ from .serializers import ParentSerializer, StudentDetailSerializer, StudentListS
 class StudentViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Student.objects.all()
     filterset_fields = ['bus', 'grade']
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsManager]
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -27,4 +27,4 @@ class StudentViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
 class ParentViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Parent.objects.all()
     serializer_class = ParentSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsManager]

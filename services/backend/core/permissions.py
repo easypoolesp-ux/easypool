@@ -5,14 +5,11 @@ from rest_framework import permissions
 # These use Django's built-in Group system for RBAC.
 # Groups are managed in Django Admin — no code deploy needed to change a user's role.
 #
-# Standard Groups (create these once in Django Admin):
-#   SuperAdmin   → full access across all schools/organisations
-#   SchoolAdmin  → scoped to their own school's data
-#   Transporter  → scoped to their own transporter's buses/routes
-#   Parent       → read-only access to their child's route (future)
-#
-# Usage on any ViewSet:
-#   permission_classes = [IsSuperAdmin | IsSchoolAdmin]
+# Standard Groups:
+#   Admin      → full CRUD access within their organisation scope
+#   Manager    → day-to-day operations
+#   Viewer     → read-only (SAFE_METHODS)
+#   Parent     → read-only to their child
 
 
 def _in_group(user, *group_names):
@@ -24,41 +21,43 @@ def _in_group(user, *group_names):
     return user.groups.filter(name__in=group_names).exists()
 
 
-class IsSuperAdmin(permissions.BasePermission):
-    """Full access. Only members of the 'SuperAdmin' Django Group."""
+class IsAdmin(permissions.BasePermission):
+    """Full access. Mapped to the 'Admin' Group."""
 
-    message = 'This action requires Super Admin access. Please contact your administrator.'
-
-    def has_permission(self, request, view):
-        return _in_group(request.user, 'SuperAdmin')
-
-
-class IsSchoolAdmin(permissions.BasePermission):
-    """Access scoped to the user's own school. Members of 'SchoolAdmin' Group."""
-
-    message = 'This action requires School Admin access. Please contact your administrator.'
+    message = 'This action requires Admin access.'
 
     def has_permission(self, request, view):
-        return _in_group(request.user, 'SuperAdmin', 'SchoolAdmin')
+        return _in_group(request.user, 'Admin')
 
 
-class IsTransporter(permissions.BasePermission):
-    """Access scoped to the user's own transporter. Members of 'Transporter' Group."""
+class IsManager(permissions.BasePermission):
+    """Operational access. Mapped to 'Manager' Group."""
 
-    message = 'This action requires Transporter access. Please contact your administrator.'
+    message = 'This action requires Manager access.'
 
     def has_permission(self, request, view):
-        return _in_group(request.user, 'SuperAdmin', 'SchoolAdmin', 'Transporter')
+        return _in_group(request.user, 'Admin', 'Manager')
+
+
+class IsViewer(permissions.BasePermission):
+    """Read-only access. Mapped to 'Viewer' Group."""
+
+    message = 'This action requires Viewer access.'
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return _in_group(request.user, 'Admin', 'Manager', 'Viewer')
+        return _in_group(request.user, 'Admin', 'Manager')  # Only Admin/Manager can write
 
 
 class IsParent(permissions.BasePermission):
     """Read-only access for parents. Members of 'Parent' Group."""
 
-    message = 'This action requires Parent access. Please contact your administrator.'
+    message = 'This action requires Parent access.'
 
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
-            return _in_group(request.user, 'SuperAdmin', 'SchoolAdmin', 'Transporter', 'Parent')
+            return _in_group(request.user, 'Admin', 'Manager', 'Viewer', 'Parent')
         return False
 
 
