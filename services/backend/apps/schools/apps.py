@@ -9,7 +9,8 @@ def _create_portal_groups(sender, **kwargs):
     Groups are idempotent (get_or_create), so this is safe to run repeatedly.
     """
     from django.contrib.auth.models import Group
-    for name in ['SuperAdmin', 'SchoolAdmin', 'Transporter', 'Parent', 'CarpoolAdmin']:
+    # Unified Role Abstractions (Your hierarchy provides the scope, the Role provides the buttons)
+    for name in ['Admin', 'Manager', 'Viewer', 'Parent']:
         Group.objects.get_or_create(name=name)
 
 

@@ -87,17 +87,12 @@ class SchoolIsolationMixin:
         if not user.is_authenticated or not user.is_active:
             return queryset.none()
 
-        # SuperAdmins see everything across all tenants
-        if user.is_superuser or user.groups.filter(name='SuperAdmin').exists():
+        # Django superusers (root developers) see everything across all tenants
+        if user.is_superuser:
             return queryset
 
         model = queryset.model
         filters = {}
-
-        # Transporter-level isolation (most specific)
-        if user.groups.filter(name='Transporter').exists():
-            if hasattr(user, 'transporter') and user.transporter and hasattr(model, 'transporter'):
-                filters['transporter'] = user.transporter
 
         # Organisation-level isolation (new multi-tenant field)
         if hasattr(user, 'organisation') and user.organisation:

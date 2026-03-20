@@ -16,8 +16,12 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy project
 COPY . .
 
-# Collect static files for WhiteNoise (with dummy DB URL to bypass connection during build)
+# Collect static files for WhiteNoise
 RUN python manage.py collectstatic --noinput
+
+# SAFETY NET: Fail the build immediately if someone forgot to run `makemigrations` locally.
+# This strictly prevents the "500 Server Error" caused by code expecting missing database columns.
+RUN python manage.py makemigrations --check --dry-run
 
 EXPOSE 8000
 
