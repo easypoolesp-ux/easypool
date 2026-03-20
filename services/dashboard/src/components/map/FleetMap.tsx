@@ -106,6 +106,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     // Refs
     const mapRef           = useRef<google.maps.Map | null>(null)
     const markerRefs       = useRef<Map<string, google.maps.Marker>>(new Map())
+    const markerStateRefs  = useRef<Map<string, string>>(new Map()) // Hash of lat,lng,status,heading
     const historyMarkerRef = useRef<google.maps.Marker | null>(null)
 
     // Map options — JSON styles only, no mapId (mapId disables styles)
@@ -142,7 +143,11 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         // Remove stale
         const ids = new Set(buses.map(b => b.id))
         markerRefs.current.forEach((m, id) => {
-            if (!ids.has(id)) { m.setMap(null); markerRefs.current.delete(id) }
+            if (!ids.has(id)) { 
+                m.setMap(null)
+                markerRefs.current.delete(id) 
+                markerStateRefs.current.delete(id)
+            }
         })
 
         buses.forEach(bus => {
@@ -152,6 +157,12 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             const heading = bus.heading || 0
             const pos     = { lat: bus.lat, lng: bus.lng }
             const isMoving = effectiveStatus === 'moving'
+
+            // Generate a state hash to skip redundant Google Maps DOM/Canvas updates
+            const stateHash = `${bus.lat},${bus.lng},${effectiveStatus},${heading},${isDark}`
+            if (markerStateRefs.current.get(bus.id) === stateHash) return
+            markerStateRefs.current.set(bus.id, stateHash)
+
             const iconUrl = buildMarkerSvg(color, heading, isMoving)
             const iconSize = new google.maps.Size(80, 80)
             const iconAnchor = new google.maps.Point(40, 40)
