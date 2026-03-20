@@ -70,35 +70,40 @@ class IsParent(permissions.BasePermission):
 
 class SchoolIsolationMixin:
     """
-    Filters querysets by the user's school or transporter automatically.
-    - SuperAdmin (group): sees all data
-    - SchoolAdmin (group): sees only their school's data
-    - Transporter (group): sees only their transporter's data
-    - Unauthenticated / no role: sees nothing (returns empty queryset)
+    Filters querysets by the user's organisation (or legacy school/transporter).
+    Works for all organisation types: school, bus_agency, carpool, corporate.
+
+    - SuperAdmin (group) / superuser : sees all data across all organisations
+    - SchoolAdmin / CarpoolAdmin     : sees only their organisation's data
+    - Transporter                    : sees only their transporter's data within the org
+    - Unauthenticated / no role      : sees nothing — safety net before permission_classes
     """
     def get_queryset(self):
         user = self.request.user
         queryset = super().get_queryset()
 
-        # Unauthenticated requests should be blocked by permission_classes first,
-        # but as a safety net, return nothing rather than leak data.
+        # Safety net: unauthenticated requests must be blocked by permission_classes.
+        # Return nothing here rather than leak any data.
         if not user.is_authenticated or not user.is_active:
             return queryset.none()
 
-        # SuperAdmins and Django superusers see everything
+        # SuperAdmins see everything across all tenants
         if user.is_superuser or user.groups.filter(name='SuperAdmin').exists():
             return queryset
 
         model = queryset.model
         filters = {}
 
-        # Transporter isolation takes priority over school isolation
+        # Transporter-level isolation (most specific)
         if user.groups.filter(name='Transporter').exists():
             if hasattr(user, 'transporter') and user.transporter and hasattr(model, 'transporter'):
                 filters['transporter'] = user.transporter
 
-        # School isolation for SchoolAdmin and Transporter (if they have a school)
-        if hasattr(user, 'school') and user.school and hasattr(model, 'school'):
+        # Organisation-level isolation (new multi-tenant field)
+        if hasattr(user, 'organisation') and user.organisation and hasattr(model, 'organisation'):
+            filters['organisation'] = user.organisation
+        # Fallback: legacy school FK for backwards compatibility
+        elif hasattr(user, 'school') and user.school and hasattr(model, 'school'):
             filters['school'] = user.school
 
         return queryset.filter(**filters) if filters else queryset.none()
