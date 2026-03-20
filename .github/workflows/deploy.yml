@@ -7,6 +7,16 @@ on:
     paths:
       - 'services/**'
       - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deploy all services (bypasses path filter)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 env:
   PROJECT_ID: project-05588bf2-f685-4769-a37
@@ -44,7 +54,7 @@ jobs:
   # ── Backend ───────────────────────────────────────────────────────────────
   build-backend:
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.backend == 'true' || inputs.force_deploy == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -119,7 +129,7 @@ jobs:
   # ── Dashboard ─────────────────────────────────────────────────────────────
   build-dashboard:
     needs: changes
-    if: needs.changes.outputs.dashboard == 'true'
+    if: needs.changes.outputs.dashboard == 'true' || inputs.force_deploy == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -179,7 +189,7 @@ jobs:
   # ── GPS Gateway (VM) ──────────────────────────────────────────────────────
   build-gateway:
     needs: changes
-    if: needs.changes.outputs.gateway == 'true'
+    if: needs.changes.outputs.gateway == 'true' || inputs.force_deploy == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
