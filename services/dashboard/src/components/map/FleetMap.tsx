@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader, Polyline } from '@react-google-maps/api'
 import { Play, Pause, X, Route, Calendar } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { MONOCHROME_DARK, MONOCHROME_LIGHT } from './mapStyles'
+import { useMapHighContrastListener } from '@/hooks/useMapHighContrast'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Bus {
@@ -37,23 +39,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://easypool-backend
 const MAP_CENTER  = { lat: 22.5726, lng: 88.3639 }
 const LIBRARIES: ('marker' | 'maps' | 'places')[] = ['marker']
 
-// ── Map Styles (no mapId — so dark mode JSON styles actually work) ─────────────
-const DARK_STYLE: google.maps.MapTypeStyle[] = [
-    { elementType: 'geometry',              stylers: [{ color: '#0f172a' }] },
-    { elementType: 'labels.text.fill',      stylers: [{ color: '#64748b' }] },
-    { elementType: 'labels.text.stroke',    stylers: [{ color: '#0f172a' }] },
-    { featureType: 'road',                  elementType: 'geometry',         stylers: [{ color: '#1e293b' }] },
-    { featureType: 'road',                  elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
-    { featureType: 'road.highway',          elementType: 'geometry',         stylers: [{ color: '#334155' }] },
-    { featureType: 'water',                 elementType: 'geometry',         stylers: [{ color: '#0b1120' }] },
-    { featureType: 'water',                 elementType: 'labels.text.fill', stylers: [{ color: '#1e3a5f' }] },
-    { featureType: 'landscape',             elementType: 'geometry',         stylers: [{ color: '#131f35' }] },
-    { featureType: 'poi',                   elementType: 'geometry',         stylers: [{ color: '#1e293b' }] },
-    { featureType: 'poi.park',              elementType: 'geometry',         stylers: [{ color: '#14261e' }] },
-    { featureType: 'transit',               elementType: 'geometry',         stylers: [{ color: '#1e293b' }] },
-    { featureType: 'administrative',        elementType: 'geometry.stroke',  stylers: [{ color: '#243447' }] },
-]
-const LIGHT_STYLE: google.maps.MapTypeStyle[] = []
+// ── Map styles moved to mapStyles.ts (single-responsibility) ─────────────────
 
 // ── Status → visual helpers ───────────────────────────────────────────────────
 /**
@@ -122,11 +108,12 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         libraries: LIBRARIES,
     })
 
-    // Theme
+    // Theme + monochrome map setting
     const { theme, systemTheme } = useTheme()
     const [mounted, setMounted] = useState(false)
     useEffect(() => setMounted(true), [])
     const isDark = mounted ? (theme === 'system' ? systemTheme : theme) === 'dark' : false
+    const highContrast = useMapHighContrastListener()
 
     // State
     const [isHistoryMode, setIsHistoryMode] = useState(false)
@@ -153,15 +140,17 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        styles: isDark ? DARK_STYLE : LIGHT_STYLE,
-    }), [isDark])
+        styles: highContrast ? (isDark ? MONOCHROME_DARK : MONOCHROME_LIGHT) : [],
+    }), [isDark, highContrast])
 
-    // Imperatively sync theme changes to live map
+    // Imperatively sync theme + high-contrast changes to live map
     useEffect(() => {
         if (mapRef.current) {
-            mapRef.current.setOptions({ styles: isDark ? DARK_STYLE : LIGHT_STYLE })
+            mapRef.current.setOptions({
+                styles: highContrast ? (isDark ? MONOCHROME_DARK : MONOCHROME_LIGHT) : []
+            })
         }
-    }, [isDark])
+    }, [isDark, highContrast])
 
     // ── Marker management ─────────────────────────────────────────────────────
     useEffect(() => {
