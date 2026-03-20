@@ -83,22 +83,28 @@ function getStatusLabel(status: string): string {
 }
 
 /**
- * Google Maps-style fleet marker:
- * - Solid colored circle with white border
- * - When moving: semi-transparent field-of-view cone in heading direction
- * - When idle/offline: just the circle, no cone
+ * Google Maps-style premium fleet marker:
+ * - Solid colored circle with crisp white border
+ * - Heading Beam: Soft radial gradient cone (only when moving)
  */
 function buildMarkerSvg(color: string, heading: number, isMoving: boolean): string {
-    const svg = `<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    const beamId = `beam-${color.replace('#','')}`
+    const svg = `<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="${beamId}" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.4" />
+          <stop offset="100%" stop-color="${color}" stop-opacity="0" />
+        </linearGradient>
+      </defs>
       ${isMoving ? `
-      <!-- Field of view cone -->
-      <g transform="rotate(${heading}, 32, 32)">
-        <path d="M32,32 L20,2 A30,30 0 0,1 44,2 Z" fill="${color}" opacity="0.18"/>
+      <!-- Soft heading beam (FOV) -->
+      <g transform="rotate(${heading}, 40, 40)">
+        <path d="M40,40 L16,4 A36,36 0 0,1 64,4 Z" fill="url(#${beamId})"/>
       </g>` : ''}
-      <!-- Outer soft ring -->
-      <circle cx="32" cy="32" r="14" fill="${color}" stroke="white" stroke-width="3"/>
-      <!-- Inner highlight -->
-      <circle cx="32" cy="32" r="5" fill="white" opacity="0.85"/>
+      <!-- Main Marker -->
+      <circle cx="40" cy="40" r="14" fill="${color}" stroke="white" stroke-width="3"/>
+      <!-- Inner core highlight -->
+      <circle cx="40" cy="40" r="5" fill="white" opacity="0.9"/>
     </svg>`
     return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
@@ -121,7 +127,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
     // State
     const [isHistoryMode, setIsHistoryMode] = useState(false)
-    const [isLiveTrail, setIsLiveTrail]     = useState(false)
+    const [liveTrailMode, setLiveTrailMode] = useState<'off' | '2h' | 'today'>('off')
     const [liveTrails, setLiveTrails]       = useState<Map<string, GPSPoint[]>>(new Map())
     const [selectedBusId, setSelectedBusId] = useState<string | null>(initialBusId || null)
     const [playbackDate, setPlaybackDate]   = useState(() =>
@@ -177,13 +183,13 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             const pos     = { lat: bus.lat, lng: bus.lng }
             const isMoving = effectiveStatus === 'moving'
             const iconUrl = buildMarkerSvg(color, heading, isMoving)
-            const iconSize = new google.maps.Size(64, 64)
-            const iconAnchor = new google.maps.Point(32, 32)
+            const iconSize = new google.maps.Size(80, 80)
+            const iconAnchor = new google.maps.Point(40, 40)
 
             const existing = markerRefs.current.get(bus.id)
             if (existing) {
                 existing.setPosition(pos)
-                existing.setIcon({ url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(32, 72) })
+                existing.setIcon({ url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(40, 72) })
                 existing.setLabel({
                     text: bus.internal_id,
                     color: isDark ? '#ffffff' : '#0f172a',
@@ -196,7 +202,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     map: mapRef.current!,
                     position: pos,
                     title: bus.internal_id,
-                    icon: { url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(32, 72) },
+                    icon: { url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(40, 72) },
                     label: {
                         text: bus.internal_id,
                         color: isDark ? '#ffffff' : '#0f172a',
@@ -228,9 +234,9 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
     // ── Live Trail Fetcher ────────────────────────────────────────────────────
     useEffect(() => {
-        if (!isLiveTrail || !isLoaded) { setLiveTrails(new Map()); return }
+        if (liveTrailMode === 'off' || !isLoaded) { setLiveTrails(new Map()); return }
 
-        const fetch2HrTrails = async () => {
+        const fetchLiveTrails = async () => {
             const token = localStorage.getItem('token')
             const date  = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
             const result = new Map<string, GPSPoint[]>()
@@ -242,20 +248,23 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                         headers: { Authorization: `Bearer ${token}` }
                     })
                     if (res.ok) {
-                        const data: GPSPoint[] = await res.json()
-                        const threshold = Date.now() - 2 * 60 * 60 * 1000
-                        const filtered  = data.filter(p => new Date(p.timestamp).getTime() > threshold)
-                        if (filtered.length > 0) result.set(bus.id, filtered)
+                        let data: GPSPoint[] = await res.json()
+                        // If only 2h mode, filter by threshold
+                        if (liveTrailMode === '2h') {
+                            const threshold = Date.now() - 2 * 60 * 60 * 1000
+                            data = data.filter(p => new Date(p.timestamp).getTime() > threshold)
+                        }
+                        if (data.length > 0) result.set(bus.id, data)
                     }
                 } catch {}
             }))
             setLiveTrails(result)
         }
 
-        fetch2HrTrails()
-        const interval = setInterval(fetch2HrTrails, 30_000)
+        fetchLiveTrails()
+        const interval = setInterval(fetchLiveTrails, 30_000)
         return () => clearInterval(interval)
-    }, [isLiveTrail, isLoaded, buses])
+    }, [isLoaded, liveTrailMode, buses])
 
     // ── Playback Marker + Auto-Follow ─────────────────────────────────────────
     useEffect(() => {
@@ -363,7 +372,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                 options={mapOptions}
             >
                 {/* Live Trails — blue dashed */}
-                {isLiveTrail && Array.from(liveTrails.values()).map((trail, i) => (
+                {liveTrailMode !== 'off' && Array.from(liveTrails.values()).map((trail, i) => (
                     <Polyline
                         key={`trail-${i}`}
                         path={trail.map(p => ({ lat: p.lat, lng: p.lng }))}
@@ -420,11 +429,20 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             {/* Map Control Buttons — stacked vertically below expand button */}
             <div className="absolute top-[68px] right-4 z-10 flex flex-col gap-2">
                 <button
-                    onClick={() => setIsLiveTrail(!isLiveTrail)}
-                    className={`p-3 rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${ isLiveTrail ? 'bg-blue-600 text-white' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white' }`}
-                    title={isLiveTrail ? 'Hide Trail' : 'Show Trail (2h)'}
+                    onClick={() => {
+                        if (liveTrailMode === 'off') setLiveTrailMode('2h')
+                        else if (liveTrailMode === '2h') setLiveTrailMode('today')
+                        else setLiveTrailMode('off')
+                    }}
+                    className={`p-3 relative rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${ liveTrailMode !== 'off' ? 'bg-blue-600 text-white shadow-blue-500/20' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white' }`}
+                    title={`Live Trail: ${liveTrailMode === 'off' ? 'Off' : liveTrailMode === '2h' ? 'Last 2 Hours' : 'Today (Full)'}`}
                 >
-                    <Route size={20} className={isLiveTrail ? 'animate-pulse' : ''} />
+                    <Route size={20} className={liveTrailMode !== 'off' ? 'animate-pulse' : ''} />
+                    {liveTrailMode !== 'off' && (
+                        <span className="absolute -bottom-1 -right-1 bg-white text-blue-600 text-[8px] font-bold px-1 rounded-sm shadow-sm border border-blue-100">
+                            {liveTrailMode === '2h' ? '2H' : 'DAY'}
+                        </span>
+                    )}
                 </button>
                 <button
                     onClick={() => toggleHistoryMode()}
@@ -455,6 +473,14 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                             <option key={b.id} value={b.id}>{b.internal_id}</option>
                         ))}
                     </select>
+                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+                    <button 
+                        onClick={() => toggleHistoryMode()}
+                        className="p-1 px-2 text-slate-400 dark:text-slate-300 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                        title="Close History"
+                    >
+                        <X size={14} />
+                    </button>
                 </div>
             )}
 

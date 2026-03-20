@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut, Filter } from 'lucide-react'
+import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut, Filter, X } from 'lucide-react'
 import Link from 'next/link'
 import nextDynamic from 'next/dynamic'
 import { components } from '@/types/api'
@@ -237,10 +237,18 @@ export default function DashboardPage() {
                             <input
                                 type="text"
                                 placeholder="Search Plate, ID, or Route..."
-                                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                                className="w-full pl-10 pr-10 py-2 bg-white dark:bg-slate-900 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm text-slate-900 dark:text-white"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-200 transition-colors"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
                         </div>
 
                         {/* Status filter chips — toggled by filter button */}
