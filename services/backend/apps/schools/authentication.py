@@ -58,9 +58,9 @@ class FirebaseAuthentication(BaseAuthentication):
             )
 
         # Store Firebase UID on first login
-        if not user.google_id:
-            user.google_id = uid
-            user.save(update_fields=['google_id'])
+        if not user.firebase_uid:
+            user.firebase_uid = uid
+            user.save(update_fields=['firebase_uid'])
 
         return (user, None)
 

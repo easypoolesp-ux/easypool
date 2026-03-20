@@ -130,7 +130,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=200)
     firebase_uid = models.CharField(max_length=200, blank=True, db_index=True)
-    google_id = models.CharField(max_length=200, blank=True)
     photo_url = models.URLField(blank=True)
 
     # Primary association: Organisation (works for all business types)
