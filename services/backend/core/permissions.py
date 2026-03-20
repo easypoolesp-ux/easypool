@@ -100,10 +100,23 @@ class SchoolIsolationMixin:
                 filters['transporter'] = user.transporter
 
         # Organisation-level isolation (new multi-tenant field)
-        if hasattr(user, 'organisation') and user.organisation and hasattr(model, 'organisation'):
-            filters['organisation'] = user.organisation
+        if hasattr(user, 'organisation') and user.organisation:
+            user_orgs = user.organisation.get_descendants()
+            user_orgs.append(user.organisation)
+
+            from django.db.models import Q
+
+            if hasattr(model, 'organisation') and hasattr(model, 'allocated_to'):
+                # For models like Bus that use the "Google Drive" style Read/Write model
+                # User sees assets they physically OWN or assets ALLOCATED to them as guests
+                filters = Q(organisation__in=user_orgs) | Q(allocated_to__in=user_orgs)
+                queryset = queryset.filter(filters).distinct()
+            elif hasattr(model, 'organisation'):
+                # For models that only have physical ownership
+                queryset = queryset.filter(organisation__in=user_orgs)
+            
         # Fallback: legacy school FK for backwards compatibility
         elif hasattr(user, 'school') and user.school and hasattr(model, 'school'):
-            filters['school'] = user.school
+            queryset = queryset.filter(school=user.school)
 
-        return queryset.filter(**filters) if filters else queryset.none()
+        return queryset

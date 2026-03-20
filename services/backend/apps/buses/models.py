@@ -12,11 +12,18 @@ class Route(models.Model):
     )
 
     id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # ── Ownership & Allocation ─────────────────────────────────────────────────
     organisation = models.ForeignKey(
         Organisation, null=True, blank=True,
         on_delete=models.CASCADE,
-        related_name='routes'
+        related_name='owned_routes'
     )
+    allocated_to = models.ManyToManyField(
+        Organisation, blank=True,
+        related_name='allocated_routes'
+    )
+
     # Legacy FK kept nullable for backwards compatibility
     school       = models.ForeignKey(
         School, null=True, blank=True,
@@ -28,6 +35,7 @@ class Route(models.Model):
         on_delete=models.SET_NULL,
         related_name='routes'
     )
+    
     name         = models.CharField(max_length=200)
     type         = models.CharField(max_length=20, choices=TYPE_CHOICES, default='morning')
     is_active    = models.BooleanField(default=True)
@@ -72,12 +80,19 @@ class Bus(models.Model):
 
     id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    # ── Ownership ──────────────────────────────────────────────────────────────
+    # ── Ownership & Allocation ─────────────────────────────────────────────────
+    # The physical owner of the asset (has Write/Edit permissions)
     organisation = models.ForeignKey(
         Organisation, null=True, blank=True,
         on_delete=models.CASCADE,
-        related_name='buses'
+        related_name='owned_buses'
     )
+    # The clients/tenants who are currently renting/sharing this asset (Read-Only map access)
+    allocated_to = models.ManyToManyField(
+        Organisation, blank=True,
+        related_name='allocated_buses'
+    )
+
     # Legacy school FK kept nullable for backwards compatibility
     school       = models.ForeignKey(
         School, null=True, blank=True,
