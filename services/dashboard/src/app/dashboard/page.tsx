@@ -75,8 +75,6 @@ export default function DashboardPage() {
         setMounted(true)
     }, [])
 
-    if (!mounted) return <div className="p-6 text-center">Loading Dashboard...</div>
-
     const toggleStatusFilter = (status: string) => {
         setHiddenStatuses(prev => {
             const next = new Set(prev)
@@ -98,6 +96,8 @@ export default function DashboardPage() {
             bus.plate_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (bus.route_name || '').toLowerCase().includes(searchQuery.toLowerCase())
     }), [activeBuses, hiddenStatuses, searchQuery])
+
+    if (!mounted) return <div className="p-6 text-center">Loading Dashboard...</div>
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6 bg-slate-50/50 dark:bg-transparent min-h-screen">
