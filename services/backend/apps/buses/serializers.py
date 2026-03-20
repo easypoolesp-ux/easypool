@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.utils import timezone
+from datetime import timedelta
 from .models import Route, Bus, Camera
 from apps.schools.serializers import SchoolSerializer
 from drf_spectacular.utils import extend_schema_field
@@ -9,20 +11,22 @@ class RouteSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class BusListSerializer(serializers.ModelSerializer):
-    lat = serializers.SerializerMethodField()
-    lng = serializers.SerializerMethodField()
-    route_name = serializers.CharField(source='route.name', read_only=True)
-    last_heartbeat = serializers.SerializerMethodField()
-    speed = serializers.SerializerMethodField()
-    heading = serializers.SerializerMethodField()
-    
+    lat             = serializers.SerializerMethodField()
+    lng             = serializers.SerializerMethodField()
+    route_name      = serializers.CharField(source='route.name', read_only=True)
+    last_heartbeat  = serializers.SerializerMethodField()
+    speed           = serializers.SerializerMethodField()
+    heading         = serializers.SerializerMethodField()
+    computed_status = serializers.SerializerMethodField()
+
     class Meta:
         model = Bus
-        fields = ('id', 'internal_id', 'plate_number', 'status', 'lat', 'lng', 'speed', 'heading', 'route_name', 'driver_name', 'gps_imei', 'last_heartbeat')
+        fields = ('id', 'internal_id', 'plate_number', 'status', 'computed_status',
+                  'lat', 'lng', 'speed', 'heading', 'route_name',
+                  'driver_name', 'gps_imei', 'last_heartbeat')
 
     @extend_schema_field(serializers.DateTimeField())
     def get_last_heartbeat(self, obj):
-        # Prefer the annotated field from the optimized view query
         if hasattr(obj, 'latest_heartbeat'):
             return obj.latest_heartbeat
         latest = obj.gps_points.first()
@@ -47,14 +51,43 @@ class BusListSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'latest_speed'):
             return obj.latest_speed
         latest = obj.gps_points.first()
-        return latest.speed if latest else 0
+        return float(latest.speed) if latest and latest.speed is not None else 0.0
 
     @extend_schema_field(serializers.FloatField())
     def get_heading(self, obj):
         if hasattr(obj, 'latest_heading'):
             return obj.latest_heading
         latest = obj.gps_points.first()
-        return latest.heading if latest else 0
+        return float(latest.heading) if latest and latest.heading is not None else 0.0
+
+    @extend_schema_field(serializers.CharField())
+    def get_computed_status(self, obj):
+        """
+        Compute real-time status from live data:
+        - 'offline'   : manually marked as inactive/maintenance
+        - 'no_signal' : no GPS data in the last 12 hours (device issue)
+        - 'moving'    : GPS received AND speed > 2 km/h
+        - 'idle'      : GPS received AND speed <= 2 km/h (engine on, stationary)
+        """
+        # Grey — manually deactivated (maintenance, not in service, etc.)
+        if obj.status == 'offline':
+            return 'offline'
+
+        heartbeat = getattr(obj, 'latest_heartbeat', None)
+        if not heartbeat:
+            latest = obj.gps_points.first()
+            heartbeat = latest.timestamp if latest else None
+
+        # Red — no GPS signal in 12 hours (device problem or bus not used)
+        if not heartbeat or (timezone.now() - heartbeat) > timedelta(hours=12):
+            return 'no_signal'
+
+        speed = getattr(obj, 'latest_speed', None) or 0
+        # Green — actively moving
+        if float(speed) > 2:
+            return 'moving'
+        # Amber — ignition on, not moving
+        return 'idle'
 
 class CameraSerializer(serializers.ModelSerializer):
     class Meta:

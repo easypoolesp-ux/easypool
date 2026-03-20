@@ -9,11 +9,12 @@ import { useTheme } from 'next-themes'
 interface Bus {
     id: string
     internal_id: string
-    status: string
+    status: string            // raw stored status (may be stale)
+    computed_status?: string  // derived: moving | idle | no_signal | offline
     lat: number
     lng: number
-    plate: string
-    route?: string
+    plate_number?: string
+    route_name?: string
     speed?: number
     heading?: number
 }
@@ -36,79 +37,132 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://easypool-backend
 const MAP_CENTER  = { lat: 22.5726, lng: 88.3639 }
 const LIBRARIES: ('marker' | 'maps' | 'places')[] = ['marker']
 
+// ── Map Styles (no mapId — so dark mode JSON styles actually work) ─────────────
 const DARK_STYLE: google.maps.MapTypeStyle[] = [
-    { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3c4d' }] },
-    { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#4b6878' }] },
-    { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#023e58' }] },
-    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#283d6a' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+    { elementType: 'geometry',              stylers: [{ color: '#0f172a' }] },
+    { elementType: 'labels.text.fill',      stylers: [{ color: '#64748b' }] },
+    { elementType: 'labels.text.stroke',    stylers: [{ color: '#0f172a' }] },
+    { featureType: 'road',                  elementType: 'geometry',         stylers: [{ color: '#1e293b' }] },
+    { featureType: 'road',                  elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
+    { featureType: 'road.highway',          elementType: 'geometry',         stylers: [{ color: '#334155' }] },
+    { featureType: 'water',                 elementType: 'geometry',         stylers: [{ color: '#0b1120' }] },
+    { featureType: 'water',                 elementType: 'labels.text.fill', stylers: [{ color: '#1e3a5f' }] },
+    { featureType: 'landscape',             elementType: 'geometry',         stylers: [{ color: '#131f35' }] },
+    { featureType: 'poi',                   elementType: 'geometry',         stylers: [{ color: '#1e293b' }] },
+    { featureType: 'poi.park',              elementType: 'geometry',         stylers: [{ color: '#14261e' }] },
+    { featureType: 'transit',               elementType: 'geometry',         stylers: [{ color: '#1e293b' }] },
+    { featureType: 'administrative',        elementType: 'geometry.stroke',  stylers: [{ color: '#243447' }] },
 ]
 const LIGHT_STYLE: google.maps.MapTypeStyle[] = []
 
-function getBusColor(status: string): string {
-    if (status === 'online' || status === 'moving') return '#22c55e'
-    if (status === 'idle') return '#94a3b8'
-    if (status === 'ignition_off') return '#ef4444'
-    return '#1e293b'
+// ── Status → visual helpers ───────────────────────────────────────────────────
+/**
+ * Four real statuses (from computed_status):
+ *  moving    → #22c55e  green
+ *  idle      → #f59e0b  amber
+ *  no_signal → #ef4444  red
+ *  offline   → #64748b  slate (manual / maintenance)
+ */
+function getStatusColor(status: string): string {
+    switch (status) {
+        case 'moving':    return '#22c55e'
+        case 'idle':      return '#f59e0b'
+        case 'no_signal': return '#ef4444'
+        default:          return '#64748b' // offline / unknown
+    }
+}
+
+function getStatusLabel(status: string): string {
+    switch (status) {
+        case 'moving':    return 'Moving'
+        case 'idle':      return 'Idle'
+        case 'no_signal': return 'No Signal'
+        case 'offline':   return 'Offline'
+        default:          return 'Unknown'
+    }
+}
+
+/** Returns an SVG data URI icon with:
+ *  - Outer colored ring (status color)
+ *  - Rotated arrow inside (pointing in heading direction)
+ *  - Clean white center
+ */
+function buildMarkerSvg(color: string, heading: number): string {
+    const svg = `<svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+      <!-- Outer glow ring -->
+      <circle cx="22" cy="22" r="20" fill="none" stroke="${color}" stroke-width="2.5" opacity="0.35"/>
+      <!-- Inner solid ring -->
+      <circle cx="22" cy="22" r="16" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2"/>
+      <!-- White fill center -->
+      <circle cx="22" cy="22" r="13" fill="white"/>
+      <!-- Rotated arrow -->
+      <g transform="rotate(${heading}, 22, 22)">
+        <polygon points="22,6 16,32 22,27 28,32" fill="${color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+      </g>
+    </svg>`
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
+export default function FleetMap({ buses, initialBusId }: Props) {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
     const { isLoaded, loadError } = useJsApiLoader({
         googleMapsApiKey: apiKey!,
         id: 'google-map-script',
         libraries: LIBRARIES,
     })
 
+    // Theme
     const { theme, systemTheme } = useTheme()
     const [mounted, setMounted] = useState(false)
     useEffect(() => setMounted(true), [])
-    const currentTheme = mounted ? (theme === 'system' ? systemTheme : theme) : 'light'
-    const isDark = currentTheme === 'dark'
+    const isDark = mounted ? (theme === 'system' ? systemTheme : theme) === 'dark' : false
 
+    // State
     const [isHistoryMode, setIsHistoryMode] = useState(false)
     const [isLiveTrail, setIsLiveTrail]     = useState(false)
     const [liveTrails, setLiveTrails]       = useState<Map<string, GPSPoint[]>>(new Map())
-    const [isMapReady, setIsMapReady]       = useState(false)
     const [selectedBusId, setSelectedBusId] = useState<string | null>(initialBusId || null)
-    
-    const [playbackDate, setPlaybackDate] = useState(() =>
-        new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+    const [playbackDate, setPlaybackDate]   = useState(() =>
+        new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
     )
     const [historyPoints, setHistoryPoints] = useState<GPSPoint[]>([])
     const [playbackIndex, setPlaybackIndex] = useState(0)
     const [isPlaying, setIsPlaying]         = useState(false)
     const [isLoading, setIsLoading]         = useState(false)
 
+    // Refs
     const mapRef           = useRef<google.maps.Map | null>(null)
     const markerRefs       = useRef<Map<string, google.maps.Marker>>(new Map())
     const historyMarkerRef = useRef<google.maps.Marker | null>(null)
-    const hasFittedRef     = useRef(false)
 
+    // Map options — JSON styles only, no mapId (mapId disables styles)
     const mapOptions = useMemo<google.maps.MapOptions>(() => ({
-        disableDefaultUI: false,
         zoomControl: true,
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || 'b0c049e7fb978545fe9416bf', // Use secret, with fallback
         styles: isDark ? DARK_STYLE : LIGHT_STYLE,
     }), [isDark])
 
-    // Update markers and bounds
+    // Imperatively sync theme changes to live map
+    useEffect(() => {
+        if (mapRef.current) {
+            mapRef.current.setOptions({ styles: isDark ? DARK_STYLE : LIGHT_STYLE })
+        }
+    }, [isDark])
+
+    // ── Marker management ─────────────────────────────────────────────────────
     useEffect(() => {
         if (!isLoaded || !mapRef.current) return
-
         if (isHistoryMode) {
             markerRefs.current.forEach(m => m.setMap(null))
             markerRefs.current.clear()
             return
         }
 
+        // Remove stale
         const ids = new Set(buses.map(b => b.id))
         markerRefs.current.forEach((m, id) => {
             if (!ids.has(id)) { m.setMap(null); markerRefs.current.delete(id) }
@@ -116,49 +170,52 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
 
         buses.forEach(bus => {
             if (!bus.lat || !bus.lng) return
-            const pos = { lat: bus.lat, lng: bus.lng }
-            const color = getBusColor(bus.status)
-            const existing = markerRefs.current.get(bus.id)
+            const effectiveStatus = bus.computed_status || bus.status
+            const color   = getStatusColor(effectiveStatus)
+            const heading = bus.heading || 0
+            const pos     = { lat: bus.lat, lng: bus.lng }
+            const iconUrl = buildMarkerSvg(color, heading)
+            const iconSize = new google.maps.Size(44, 44)
+            const iconAnchor = new google.maps.Point(22, 22)
 
+            const existing = markerRefs.current.get(bus.id)
             if (existing) {
                 existing.setPosition(pos)
-                existing.setIcon({
-                    path: "M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z",
-                    fillColor: color,
-                    fillOpacity: 1,
-                    strokeColor: "#ffffff",
-                    strokeWeight: 2,
-                    scale: 1.2,
-                    rotation: bus.heading || 0,
-                    anchor: new google.maps.Point(12, 12),
+                existing.setIcon({ url: iconUrl, scaledSize: iconSize, anchor: iconAnchor })
+                existing.setLabel({
+                    text: bus.internal_id,
+                    color: isDark ? '#ffffff' : '#0f172a',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    className: 'bus-map-label',
                 })
             } else {
                 const m = new google.maps.Marker({
                     map: mapRef.current!,
                     position: pos,
                     title: bus.internal_id,
-                    icon: {
-                        path: "M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z",
-                        fillColor: color,
-                        fillOpacity: 1,
-                        strokeColor: "#ffffff",
-                        strokeWeight: 2,
-                        scale: 1.2,
-                        rotation: bus.heading || 0,
-                        anchor: new google.maps.Point(12, 12),
-                    }
+                    icon: { url: iconUrl, scaledSize: iconSize, anchor: iconAnchor },
+                    label: {
+                        text: bus.internal_id,
+                        color: isDark ? '#ffffff' : '#0f172a',
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                        className: 'bus-map-label',
+                    },
                 })
-                m.addListener('click', () => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: bus.id })))
+                m.addListener('click', () =>
+                    window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: bus.id }))
+                )
                 markerRefs.current.set(bus.id, m)
             }
         })
 
-        // FOCUS / BOUNDS optimization
+        // Auto-focus when bus list changes (search/filter)
         const valid = buses.filter(b => b.lat != null && b.lng != null)
         if (valid.length > 0 && mapRef.current) {
             if (valid.length === 1) {
                 mapRef.current.panTo({ lat: valid[0].lat, lng: valid[0].lng })
-                if (mapRef.current.getZoom()! < 15) mapRef.current.setZoom(15)
+                if ((mapRef.current.getZoom() ?? 0) < 15) mapRef.current.setZoom(15)
             } else {
                 const bounds = new google.maps.LatLngBounds()
                 valid.forEach(v => bounds.extend({ lat: v.lat, lng: v.lng }))
@@ -167,16 +224,17 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         }
     }, [isLoaded, buses, isHistoryMode, isDark])
 
-    // Live Trail Fetcher
+    // ── Live Trail Fetcher ────────────────────────────────────────────────────
     useEffect(() => {
         if (!isLiveTrail || !isLoaded) { setLiveTrails(new Map()); return }
-        const fetchAllTrails = async () => {
+
+        const fetch2HrTrails = async () => {
             const token = localStorage.getItem('token')
             const date  = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
-            const nextTrails = new Map<string, GPSPoint[]>()
-            const visibleBuses = buses.slice(0, 10) // limit to avoid spam
+            const result = new Map<string, GPSPoint[]>()
+            const subset = buses.filter(b => b.computed_status === 'moving' || b.computed_status === 'idle').slice(0, 10)
 
-            await Promise.all(visibleBuses.map(async bus => {
+            await Promise.all(subset.map(async bus => {
                 try {
                     const res = await fetch(`${BACKEND_URL}/api/gps/playback?bus=${bus.id}&date=${date}`, {
                         headers: { Authorization: `Bearer ${token}` }
@@ -184,59 +242,76 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                     if (res.ok) {
                         const data: GPSPoint[] = await res.json()
                         const threshold = Date.now() - 2 * 60 * 60 * 1000
-                        nextTrails.set(bus.id, data.filter(p => new Date(p.timestamp).getTime() > threshold))
+                        const filtered  = data.filter(p => new Date(p.timestamp).getTime() > threshold)
+                        if (filtered.length > 0) result.set(bus.id, filtered)
                     }
-                } catch (err) {}
+                } catch {}
             }))
-            setLiveTrails(nextTrails)
+            setLiveTrails(result)
         }
-        fetchAllTrails()
-        const interval = setInterval(fetchAllTrails, 30000)
+
+        fetch2HrTrails()
+        const interval = setInterval(fetch2HrTrails, 30_000)
         return () => clearInterval(interval)
     }, [isLiveTrail, isLoaded, buses])
 
-    // Playback Focus
+    // ── Playback Marker + Auto-Follow ─────────────────────────────────────────
     useEffect(() => {
         if (!isHistoryMode || !historyPoints[playbackIndex] || !mapRef.current) {
-            if (historyMarkerRef.current) { historyMarkerRef.current.setMap(null); historyMarkerRef.current = null }
+            historyMarkerRef.current?.setMap(null)
+            historyMarkerRef.current = null
             return
         }
-        const pt = historyPoints[playbackIndex]
+
+        const pt  = historyPoints[playbackIndex]
         const pos = { lat: pt.lat, lng: pt.lng }
+
         if (!historyMarkerRef.current) {
             historyMarkerRef.current = new google.maps.Marker({
                 map: mapRef.current!,
                 position: pos,
-                icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#3b82f6', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3, scale: 10 },
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    fillColor: '#3b82f6',
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 3,
+                    scale: 11,
+                },
                 zIndex: 1000
             })
         } else {
             historyMarkerRef.current.setPosition(pos)
         }
+        // Auto-follow during playback
         if (isPlaying) mapRef.current.panTo(pos)
     }, [playbackIndex, isHistoryMode, historyPoints, isPlaying])
 
-    // History Loader
+    // ── History fetching ──────────────────────────────────────────────────────
     const loadHistory = useCallback(async (busId: string, date: string) => {
         setIsLoading(true)
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`${BACKEND_URL}/api/gps/playback?bus=${busId}&date=${date}`, {
+            const res   = await fetch(`${BACKEND_URL}/api/gps/playback?bus=${busId}&date=${date}`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             const data = await res.json()
             setHistoryPoints(Array.isArray(data) ? data : [])
             setPlaybackIndex(0)
             if (Array.isArray(data) && data.length > 0 && mapRef.current) {
-                const b = new google.maps.LatLngBounds()
-                data.forEach(p => b.extend({ lat: p.lat, lng: p.lng }))
-                mapRef.current.fitBounds(b, 50)
+                const bounds = new google.maps.LatLngBounds()
+                data.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }))
+                mapRef.current.fitBounds(bounds, 50)
             }
-        } catch (e) {} finally { setIsLoading(false) }
+        } catch {} finally { setIsLoading(false) }
     }, [])
 
     const toggleHistoryMode = useCallback((bid?: string) => {
-        if (isHistoryMode && !bid) { setIsHistoryMode(false); setHistoryPoints([]); return }
+        if (isHistoryMode && !bid) {
+            setIsHistoryMode(false)
+            setHistoryPoints([])
+            return
+        }
         const id = bid || selectedBusId || buses[0]?.id
         if (!id) return
         setSelectedBusId(id)
@@ -250,6 +325,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         return () => window.removeEventListener('map:viewHistory', h)
     }, [toggleHistoryMode])
 
+    // Playback timer
     useEffect(() => {
         if (!isPlaying) return
         if (playbackIndex >= historyPoints.length - 1) { setIsPlaying(false); return }
@@ -257,78 +333,170 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         return () => clearInterval(t)
     }, [isPlaying, playbackIndex, historyPoints])
 
-    if (loadError) return <div className="p-8 text-red-500">Error loading maps.</div>
-    if (!isLoaded) return <div className="p-8 text-blue-500 animate-pulse">Initializing Fleet Map...</div>
+    // Live status legend counts
+    const counts = useMemo(() => ({
+        moving:    buses.filter(b => (b.computed_status || b.status) === 'moving').length,
+        idle:      buses.filter(b => (b.computed_status || b.status) === 'idle').length,
+        no_signal: buses.filter(b => (b.computed_status || b.status) === 'no_signal').length,
+        offline:   buses.filter(b => (b.computed_status || b.status) === 'offline').length,
+    }), [buses])
+
+    // ── Render ────────────────────────────────────────────────────────────────
+    if (loadError) return <div className="p-8 text-red-500 text-sm font-bold">⚠️ Maps failed to load. Check API Key.</div>
+    if (!isLoaded) return (
+        <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-slate-900 rounded-xl">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+    )
+
+    const currentPt = historyPoints[playbackIndex]
 
     return (
-        <div className="relative w-full h-full rounded-xl overflow-hidden border border-border bg-slate-100 dark:bg-slate-900 shadow-2xl">
+        <div className="relative w-full h-full rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl">
             <GoogleMap
                 mapContainerStyle={{ width: '100%', height: '100%' }}
                 center={MAP_CENTER}
                 zoom={12}
-                onLoad={m => { mapRef.current = m; setIsMapReady(true) }}
+                onLoad={m => { mapRef.current = m }}
                 options={mapOptions}
             >
-                {/* Live Trails (Last 2h) — Blue Dashed for better visibility */}
-                {isLiveTrail && Array.from(liveTrails.values()).map((t, idx) => (
-                    <Polyline 
-                        key={`t-${idx}`} 
-                        path={t.map(p => ({ lat: p.lat, lng: p.lng }))} 
-                        options={{ 
-                            strokeColor: '#3b82f6', 
-                            strokeOpacity: 0, 
+                {/* Live Trails — blue dashed */}
+                {isLiveTrail && Array.from(liveTrails.values()).map((trail, i) => (
+                    <Polyline
+                        key={`trail-${i}`}
+                        path={trail.map(p => ({ lat: p.lat, lng: p.lng }))}
+                        options={{
+                            strokeColor: '#3b82f6',
+                            strokeOpacity: 0,
                             icons: [{
-                                icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, scale: 5, strokeWeight: 5 },
-                                offset: '0',
-                                repeat: '20px'
+                                icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.85, scale: 5, strokeWeight: 5 },
+                                offset: '0', repeat: '18px'
                             }]
-                        }} 
+                        }}
                     />
                 ))}
 
-                {/* History Line */}
+                {/* History playback line */}
                 {isHistoryMode && historyPoints.length > 1 && (
-                    <Polyline 
-                        path={historyPoints.map(p => ({ lat: p.lat, lng: p.lng }))} 
-                        options={{ strokeColor: '#3b82f6', strokeWeight: 3, strokeOpacity: 0.8 }} 
+                    <Polyline
+                        path={historyPoints.map(p => ({ lat: p.lat, lng: p.lng }))}
+                        options={{ strokeColor: '#3b82f6', strokeWeight: 3, strokeOpacity: 0.75 }}
                     />
                 )}
             </GoogleMap>
 
-            {/* Buttons */}
-            <div className="absolute top-4 left-4 right-[120px] pointer-events-none flex justify-between">
-                <div></div>
-                <div className="flex gap-2 pointer-events-auto">
-                    <button 
-                        onClick={() => setIsLiveTrail(!isLiveTrail)}
-                        className={`p-3 rounded-xl shadow-lg backdrop-blur-md transition-all ${isLiveTrail ? 'bg-blue-600 text-white' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200'}`}
-                    >
-                        <Route size={20} className={isLiveTrail ? 'animate-pulse' : ''} />
-                    </button>
-                    <button 
-                        onClick={() => toggleHistoryMode()}
-                        className={`p-3 rounded-xl shadow-lg backdrop-blur-md transition-all ${isHistoryMode ? 'bg-blue-600 text-white' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200'}`}
-                    >
-                        {isHistoryMode ? <X size={20} /> : <Calendar size={20} />}
-                    </button>
+            {/* Status Legend — bottom left */}
+            {!isHistoryMode && (
+                <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-1.5 pointer-events-none max-w-[260px]">
+                    {counts.moving > 0 && (
+                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                            <span className="text-[10px] font-bold text-white">{counts.moving} Moving</span>
+                        </div>
+                    )}
+                    {counts.idle > 0 && (
+                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                            <div className="w-2 h-2 rounded-full bg-amber-400" />
+                            <span className="text-[10px] font-bold text-white">{counts.idle} Idle</span>
+                        </div>
+                    )}
+                    {counts.no_signal > 0 && (
+                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                            <span className="text-[10px] font-bold text-white">{counts.no_signal} No Signal</span>
+                        </div>
+                    )}
+                    {counts.offline > 0 && (
+                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                            <div className="w-2 h-2 rounded-full bg-slate-500" />
+                            <span className="text-[10px] font-bold text-white">{counts.offline} Offline</span>
+                        </div>
+                    )}
                 </div>
+            )}
+
+            {/* Map Control Buttons — top right (shifted left of fullscreen btn) */}
+            <div className="absolute top-4 right-[116px] z-10 flex gap-2">
+                <button
+                    onClick={() => setIsLiveTrail(!isLiveTrail)}
+                    className={`p-3 rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${ isLiveTrail ? 'bg-blue-600 text-white' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white' }`}
+                    title={isLiveTrail ? 'Hide Trail (2h)' : 'Show Trail (2h)'}
+                >
+                    <Route size={20} className={isLiveTrail ? 'animate-pulse' : ''} />
+                </button>
+                <button
+                    onClick={() => toggleHistoryMode()}
+                    className={`p-3 rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${ isHistoryMode ? 'bg-blue-600 text-white' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white' }`}
+                    title={isHistoryMode ? 'Exit History' : 'History Playback'}
+                >
+                    {isHistoryMode ? <X size={20} /> : <Calendar size={20} />}
+                </button>
             </div>
 
-            {/* Playback Controls */}
-            {isHistoryMode && historyPoints.length > 0 && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md z-50">
-                    <div className="bg-slate-900/90 backdrop-blur-xl p-4 rounded-3xl shadow-2xl border border-white/10 text-white flex flex-col gap-3">
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => setIsPlaying(!isPlaying)} className="p-3 bg-blue-500 rounded-2xl">
-                                {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
-                            </button>
-                            <div className="flex-1">
-                                <p className="text-xs font-black">{new Date(historyPoints[playbackIndex].timestamp).toLocaleTimeString()}</p>
-                                <p className="text-[10px] opacity-70 uppercase tracking-widest">{Math.round(historyPoints[playbackIndex].speed)} KM/H</p>
+            {/* History Controls (date + bus picker) */}
+            {isHistoryMode && (
+                <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-white/10">
+                    <Calendar size={14} className="text-blue-500 ml-2" />
+                    <input
+                        type="date"
+                        value={playbackDate}
+                        onChange={e => { setPlaybackDate(e.target.value); if (selectedBusId) loadHistory(selectedBusId, e.target.value) }}
+                        className="bg-transparent text-xs font-bold border-none focus:ring-0 p-0 text-slate-800 dark:text-white cursor-pointer pr-2"
+                    />
+                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+                    <select
+                        value={selectedBusId || ''}
+                        onChange={e => { setSelectedBusId(e.target.value); loadHistory(e.target.value, playbackDate) }}
+                        className="bg-transparent text-xs font-bold border-none focus:ring-0 py-1 px-2 text-slate-800 dark:text-white cursor-pointer"
+                    >
+                        {buses.map(b => (
+                            <option key={b.id} value={b.id}>{b.internal_id}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
+            {/* Playback Timeline */}
+            {isHistoryMode && (
+                <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-[92%] max-w-[420px] z-50">
+                    <div className="bg-slate-900/92 backdrop-blur-2xl p-4 rounded-3xl shadow-2xl border border-white/10 text-white flex flex-col gap-3">
+                        {isLoading ? (
+                            <div className="flex items-center justify-center py-3">
+                                <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
                             </div>
-                            <div className="text-xs opacity-50">{playbackIndex + 1} / {historyPoints.length}</div>
-                        </div>
-                        <input type="range" min="0" max={historyPoints.length - 1} value={playbackIndex} onChange={e => setPlaybackIndex(Number(e.target.value))} className="w-full accent-blue-500" />
+                        ) : historyPoints.length === 0 ? (
+                            <p className="text-center text-slate-400 text-xs italic py-1">No data for this date</p>
+                        ) : (
+                            <>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setIsPlaying(!isPlaying)}
+                                        className="p-3 bg-blue-500 hover:bg-blue-400 text-white rounded-2xl shadow-lg shadow-blue-500/30 transition-all active:scale-95"
+                                    >
+                                        {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+                                    </button>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-black text-blue-300 truncate">
+                                            {currentPt ? new Date(currentPt.timestamp).toLocaleTimeString('en-IN') : '—'}
+                                        </p>
+                                        <p className="text-[11px] text-white/60 font-semibold">
+                                            {currentPt ? `${Math.round(currentPt.speed)} km/h` : '—'}
+                                        </p>
+                                    </div>
+                                    <div className="text-[11px] font-black bg-white/10 text-white/70 px-3 py-1.5 rounded-full">
+                                        {playbackIndex + 1} <span className="opacity-40">/</span> {historyPoints.length}
+                                    </div>
+                                </div>
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={Math.max(0, historyPoints.length - 1)}
+                                    value={playbackIndex}
+                                    onChange={e => setPlaybackIndex(Number(e.target.value))}
+                                    className="w-full accent-blue-500 h-1.5 rounded-full cursor-pointer"
+                                />
+                            </>
+                        )}
                     </div>
                 </div>
             )}

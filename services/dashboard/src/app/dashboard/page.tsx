@@ -87,24 +87,16 @@ export default function DashboardPage() {
 
     if (!mounted) return <div className="p-6 text-center">Loading Dashboard...</div>
 
-    const getStatusInfo = (lastHeartbeat: string | null) => {
-        if (!lastHeartbeat) return { label: 'NO DATA', color: 'text-slate-300', dot: 'bg-slate-200' }
-        const last = new Date(lastHeartbeat).getTime()
-        const now = new Date().getTime()
-        const diffMinutes = (now - last) / (1000 * 60)
-
-        if (diffMinutes < 2) return { label: 'LIVE', color: 'text-green-600', dot: 'bg-green-500 animate-pulse' }
-        
-        if (diffMinutes < 60) {
-            return { label: `${Math.round(diffMinutes)}m AGO`, color: 'text-amber-500', dot: 'bg-amber-400' }
+    /** Use computed_status from backend for accurate real-time status */
+    const getStatusDisplay = (bus: any) => {
+        const s = bus.computed_status || bus.status
+        switch (s) {
+            case 'moving':    return { label: 'Moving',    color: 'text-green-600 dark:text-green-400', dot: 'bg-green-500 animate-pulse', speed: Math.round(bus.speed || 0) }
+            case 'idle':      return { label: 'Idle',      color: 'text-amber-500 dark:text-amber-400', dot: 'bg-amber-400',              speed: null }
+            case 'no_signal': return { label: 'No Signal', color: 'text-red-500 dark:text-red-400',   dot: 'bg-red-500',                 speed: null }
+            case 'offline':   return { label: 'Offline',   color: 'text-slate-400',                    dot: 'bg-slate-400',               speed: null }
+            default:          return { label: 'Unknown',   color: 'text-slate-300',                    dot: 'bg-slate-300',               speed: null }
         }
-        
-        const diffHours = Math.round(diffMinutes / 60)
-        if (diffHours < 24) {
-            return { label: `${diffHours}h AGO`, color: 'text-orange-500', dot: 'bg-orange-400' }
-        }
-
-        return { label: `${Math.round(diffHours / 24)}d AGO`, color: 'text-slate-400', dot: 'bg-slate-300' }
     }
 
     const filteredBuses = buses.filter(bus =>
@@ -233,7 +225,12 @@ export default function DashboardPage() {
                                         <Card className="hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer border-none shadow-sm bg-white dark:bg-slate-900">
                                             <CardContent className="p-4 flex items-center justify-between">
                                                 <div className="flex items-center gap-4">
-                                                    <div className={`p-2.5 rounded-xl ${bus.status === 'online' ? 'bg-green-500/10 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <div className={`p-2.5 rounded-xl ${
+                                                    (bus as any).computed_status === 'moving' ? 'bg-green-500/10 text-green-600' :
+                                                    (bus as any).computed_status === 'idle'   ? 'bg-amber-400/10 text-amber-500' :
+                                                    (bus as any).computed_status === 'no_signal' ? 'bg-red-500/10 text-red-500' :
+                                                    'bg-slate-100 text-slate-400'
+                                                }`}>
                                                         <Bus className="w-5 h-5" />
                                                     </div>
                                                     <div>
@@ -248,16 +245,16 @@ export default function DashboardPage() {
                                                 </div>
                                                 <div className="flex flex-col items-end gap-1 text-[10px]">
                                                     {(() => {
-                                                        const status = getStatusInfo((bus as any).last_heartbeat)
+                                                        const st = getStatusDisplay(bus)
                                                         return (
                                                             <>
-                                                                <span className={`${status.color} flex items-center gap-1.5 font-bold uppercase tracking-wider`}>
-                                                                    <div className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-                                                                    {status.label}
+                                                                <span className={`${st.color} flex items-center gap-1.5 font-bold uppercase tracking-wider`}>
+                                                                    <div className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+                                                                    {st.label}
                                                                 </span>
-                                                                {(bus as any).speed > 5 && (
+                                                                {st.speed !== null && st.speed > 0 && (
                                                                     <span className="font-mono font-bold text-slate-500 dark:text-slate-400">
-                                                                        {Math.round((bus as any).speed)} KM/H
+                                                                        {st.speed} km/h
                                                                     </span>
                                                                 )}
                                                             </>
