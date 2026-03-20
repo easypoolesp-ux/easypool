@@ -11,6 +11,7 @@ GATEWAY_PORT    = int(os.getenv("GATEWAY_PORT", 5027))
 # Teltonika DIN1 (ignition wire) IO IDs.
 # Newer FMB920 firmware uses 239 (0xEF); older firmware may use 1.
 # Both are checked so the parser works regardless of firmware version.
+# Trigger CI/CD refresh. Correct Codec 8 / 8E IO parser.
 IGNITION_IO_IDS = {239, 1}
 
 

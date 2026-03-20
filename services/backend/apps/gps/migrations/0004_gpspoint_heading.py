@@ -8,9 +8,16 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='gpspoint',
-            name='heading',
-            field=models.FloatField(default=0, help_text='Direction of travel in degrees (0-360)'),
+        migrations.RunSQL(
+            """
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='gps_gpspoint' AND column_name='heading') THEN
+                ALTER TABLE gps_gpspoint ADD COLUMN heading double precision DEFAULT 0;
+              END IF;
+            END
+            $$;
+            """,
+            reverse_sql="ALTER TABLE gps_gpspoint DROP COLUMN IF EXISTS heading;"
         ),
     ]

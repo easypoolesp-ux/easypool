@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
     title: "EasyPool | Fleet Monitoring & Safety Dashboard",
     description: "Real-time monitoring and safety management",
+    icons: {
+        icon: '/logo.jpeg',
+    },
 };
 
 import QueryProvider from "@/components/providers/QueryProvider";
