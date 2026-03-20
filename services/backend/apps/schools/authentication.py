@@ -1,10 +1,11 @@
 import firebase_admin
-from firebase_admin import credentials, auth
+from decouple import config
+from firebase_admin import auth, credentials
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import BasePermission
+
 from apps.schools.models import User
-from decouple import config
 
 # ── Firebase Admin SDK Initialization ─────────────────────────────────────────
 # projectId must be set explicitly when the Cloud Run service account project
@@ -23,42 +24,43 @@ class FirebaseAuthentication(BaseAuthentication):
     Maps the Firebase user to a Django User via email.
     Only users that already exist in the Django database are allowed (invite-only).
     """
+
     def authenticate(self, request):
-        auth_header = request.META.get("HTTP_AUTHORIZATION")
-        if not auth_header or not auth_header.startswith("Bearer "):
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        if not auth_header or not auth_header.startswith('Bearer '):
             return None
 
-        id_token = auth_header.split(" ").pop()
+        id_token = auth_header.split(' ').pop()
 
         try:
             decoded_token = auth.verify_id_token(id_token)
         except auth.ExpiredIdTokenError:
-            raise AuthenticationFailed("Your session has expired. Please sign in again.")
+            raise AuthenticationFailed('Your session has expired. Please sign in again.')
         except auth.InvalidIdTokenError:
-            raise AuthenticationFailed("Invalid session token. Please sign in again.")
+            raise AuthenticationFailed('Invalid session token. Please sign in again.')
         except Exception as e:
-            raise AuthenticationFailed(f"Authentication failed: {str(e)}")
+            raise AuthenticationFailed(f'Authentication failed: {str(e)}')
 
-        uid = decoded_token.get("uid")
-        email = decoded_token.get("email")
+        uid = decoded_token.get('uid')
+        email = decoded_token.get('email')
 
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
             raise AuthenticationFailed(
-                "Access denied. Your account is not registered in EasyPool. "
-                "Please contact your administrator."
+                'Access denied. Your account is not registered in EasyPool. '
+                'Please contact your administrator.'
             )
 
         if not user.is_active:
             raise AuthenticationFailed(
-                "Your account has been deactivated. Please contact your administrator."
+                'Your account has been deactivated. Please contact your administrator.'
             )
 
         # Store Firebase UID on first login
         if not user.google_id:
             user.google_id = uid
-            user.save(update_fields=["google_id"])
+            user.save(update_fields=['google_id'])
 
         return (user, None)
 
@@ -83,17 +85,11 @@ class IsPortalUser(BasePermission):
     Baseline permission: allows any active authenticated user registered in Django.
     Use this on all views as the minimum requirement.
     """
-    message = (
-        "You do not have access to this portal. "
-        "Please contact your EasyPool administrator."
-    )
+
+    message = 'You do not have access to this portal. Please contact your EasyPool administrator.'
 
     def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.is_active
-        )
+        return bool(request.user and request.user.is_authenticated and request.user.is_active)
 
 
 class InGroup(BasePermission):
@@ -107,9 +103,10 @@ class InGroup(BasePermission):
     Usage:
         permission_classes = [IsAuthenticated, InGroup(['SuperAdmin', 'SchoolAdmin'])]
     """
+
     message = (
-        "You do not have permission to access this resource. "
-        "Please contact your EasyPool administrator."
+        'You do not have permission to access this resource. '
+        'Please contact your EasyPool administrator.'
     )
 
     def __init__(self, allowed_groups: list):

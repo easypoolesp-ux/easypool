@@ -1,5 +1,7 @@
 from django.contrib import admin
+
 from .models import Organisation, School, Transporter, User
+
 
 @admin.register(Organisation)
 class OrganisationAdmin(admin.ModelAdmin):
@@ -8,6 +10,7 @@ class OrganisationAdmin(admin.ModelAdmin):
     search_fields = ('name',)
     raw_id_fields = ('parent',)
 
+
 @admin.register(School)
 class SchoolAdmin(admin.ModelAdmin):
     list_display = ('name', 'organisation', 'contact_email', 'phone', 'is_active', 'created_at')
@@ -15,12 +18,14 @@ class SchoolAdmin(admin.ModelAdmin):
     list_filter = ('is_active',)
     raw_id_fields = ('organisation',)
 
+
 @admin.register(Transporter)
 class TransporterAdmin(admin.ModelAdmin):
     list_display = ('name', 'organisation', 'contact_person', 'phone', 'is_active')
     search_fields = ('name', 'contact_person', 'email')
     list_filter = ('is_active',)
     raw_id_fields = ('organisation',)
+
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):

@@ -1,15 +1,19 @@
 from django.db import models
-from apps.students.models import Student
+
 from apps.buses.models import Bus
+from apps.students.models import Student
+
 
 class Attendance(models.Model):
     DIRECTION_CHOICES = (
         ('boarding', 'Boarding'),
         ('alighting', 'Alighting'),
     )
-    
+
     id = models.BigAutoField(primary_key=True)
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendance_records')
+    student = models.ForeignKey(
+        Student, on_delete=models.CASCADE, related_name='attendance_records'
+    )
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='attendance_records')
     direction = models.CharField(max_length=20, choices=DIRECTION_CHOICES)
     confidence = models.FloatField()
@@ -26,4 +30,4 @@ class Attendance(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.student.full_name} - {self.direction} @ {self.timestamp}"
+        return f'{self.student.full_name} - {self.direction} @ {self.timestamp}'

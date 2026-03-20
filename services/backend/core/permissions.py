@@ -1,6 +1,5 @@
 from rest_framework import permissions
 
-
 # ── Core Permission Classes ────────────────────────────────────────────────────
 #
 # These use Django's built-in Group system for RBAC.
@@ -27,7 +26,8 @@ def _in_group(user, *group_names):
 
 class IsSuperAdmin(permissions.BasePermission):
     """Full access. Only members of the 'SuperAdmin' Django Group."""
-    message = "This action requires Super Admin access. Please contact your administrator."
+
+    message = 'This action requires Super Admin access. Please contact your administrator.'
 
     def has_permission(self, request, view):
         return _in_group(request.user, 'SuperAdmin')
@@ -35,7 +35,8 @@ class IsSuperAdmin(permissions.BasePermission):
 
 class IsSchoolAdmin(permissions.BasePermission):
     """Access scoped to the user's own school. Members of 'SchoolAdmin' Group."""
-    message = "This action requires School Admin access. Please contact your administrator."
+
+    message = 'This action requires School Admin access. Please contact your administrator.'
 
     def has_permission(self, request, view):
         return _in_group(request.user, 'SuperAdmin', 'SchoolAdmin')
@@ -43,7 +44,8 @@ class IsSchoolAdmin(permissions.BasePermission):
 
 class IsTransporter(permissions.BasePermission):
     """Access scoped to the user's own transporter. Members of 'Transporter' Group."""
-    message = "This action requires Transporter access. Please contact your administrator."
+
+    message = 'This action requires Transporter access. Please contact your administrator.'
 
     def has_permission(self, request, view):
         return _in_group(request.user, 'SuperAdmin', 'SchoolAdmin', 'Transporter')
@@ -51,7 +53,8 @@ class IsTransporter(permissions.BasePermission):
 
 class IsParent(permissions.BasePermission):
     """Read-only access for parents. Members of 'Parent' Group."""
-    message = "This action requires Parent access. Please contact your administrator."
+
+    message = 'This action requires Parent access. Please contact your administrator.'
 
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
@@ -68,6 +71,7 @@ class IsParent(permissions.BasePermission):
 # an empty queryset rather than leaking data, so the view's permission_classes
 # will issue a 403 before the data is even fetched.
 
+
 class SchoolIsolationMixin:
     """
     Filters querysets by the user's organisation (or legacy school/transporter).
@@ -78,6 +82,7 @@ class SchoolIsolationMixin:
     - Transporter                    : sees only their transporter's data within the org
     - Unauthenticated / no role      : sees nothing — safety net before permission_classes
     """
+
     def get_queryset(self):
         user = self.request.user
         queryset = super().get_queryset()
@@ -109,7 +114,7 @@ class SchoolIsolationMixin:
             elif hasattr(model, 'organisation'):
                 # For models that only have physical ownership
                 queryset = queryset.filter(organisation__in=user_orgs)
-            
+
         # Fallback: legacy school FK for backwards compatibility
         elif hasattr(user, 'school') and user.school and hasattr(model, 'school'):
             queryset = queryset.filter(school=user.school)

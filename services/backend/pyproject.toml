@@ -1,0 +1,44 @@
+[project]
+name = "easypool-backend"
+version = "0.1.0"
+description = "EasyPool Backend API"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".git",
+    "migrations",
+    "__pycache__",
+    "env",
+    "venv",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long (handled by formatter)
+    "B008", # do not perform function calls in argument defaults
+]
+
+[tool.ruff.format]
+quote-style = "single"
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = "--nomigrations --disable-warnings"
+
+[tool.bandit]
+exclude_dirs = ["tests", "migrations"]
+tests = ["B201", "B301"]
+skips = ["B101"] # Ignore asserts

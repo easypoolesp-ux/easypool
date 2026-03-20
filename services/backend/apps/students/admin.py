@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import Student, Parent
+
+from .models import Parent, Student
+
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
@@ -7,6 +9,7 @@ class StudentAdmin(admin.ModelAdmin):
     search_fields = ('full_name', 'student_number')
     list_filter = ('school', 'grade', 'is_active')
     raw_id_fields = ('school', 'bus')
+
 
 @admin.register(Parent)
 class ParentAdmin(admin.ModelAdmin):
@@ -16,8 +19,10 @@ class ParentAdmin(admin.ModelAdmin):
 
     def get_full_name(self, obj):
         return obj.user.full_name
+
     get_full_name.short_description = 'Parent Name'
 
     def get_email(self, obj):
         return obj.user.email
+
     get_email.short_description = 'Email'

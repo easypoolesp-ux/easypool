@@ -1,0 +1,92 @@
+name: Enterprise Quality Gates (CI)
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  # ── Detect which services changed ─────────────────────────────────────────
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      dashboard: ${{ steps.filter.outputs.dashboard }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'services/backend/**'
+            dashboard:
+              - 'services/dashboard/**'
+
+  # ── Backend Checks (Python/Django) ────────────────────────────────────────
+  backend-lint-and-security:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/backend
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Linting & Security Tools
+        run: |
+          pip install ruff bandit safety
+          pip install -r requirements.txt
+
+      - name: Ruff Format Check
+        run: ruff format --check .
+
+      - name: Ruff Lint Check
+        run: ruff check .
+
+      - name: Bandit Security Scan
+        run: bandit -c pyproject.toml -r .
+
+      - name: Django Configuration Check
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+
+
+  # ── Frontend Checks (Next.js/TypeScript) ──────────────────────────────────
+  dashboard-lint-and-typecheck:
+    needs: changes
+    if: needs.changes.outputs.dashboard == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/dashboard
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './services/dashboard/package-lock.json'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Prettier Format Check
+        run: npx prettier --check "**/*.{ts,tsx,md,json}"
+
+      - name: ESLint Check
+        run: npm run lint:strict
+
+      - name: TypeScript Compiler Check (No Emit)
+        run: npm run typecheck

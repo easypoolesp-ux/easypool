@@ -1,11 +1,14 @@
 from django.contrib import admin
-from .models import GPSPoint, Alert
+
+from .models import Alert, GPSPoint
+
 
 @admin.register(GPSPoint)
 class GPSPointAdmin(admin.ModelAdmin):
     list_display = ('bus', 'lat', 'lng', 'speed', 'heading', 'ignition', 'timestamp')
     list_filter = ('bus', 'ignition', 'timestamp')
     readonly_fields = ('timestamp',)
+
 
 @admin.register(Alert)
 class AlertAdmin(admin.ModelAdmin):

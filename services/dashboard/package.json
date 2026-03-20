@@ -6,7 +6,10 @@
         "dev": "next dev",
         "build": "next build",
         "start": "next start",
-        "lint": "next lint"
+        "lint": "next lint",
+        "lint:strict": "next lint --dir src",
+        "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@radix-ui/react-tabs": "^1.0.4",

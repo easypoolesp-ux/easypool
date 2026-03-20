@@ -1,7 +1,10 @@
 import uuid
+
 from django.db import models
-from apps.schools.models import User
+
 from apps.buses.models import Bus
+from apps.schools.models import User
+
 
 class GPSPoint(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -21,7 +24,8 @@ class GPSPoint(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.bus.internal_id} @ {self.timestamp}"
+        return f'{self.bus.internal_id} @ {self.timestamp}'
+
 
 class Alert(models.Model):
     TYPE_CHOICES = (
@@ -31,14 +35,16 @@ class Alert(models.Model):
         ('camera_offline', 'Camera Offline'),
         ('student_missing', 'Student Missing'),
     )
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='alerts')
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     message = models.TextField()
     is_resolved = models.BooleanField(default=False)
-    resolved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='resolved_alerts')
+    resolved_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='resolved_alerts'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.get_type_display()} - {self.bus.internal_id}"
+        return f'{self.get_type_display()} - {self.bus.internal_id}'

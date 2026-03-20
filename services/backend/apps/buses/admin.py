@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import Route, Bus, Camera
+
+from .models import Bus, Camera, Route
+
 
 @admin.register(Route)
 class RouteAdmin(admin.ModelAdmin):
@@ -9,9 +11,11 @@ class RouteAdmin(admin.ModelAdmin):
     raw_id_fields = ('organisation',)
     filter_horizontal = ('allocated_to',)
 
+
 class CameraInline(admin.TabularInline):
     model = Camera
     extra = 1
+
 
 @admin.register(Bus)
 class BusAdmin(admin.ModelAdmin):

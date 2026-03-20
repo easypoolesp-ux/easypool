@@ -1,29 +1,46 @@
-from rest_framework import serializers
-from django.utils import timezone
 from datetime import timedelta
-from .models import Route, Bus, Camera
-from apps.schools.serializers import SchoolSerializer
+
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
+from rest_framework import serializers
+
+from apps.schools.serializers import SchoolSerializer
+
+from .models import Bus, Camera, Route
+
 
 class RouteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Route
         fields = '__all__'
 
+
 class BusListSerializer(serializers.ModelSerializer):
-    lat             = serializers.SerializerMethodField()
-    lng             = serializers.SerializerMethodField()
-    route_name      = serializers.CharField(source='route.name', read_only=True)
-    last_heartbeat  = serializers.SerializerMethodField()
-    speed           = serializers.SerializerMethodField()
-    heading         = serializers.SerializerMethodField()
+    lat = serializers.SerializerMethodField()
+    lng = serializers.SerializerMethodField()
+    route_name = serializers.CharField(source='route.name', read_only=True)
+    last_heartbeat = serializers.SerializerMethodField()
+    speed = serializers.SerializerMethodField()
+    heading = serializers.SerializerMethodField()
     computed_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Bus
-        fields = ('id', 'internal_id', 'plate_number', 'status', 'computed_status',
-                  'lat', 'lng', 'speed', 'heading', 'route_name',
-                  'driver_name', 'gps_imei', 'last_heartbeat')
+        fields = (
+            'id',
+            'internal_id',
+            'plate_number',
+            'status',
+            'computed_status',
+            'lat',
+            'lng',
+            'speed',
+            'heading',
+            'route_name',
+            'driver_name',
+            'gps_imei',
+            'last_heartbeat',
+        )
 
     @extend_schema_field(serializers.DateTimeField())
     def get_last_heartbeat(self, obj):
@@ -71,41 +88,47 @@ class BusListSerializer(serializers.ModelSerializer):
         5. 'stopped'   (Black) : < 10m signal + engine OFF (parked) OR silence > 10m
         """
         # Grey — manually deactivated for maintenance
-        if obj.status == 'offline': return 'offline'
+        if obj.status == 'offline':
+            return 'offline'
 
-        latest    = obj.gps_points.first()
+        latest = obj.gps_points.first()
         heartbeat = getattr(obj, 'latest_heartbeat', None) or (latest.timestamp if latest else None)
-        if not heartbeat: return 'no_signal'
+        if not heartbeat:
+            return 'no_signal'
 
-        now  = timezone.now()
+        now = timezone.now()
         diff = now - heartbeat
 
         # Red — long-term failure
         # 1. 12-hour absolute silence = NO SIGNAL (Red)
         if diff > timedelta(hours=12):
             return 'no_signal'
-        
+
         # Pull ignition state
         ignition = getattr(obj, 'latest_ignition', None)
-        if ignition is None: ignition = latest.ignition if latest else False
+        if ignition is None:
+            ignition = latest.ignition if latest else False
 
         # 2. Critical Alert: Engine was ON but silence > 15m = NO SIGNAL (Red)
         if ignition and diff > timedelta(minutes=15):
             return 'no_signal'
-        
+
         # 3. Parked: Engine is OFF and seen < 12h ago = STOPPED (Slate)
         if not ignition:
             return 'stopped'
 
         # 4. Engine is ON + Recent (< 5m): check speed for Moving vs Idle
         speed = getattr(obj, 'latest_speed', None)
-        if speed is None: speed = float(latest.speed or 0) if latest else 0
+        if speed is None:
+            speed = float(latest.speed or 0) if latest else 0
         return 'moving' if float(speed) > 2 else 'idle'
+
 
 class CameraSerializer(serializers.ModelSerializer):
     class Meta:
         model = Camera
         fields = ('id', 'name', 'stream_slug', 'stream_url', 'is_active')
+
 
 class BusDetailSerializer(serializers.ModelSerializer):
     route = RouteSerializer(read_only=True)
@@ -114,7 +137,7 @@ class BusDetailSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
     lng = serializers.SerializerMethodField()
     last_heartbeat = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Bus
         fields = '__all__'

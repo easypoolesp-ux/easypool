@@ -9,6 +9,7 @@ def _create_portal_groups(sender, **kwargs):
     Groups are idempotent (get_or_create), so this is safe to run repeatedly.
     """
     from django.contrib.auth.models import Group
+
     # Unified Role Abstractions (Your hierarchy provides the scope, the Role provides the buttons)
     for name in ['Admin', 'Manager', 'Viewer', 'Parent']:
         Group.objects.get_or_create(name=name)
@@ -20,4 +21,5 @@ class SchoolsConfig(AppConfig):
 
     def ready(self):
         from django.db.models.signals import post_migrate
+
         post_migrate.connect(_create_portal_groups, sender=self)

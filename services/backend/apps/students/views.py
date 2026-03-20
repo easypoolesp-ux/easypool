@@ -1,7 +1,10 @@
-from rest_framework import viewsets, decorators, response
+from rest_framework import decorators, response, viewsets
+
 from core.permissions import IsSchoolAdmin, SchoolIsolationMixin
-from .models import Student, Parent
-from .serializers import StudentListSerializer, StudentDetailSerializer, ParentSerializer
+
+from .models import Parent, Student
+from .serializers import ParentSerializer, StudentDetailSerializer, StudentListSerializer
+
 
 class StudentViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Student.objects.all()
@@ -19,6 +22,7 @@ class StudentViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
         student = self.get_object()
         # In real world: upload to GCS, then trigger AI
         return response.Response({'status': 'photo uploaded, processing started'})
+
 
 class ParentViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Parent.objects.all()
