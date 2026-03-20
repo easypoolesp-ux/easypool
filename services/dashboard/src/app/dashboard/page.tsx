@@ -91,7 +91,7 @@ export default function DashboardPage() {
     const getStatusDisplay = (bus: any) => {
         const s = bus.computed_status || bus.status
         switch (s) {
-            case 'moving':    return { label: 'Moving',    color: 'text-green-600 dark:text-green-400', dot: 'bg-green-500 animate-pulse', speed: Math.round(bus.speed || 0) }
+            case 'moving':    return { label: 'Moving',    color: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500 animate-pulse', speed: Math.round(bus.speed || 0) }
             case 'idle':      return { label: 'Idle',      color: 'text-amber-500 dark:text-amber-400', dot: 'bg-amber-400',              speed: null }
             case 'no_signal': return { label: 'No Signal', color: 'text-red-500 dark:text-red-400',   dot: 'bg-red-500',                 speed: null }
             case 'offline':   return { label: 'Offline',   color: 'text-slate-400',                    dot: 'bg-slate-400',               speed: null }
@@ -226,7 +226,7 @@ export default function DashboardPage() {
                                             <CardContent className="p-4 flex items-center justify-between">
                                                 <div className="flex items-center gap-4">
                                                     <div className={`p-2.5 rounded-xl ${
-                                                    (bus as any).computed_status === 'moving' ? 'bg-green-500/10 text-green-600' :
+                                                    (bus as any).computed_status === 'moving' ? 'bg-blue-500/10 text-blue-600' :
                                                     (bus as any).computed_status === 'idle'   ? 'bg-amber-400/10 text-amber-500' :
                                                     (bus as any).computed_status === 'no_signal' ? 'bg-red-500/10 text-red-500' :
                                                     'bg-slate-100 text-slate-400'
@@ -246,17 +246,11 @@ export default function DashboardPage() {
                                                 <div className="flex flex-col items-end gap-1 text-[10px]">
                                                     {(() => {
                                                         const st = getStatusDisplay(bus)
-                                                        // Time ago from last_heartbeat
+                                                        // Last update timestamp
                                                         const hb = (bus as any).last_heartbeat
-                                                        let ago = ''
-                                                        if (hb) {
-                                                            const diffMs = Date.now() - new Date(hb).getTime()
-                                                            const mins = Math.floor(diffMs / 60000)
-                                                            if (mins < 1) ago = 'Just now'
-                                                            else if (mins < 60) ago = `${mins}m ago`
-                                                            else if (mins < 1440) ago = `${Math.floor(mins / 60)}h ago`
-                                                            else ago = `${Math.floor(mins / 1440)}d ago`
-                                                        }
+                                                        const timeStr = hb
+                                                            ? new Date(hb).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                                                            : ''
                                                         return (
                                                             <>
                                                                 <span className={`${st.color} flex items-center gap-1.5 font-bold uppercase tracking-wider`}>
@@ -268,9 +262,9 @@ export default function DashboardPage() {
                                                                         {st.speed} km/h
                                                                     </span>
                                                                 )}
-                                                                {ago && (
+                                                                {timeStr && (
                                                                     <span className="text-[9px] text-muted-foreground font-medium">
-                                                                        {ago}
+                                                                        {timeStr}
                                                                     </span>
                                                                 )}
                                                             </>

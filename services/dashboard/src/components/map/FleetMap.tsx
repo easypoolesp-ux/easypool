@@ -65,7 +65,7 @@ const LIGHT_STYLE: google.maps.MapTypeStyle[] = []
  */
 function getStatusColor(status: string): string {
     switch (status) {
-        case 'moving':    return '#22c55e'
+        case 'moving':    return '#3b82f6'   // blue — visible on all map themes
         case 'idle':      return '#f59e0b'
         case 'no_signal': return '#ef4444'
         default:          return '#64748b' // offline / unknown
@@ -235,7 +235,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             const token = localStorage.getItem('token')
             const date  = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
             const result = new Map<string, GPSPoint[]>()
-            const subset = buses.filter(b => b.computed_status === 'moving' || b.computed_status === 'idle').slice(0, 10)
+            const subset = buses.filter(b => b.lat != null && b.lng != null).slice(0, 10)
 
             await Promise.all(subset.map(async bus => {
                 try {
@@ -393,7 +393,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                 <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-1.5 pointer-events-none max-w-[260px]">
                     {counts.moving > 0 && (
                         <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
-                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                            <div className="w-2 h-2 rounded-full bg-blue-500" />
                             <span className="text-[10px] font-bold text-white">{counts.moving} Moving</span>
                         </div>
                     )}
