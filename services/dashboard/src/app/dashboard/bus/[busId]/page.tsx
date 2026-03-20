@@ -9,6 +9,8 @@ import LiveCamera from '@/components/video/LiveCamera'
 import PlaybackCamera from '@/components/video/PlaybackCamera'
 import FleetMap from '@/components/map/FleetMap'
 import { components } from '@/types/api'
+import Image from 'next/image'
+
 
 import UserProfile from '@/components/layout/UserProfile'
 
@@ -137,7 +139,15 @@ export default function BusDetailPage({ params }: Props) {
                         <ArrowLeft className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
                     </Link>
                     <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                        <Bus className="w-8 h-8 text-primary" />
+                        <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-border shadow-sm">
+                            <Image 
+                                src="/logo.jpeg" 
+                                alt="EasyPool Logo" 
+                                fill 
+                                className="object-cover"
+                                priority
+                            />
+                        </div>
                         Bus Monitoring: {bus.internal_id}
                     </h1>
                 </div>

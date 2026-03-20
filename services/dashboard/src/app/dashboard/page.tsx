@@ -9,6 +9,8 @@ import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut } from
 import Link from 'next/link'
 import nextDynamic from 'next/dynamic'
 import { components } from '@/types/api'
+import Image from 'next/image'
+
 
 import UserProfile from '@/components/layout/UserProfile'
 
@@ -114,9 +116,20 @@ export default function DashboardPage() {
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6 bg-slate-50/50 dark:bg-transparent min-h-screen">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Fleet Overview</h1>
-                    <p className="text-muted-foreground">Monitor real-time status of all active school buses in Kolkata.</p>
+                <div className="flex items-center gap-4">
+                    <div className="relative w-12 h-12 overflow-hidden rounded-xl border border-border shadow-sm">
+                        <Image 
+                            src="/logo.jpeg" 
+                            alt="EasyPool Logo" 
+                            fill 
+                            className="object-cover"
+                            priority
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Fleet Overview</h1>
+                        <p className="text-muted-foreground text-sm">Monitor real-time status of all active school buses in Kolkata.</p>
+                    </div>
                 </div>
                 <UserProfile />
             </header>

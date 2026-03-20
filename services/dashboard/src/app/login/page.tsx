@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bus, Eye, EyeOff, Loader2, Shield } from 'lucide-react'
+import Image from 'next/image'
+
 
 export default function LoginPage() {
     const router = useRouter()
@@ -60,8 +62,14 @@ export default function LoginPage() {
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8 space-y-8">
 
                     <div className="text-center space-y-3">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/20 border border-blue-500/30 mx-auto">
-                            <Bus className="w-8 h-8 text-blue-400" />
+                        <div className="relative w-20 h-20 rounded-2xl overflow-hidden border border-white/10 mx-auto shadow-2xl">
+                            <Image 
+                                src="/logo.jpeg" 
+                                alt="EasyPool Logo" 
+                                fill 
+                                className="object-cover"
+                                priority
+                            />
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-white tracking-tight">EasyPool</h1>
