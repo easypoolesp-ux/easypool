@@ -441,8 +441,8 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 </div>
             )}
 
-            {/* Top Controls */}
-            <div className="absolute top-4 left-4 right-4 flex justify-between pointer-events-none">
+            {/* Top Controls — shifted left to avoid the Fullscreen/Expand button at right-[60px] */}
+            <div className="absolute top-4 left-4 right-[110px] flex justify-between pointer-events-none">
                 {isHistoryMode && (
                     <div className="pointer-events-auto flex items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-white/10">
                         <div className="px-3 py-1.5 flex items-center gap-2 border-r border-slate-200 dark:border-slate-800">
