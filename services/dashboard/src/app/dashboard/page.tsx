@@ -10,6 +10,7 @@ import Link from 'next/link'
 import nextDynamic from 'next/dynamic'
 import { components } from '@/types/api'
 import Image from 'next/image'
+import FleetStatusDonut from '@/components/fleet/FleetStatusDonut'
 
 
 import UserProfile from '@/components/layout/UserProfile'
@@ -186,6 +187,19 @@ export default function DashboardPage() {
                             </button>
                         </div>
 
+                        {/* ── Fleet Health Donut ── */}
+                        <FleetStatusDonut
+                            statuses={[
+                                { key: 'moving',    label: 'Moving',      count: buses.filter(b => ((b as any).computed_status || b.status) === 'moving').length,    color: '#3b82f6', tailwind: 'bg-blue-500' },
+                                { key: 'idle',      label: 'Idle',        count: buses.filter(b => ((b as any).computed_status || b.status) === 'idle').length,      color: '#f59e0b', tailwind: 'bg-amber-400' },
+                                { key: 'stopped',   label: 'Stopped',     count: buses.filter(b => ((b as any).computed_status || b.status) === 'stopped').length,   color: '#0f172a', tailwind: 'bg-slate-900' },
+                                { key: 'offline',   label: 'Maintenance', count: buses.filter(b => ((b as any).computed_status || b.status) === 'offline').length,   color: '#94a3b8', tailwind: 'bg-slate-400' },
+                                { key: 'no_signal', label: 'No Signal',   count: buses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').length, color: '#ef4444', tailwind: 'bg-red-500' },
+                            ]}
+                            criticalBuses={buses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').map(b => ({ id: (b as any).id, internal_id: b.internal_id }))}
+                            onCriticalClick={(busId) => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: busId }))}
+                        />
+
                         {/* Search Bar */}
                         <div className="relative group">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -202,10 +216,11 @@ export default function DashboardPage() {
                         {showFilters && (
                         <div className="flex flex-wrap gap-1.5">
                             {[
-                                { key: 'moving',    label: 'Moving',    dot: 'bg-blue-500' },
-                                { key: 'idle',      label: 'Idle',      dot: 'bg-amber-400' },
-                                { key: 'no_signal', label: 'No Signal', dot: 'bg-red-500' },
-                                { key: 'offline',   label: 'Offline',   dot: 'bg-slate-400' },
+                                { key: 'moving',    label: 'Moving',      dot: 'bg-blue-500' },
+                                { key: 'idle',      label: 'Idle',        dot: 'bg-amber-400' },
+                                { key: 'stopped',   label: 'Stopped',     dot: 'bg-slate-900 dark:bg-slate-200' },
+                                { key: 'no_signal', label: 'No Signal',   dot: 'bg-red-500' },
+                                { key: 'offline',   label: 'Maintenance', dot: 'bg-slate-400' },
                             ].map(f => (
                                 <button
                                     key={f.key}
