@@ -147,7 +147,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         from apps.schools.models import Transporter
 
         # Create a default transporter for the school if none exists to demo "Groups"
-        for school in list(set([b.school for b in buses])):
+        for school in {b.school for b in buses if b.school}:
             if not Transporter.objects.filter(school=school).exists():
                 Transporter.objects.create(
                     school=school,
