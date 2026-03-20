@@ -10,7 +10,7 @@ from apps.schools.views import OrganisationViewSet, TransporterViewSet, UserView
 
 router = DefaultRouter(trailing_slash=False)
 router.register('organisations', OrganisationViewSet, basename='organisation')
-router.register('schools', OrganisationViewSet, basename='school') # Compatibility bridge
+router.register('schools', OrganisationViewSet, basename='school')  # Compatibility bridge
 router.register('users', UserViewSet, basename='user')
 router.register('transporters', TransporterViewSet, basename='transporter')
 router.register('routes', RouteViewSet, basename='route')

@@ -10,6 +10,7 @@ from .serializers import (
     GPSPointSerializer,
 )
 
+
 class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
     queryset = GPSPoint.objects.all()
     serializer_class = GPSPointSerializer
@@ -65,7 +66,9 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             if hasattr(user, 'organisation') and user.organisation:
                 user_orgs = user.organisation.get_descendants()
                 user_orgs.append(user.organisation)
-                bus_qs = bus_qs.filter(Q(organisation__in=user_orgs) | Q(allocated_to__in=user_orgs))
+                bus_qs = bus_qs.filter(
+                    Q(organisation__in=user_orgs) | Q(allocated_to__in=user_orgs)
+                )
             else:
                 return response.Response({'error': 'Unauthorized'}, status=403)
 
@@ -76,6 +79,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 
         if date_str:
             from django.utils.dateparse import parse_date
+
             target_date = parse_date(date_str)
             if target_date:
                 qs = qs.filter(timestamp__date=target_date)
@@ -83,6 +87,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                 return response.Response({'error': 'Invalid date format'}, status=400)
         else:
             from django.utils import timezone
+
             qs = qs.filter(timestamp__date=timezone.now().date())
 
         return response.Response(GPSPlaybackSerializer(qs.order_by('timestamp'), many=True).data)
@@ -97,21 +102,34 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         imei = request.data.get('imei')
         try:
             from django.utils import timezone
+
             bus = Bus.objects.get(gps_imei=imei)
             lat, lng = request.data.get('lat'), request.data.get('lng')
             speed = float(request.data.get('speed', 0))
             heading = float(request.data.get('heading', 0))
             ignition = request.data.get('ignition', False)
 
-            GPSPoint.objects.create(bus=bus, lat=lat, lng=lng, speed=speed, heading=heading, ignition=ignition, timestamp=timezone.now())
+            GPSPoint.objects.create(
+                bus=bus,
+                lat=lat,
+                lng=lng,
+                speed=speed,
+                heading=heading,
+                ignition=ignition,
+                timestamp=timezone.now(),
+            )
 
-            if not ignition: bus.status = 'ignition_off'
-            elif speed > 5: bus.status = 'moving'
-            else: bus.status = 'idle'
+            if not ignition:
+                bus.status = 'ignition_off'
+            elif speed > 5:
+                bus.status = 'moving'
+            else:
+                bus.status = 'idle'
             bus.save()
             return response.Response({'status': 'success'})
         except Exception as e:
             return response.Response({'error': str(e)}, status=400)
+
 
 class AlertViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Alert.objects.all()

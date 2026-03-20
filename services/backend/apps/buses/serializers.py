@@ -4,10 +4,12 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import Bus, Camera, Route
 
+
 class RouteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Route
         fields = '__all__'
+
 
 class BusListSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
@@ -16,7 +18,7 @@ class BusListSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.CharField())
     def get_route_name(self, obj):
-        return obj.route.name if obj.route else "Unassigned"
+        return obj.route.name if obj.route else 'Unassigned'
 
     last_heartbeat = serializers.SerializerMethodField()
     speed = serializers.SerializerMethodField()
@@ -25,7 +27,21 @@ class BusListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Bus
-        fields = ('id', 'internal_id', 'plate_number', 'status', 'computed_status', 'lat', 'lng', 'speed', 'heading', 'route_name', 'driver_name', 'gps_imei', 'last_heartbeat')
+        fields = (
+            'id',
+            'internal_id',
+            'plate_number',
+            'status',
+            'computed_status',
+            'lat',
+            'lng',
+            'speed',
+            'heading',
+            'route_name',
+            'driver_name',
+            'gps_imei',
+            'last_heartbeat',
+        )
 
     @extend_schema_field(serializers.DateTimeField())
     def get_last_heartbeat(self, obj):
@@ -55,15 +71,19 @@ class BusListSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.CharField())
     def get_computed_status(self, obj):
         latest = obj.gps_points.first()
-        if not latest: return 'no_signal'
+        if not latest:
+            return 'no_signal'
         diff = timezone.now() - latest.timestamp
-        if diff > timedelta(hours=12): return 'no_signal'
+        if diff > timedelta(hours=12):
+            return 'no_signal'
         return 'moving' if float(latest.speed or 0) > 2 else 'idle'
+
 
 class CameraSerializer(serializers.ModelSerializer):
     class Meta:
         model = Camera
         fields = ('id', 'name', 'stream_slug', 'stream_url', 'is_active')
+
 
 class BusDetailSerializer(serializers.ModelSerializer):
     route = RouteSerializer(read_only=True)

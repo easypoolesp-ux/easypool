@@ -125,6 +125,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     Portal user. Authenticated via Firebase; authorised via Django Groups.
     Belongs to an Organisation.
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=200)

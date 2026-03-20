@@ -2,16 +2,20 @@ from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 from .models import Organisation, Transporter, User
 
+
 class OrganisationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organisation
         fields = '__all__'
 
+
 class TransporterSerializer(serializers.ModelSerializer):
     organisation_name = serializers.CharField(source='organisation.name', read_only=True)
+
     class Meta:
         model = Transporter
         fields = '__all__'
+
 
 class UserSerializer(serializers.ModelSerializer):
     organisation_name = serializers.SerializerMethodField()

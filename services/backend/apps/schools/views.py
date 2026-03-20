@@ -3,15 +3,18 @@ from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin
 from .models import Organisation, Transporter, User
 from .serializers import OrganisationSerializer, TransporterSerializer, UserSerializer
 
+
 class OrganisationViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Organisation.objects.all()
     serializer_class = OrganisationSerializer
     permission_classes = [IsAdmin | IsManager]
 
+
 class TransporterViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Transporter.objects.all()
     serializer_class = TransporterSerializer
     permission_classes = [IsAdmin | IsManager | IsViewer]
+
 
 class UserViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = User.objects.all()
