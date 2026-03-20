@@ -365,21 +365,6 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                 )}
             </GoogleMap>
 
-            {/* Status Legend — bottom left */}
-            {!isHistoryMode && (
-                <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-1.5 pointer-events-none max-w-[320px]">
-                    {FLEET_STATUSES.map(s => {
-                        const count = (counts as any)[s.key] || 0
-                        if (count === 0) return null
-                        return (
-                            <div key={s.key} className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 shadow-lg">
-                                <div className={`w-2 h-2 rounded-full ${s.dot} border border-white/20`} />
-                                <span className="text-[10px] font-bold text-white tracking-tight">{count} {s.label}</span>
-                            </div>
-                        )
-                    })}
-                </div>
-            )}
 
             {/* Map Control Buttons — stacked vertically below expand button */}
             <div className="absolute top-[68px] right-4 z-10 flex flex-col gap-2">
