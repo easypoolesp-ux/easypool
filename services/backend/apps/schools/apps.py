@@ -18,6 +18,7 @@ def _create_portal_groups(sender, **kwargs):
 class SchoolsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.schools'
+    verbose_name = '1. Identity & Organisations'
 
     def ready(self):
         from django.db.models.signals import post_migrate

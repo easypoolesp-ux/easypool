@@ -9,7 +9,23 @@ from apps.schools.models import School, User
 
 class Student(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='students')
+
+    # ── Ownership & Allocation ─────────────────────────────────────────────────
+    organisation = models.ForeignKey(
+        'schools.Organisation',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='students',
+    )
+    allocated_to = models.ManyToManyField(
+        'schools.Organisation', blank=True, related_name='allocated_students'
+    )
+
+    # Legacy FK kept nullable
+    school = models.ForeignKey(
+        School, null=True, blank=True, on_delete=models.CASCADE, related_name='students'
+    )
     bus = models.ForeignKey(
         Bus, null=True, blank=True, on_delete=models.SET_NULL, related_name='students'
     )
@@ -31,6 +47,13 @@ class Student(models.Model):
 
 class Parent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organisation = models.ForeignKey(
+        'schools.Organisation',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='parents_list',
+    )
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='parent_profile')
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='parents')
     fcm_token = models.TextField(blank=True)
