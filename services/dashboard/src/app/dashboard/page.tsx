@@ -231,7 +231,7 @@ export default function DashboardPage() {
                                     internal_id: b.internal_id,
                                     last_seen: (b as any).last_heartbeat
                                 }))}
-                            onViewBus={(busId) => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: busId }))}
+                            onViewBus={(busId) => window.dispatchEvent(new CustomEvent('map:focusBus', { detail: busId }))}
                         />
 
                         {/* ── Fleet Health Donut ── */}

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader, Polyline } from '@react-google-maps/api'
-import { Play, Pause, X, Route, Calendar } from 'lucide-react'
+import { Play, Pause, X, Route, Calendar, Crosshair, Maximize, Unlock } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { MONOCHROME_DARK, MONOCHROME_LIGHT, DARK_DEFAULT } from './mapStyles'
 import { useMapHighContrastListener } from '@/hooks/useMapHighContrast'
@@ -93,6 +93,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     const [liveTrailMode, setLiveTrailMode] = useState<'off' | '2h' | 'today'>('off')
     const [liveTrails, setLiveTrails]       = useState<Map<string, GPSPoint[]>>(new Map())
     const [selectedBusId, setSelectedBusId] = useState<string | null>(initialBusId || null)
+    const [cameraMode, setCameraMode] = useState<'free' | 'follow' | 'overview'>('free')
     const [playbackDate, setPlaybackDate]   = useState(() =>
         new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
     )
@@ -180,26 +181,36 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                         className: 'bus-map-label',
                     },
                 })
-                m.addListener('click', () =>
-                    window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: bus.id }))
-                )
+                m.addListener('click', () => {
+                    setSelectedBusId(bus.id)
+                    setCameraMode('follow')
+                })
                 markerRefs.current.set(bus.id, m)
             }
         })
 
-        // Auto-focus when bus list changes (search/filter)
-        const valid = buses.filter(b => b.lat != null && b.lng != null)
-        if (valid.length > 0 && mapRef.current) {
-            if (valid.length === 1) {
-                mapRef.current.panTo({ lat: valid[0].lat, lng: valid[0].lng })
-                if ((mapRef.current.getZoom() ?? 0) < 15) mapRef.current.setZoom(15)
-            } else {
-                const bounds = new google.maps.LatLngBounds()
-                valid.forEach(v => bounds.extend({ lat: v.lat, lng: v.lng }))
-                mapRef.current.fitBounds(bounds, 80)
+        // Camera Mode Logic
+        if (mapRef.current) {
+            if (cameraMode === 'follow' && selectedBusId) {
+                // Follow: pan to the selected bus
+                const target = buses.find(b => b.id === selectedBusId)
+                if (target && target.lat != null && target.lng != null) {
+                    mapRef.current.panTo({ lat: target.lat, lng: target.lng })
+                    if ((mapRef.current.getZoom() ?? 0) < 15) mapRef.current.setZoom(15)
+                }
+            } else if (cameraMode === 'overview') {
+                // Overview: fit all visible buses, then snap back to free
+                const valid = buses.filter(b => b.lat != null && b.lng != null)
+                if (valid.length > 0) {
+                    const bounds = new google.maps.LatLngBounds()
+                    valid.forEach(v => bounds.extend({ lat: v.lat, lng: v.lng }))
+                    mapRef.current.fitBounds(bounds, 80)
+                }
+                setCameraMode('free')
             }
+            // cameraMode === 'free' → do nothing, let user explore
         }
-    }, [isLoaded, isMapReady, buses, isHistoryMode, isDark])
+    }, [isLoaded, isMapReady, buses, isHistoryMode, isDark, cameraMode, selectedBusId])
 
     // ── Live Trail Fetcher ────────────────────────────────────────────────────
     useEffect(() => {
@@ -299,6 +310,17 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         loadHistory(id, playbackDate)
     }, [isHistoryMode, selectedBusId, buses, playbackDate, loadHistory])
 
+    // Select + Follow bus (from sidebar/alert clicks)
+    useEffect(() => {
+        const h = (e: any) => {
+            setSelectedBusId(e.detail)
+            setCameraMode('follow')
+        }
+        window.addEventListener('map:focusBus', h)
+        return () => window.removeEventListener('map:focusBus', h)
+    }, [])
+
+    // Enter history mode (from dedicated history button or sidebar)
     useEffect(() => {
         const h = (e: any) => toggleHistoryMode(e.detail)
         window.addEventListener('map:viewHistory', h)
@@ -368,6 +390,28 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
             {/* Map Control Buttons — stacked vertically below expand button */}
             <div className="absolute top-[68px] right-4 z-10 flex flex-col gap-2">
+                <button
+                    onClick={() => {
+                        if (cameraMode === 'free') setCameraMode(selectedBusId ? 'follow' : 'overview')
+                        else if (cameraMode === 'follow') setCameraMode('overview')
+                        else setCameraMode('free')
+                    }}
+                    className={`p-3 relative rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${
+                        cameraMode !== 'free'
+                            ? 'bg-blue-600 text-white shadow-blue-500/20'
+                            : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white'
+                    }`}
+                    title={cameraMode === 'free' ? 'Free Browse' : cameraMode === 'follow' ? 'Following Bus' : 'Fit All'}
+                >
+                    {cameraMode === 'free' && <Unlock size={20} />}
+                    {cameraMode === 'follow' && <Crosshair size={20} className="animate-pulse" />}
+                    {cameraMode === 'overview' && <Maximize size={20} />}
+                    {cameraMode !== 'free' && (
+                        <span className="absolute -bottom-1 -right-1 bg-white text-blue-600 text-[7px] font-bold px-1 rounded-sm shadow-sm border border-blue-100">
+                            {cameraMode === 'follow' ? 'LOCK' : 'ALL'}
+                        </span>
+                    )}
+                </button>
                 <button
                     onClick={() => {
                         if (liveTrailMode === 'off') setLiveTrailMode('2h')
