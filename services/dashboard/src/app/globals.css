@@ -78,7 +78,14 @@
     color: #0f172a !important; /* Force dark text on the white background */
   }
   
-  .dark .gm-style .gm-ui-hover-effect span {
-    background-color: #0f172a !important; /* Force the close 'X' to be dark */
+  .dark .gm-style .gm-ui-hover-effect {
+    background-color: transparent !important; /* Ensure no circle/box background */
   }
-}
+  
+  .dark .gm-style .gm-ui-hover-effect img,
+  .dark .gm-style .gm-ui-hover-effect span {
+    filter: brightness(0) !important; /* Make the SVG/Icon pure black instead of adding a background color */
+    background-color: transparent !important;
+  }
+}
+
