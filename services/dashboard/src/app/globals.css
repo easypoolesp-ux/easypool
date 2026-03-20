@@ -71,4 +71,14 @@
   .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
   }
-}
+
+  /* Fix for Google Maps InfoWindow bubbles in Dark Mode */
+  .dark .gm-style .gm-style-iw,
+  .dark .gm-style .gm-style-iw * {
+    color: #0f172a !important; /* Force dark text on the white background */
+  }
+  
+  .dark .gm-style .gm-ui-hover-effect span {
+    background-color: #0f172a !important; /* Force the close 'X' to be dark */
+  }
+}
