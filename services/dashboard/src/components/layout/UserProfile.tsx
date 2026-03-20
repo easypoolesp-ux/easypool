@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { LogOut, Settings, ChevronDown, Sun, Moon, Laptop, Map } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useMapHighContrast } from '@/hooks/useMapHighContrast'
+import { signOut } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 
 interface UserData {
     id: string
@@ -26,18 +28,21 @@ export default function UserProfile() {
     useEffect(() => {
         const fetchUser = async () => {
             try {
-                const token = localStorage.getItem('token')
-                if (!token) return
-                
-                const res = await fetch('/api/users/me', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const firebaseUser = auth.currentUser
+                if (!firebaseUser) return
+
+                // Always fetch a fresh token — never read from localStorage
+                const idToken = await firebaseUser.getIdToken()
+                const backendUrl = process.env.NEXT_PUBLIC_API_URL || ''
+                const res = await fetch(`${backendUrl}/api/users/me`, {
+                    headers: { 'Authorization': `Bearer ${idToken}` }
                 })
                 if (res.ok) {
                     const data = await res.json()
                     setUser(data)
                 }
             } catch (err) {
-                console.error("Failed to fetch user profile:", err)
+                console.error('Failed to fetch user profile:', err)
             }
         }
         fetchUser()
@@ -52,10 +57,13 @@ export default function UserProfile() {
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    const handleLogout = () => {
-        localStorage.removeItem('token')
-        localStorage.removeItem('refresh_token')
-        document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+    const handleLogout = async () => {
+        // Sign out from Firebase (Gate 1) — this invalidates the ID token
+        await signOut(auth)
+        // Clear all local storage — no stale data remains in the browser
+        localStorage.clear()
+        sessionStorage.clear()
+        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict'
         router.push('/login')
     }
 
