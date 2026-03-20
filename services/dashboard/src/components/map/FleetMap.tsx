@@ -131,8 +131,8 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        // mapId removed to allow local JSON styles to override.
-        // Styles applied imperatively below so they can react to theme changes
+        mapId: 'b0c049e7fb978545fe9416bf', // User provided Map ID
+        // Styles are applied imperatively to react to dashboard theme toggle
     }), [])
 
     // ── Apply JSON style imperatively when theme changes ──────────────────────
