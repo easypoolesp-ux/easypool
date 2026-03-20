@@ -18,6 +18,8 @@ class RouteViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
 
 
 class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
+    queryset = Bus.objects.all()
+
     def get_queryset(self):
         # Apply isolation first via super()
         queryset = super().get_queryset()

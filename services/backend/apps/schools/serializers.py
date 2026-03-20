@@ -3,9 +3,11 @@ from drf_spectacular.utils import extend_schema_field
 from .models import Organisation, User
 
 class OrganisationSerializer(serializers.ModelSerializer):
+    vehicle_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Organisation
-        fields = '__all__'
+        fields = ('id', 'name', 'org_type', 'parent', 'address', 'contact_email', 'phone', 'is_active', 'vehicle_count', 'created_at')
 
 # Compatibility: The frontend still expects a "transporters" API. 
 # We point it to Organisation but filter for bus_agency in the view.

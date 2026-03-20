@@ -8,6 +8,13 @@ class OrganisationViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     serializer_class = OrganisationSerializer
     permission_classes = [IsAdmin | IsManager]
 
+    def get_queryset(self):
+        from django.db.models import Count
+        queryset = super().get_queryset()
+        return queryset.annotate(
+            vehicle_count=Count('owned_buses', distinct=True) + Count('allocated_buses', distinct=True)
+        )
+
 # Compatibility Bridge: Maps the old Transporter API 
 # to the new pure-Organisation model (type: bus_agency).
 class TransporterViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
