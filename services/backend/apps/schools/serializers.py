@@ -5,7 +5,8 @@ from .models import Organisation, User
 
 
 class OrganisationSerializer(serializers.ModelSerializer):
-    vehicle_count = serializers.IntegerField(read_only=True)
+    owned_count = serializers.IntegerField(read_only=True)
+    allocated_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Organisation
@@ -18,7 +19,8 @@ class OrganisationSerializer(serializers.ModelSerializer):
             'contact_email',
             'phone',
             'is_active',
-            'vehicle_count',
+            'owned_count',
+            'allocated_count',
             'created_at',
         )
 

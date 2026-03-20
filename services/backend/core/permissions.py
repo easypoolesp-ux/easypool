@@ -96,22 +96,22 @@ def apply_isolation(user, queryset):
         if model == Organisation:
             queryset = queryset.filter(id__in=[org.id for org in user_orgs])
 
-        # 1. Model directly supports multi-tenant isolation
-        elif hasattr(model, 'organisation'):
-            if hasattr(model, 'allocated_to'):
-                # Assets that user OWNS or is ALLOCATED to as guest
-                queryset = queryset.filter(
-                    Q(organisation__in=user_orgs) | Q(allocated_to__in=user_orgs)
-                ).distinct()
-            else:
-                # Direct physical ownership only
-                queryset = queryset.filter(organisation__in=user_orgs)
+        # 1. Model is a Bus
+        elif model.__name__ == 'Bus':
+            queryset = queryset.filter(
+                Q(organisation__in=user_orgs) | Q(allocations__granted_to__in=user_orgs)
+            ).distinct()
 
-        # 2. Model is linked to a Bus (which defines the isolation scope)
+        # 2. Model is linked to a Bus (GPSPoint, Camera, etc.)
         elif hasattr(model, 'bus'):
             queryset = queryset.filter(
-                Q(bus__organisation__in=user_orgs) | Q(bus__allocated_to__in=user_orgs)
+                Q(bus__organisation__in=user_orgs) | Q(bus__allocations__granted_to__in=user_orgs)
             ).distinct()
+
+        # 3. Model is a Route
+        elif model.__name__ == 'Route':
+            # Routes currently don't have an allocation model yet, but we'll follow similar logic
+            queryset = queryset.filter(organisation__in=user_orgs)
 
     return queryset
 

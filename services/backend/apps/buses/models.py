@@ -18,7 +18,6 @@ class Route(models.Model):
     organisation = models.ForeignKey(
         Organisation, null=True, blank=True, on_delete=models.CASCADE, related_name='owned_routes'
     )
-    allocated_to = models.ManyToManyField(Organisation, blank=True, related_name='allocated_routes')
 
     transporter = models.ForeignKey(
         Organisation,
@@ -70,7 +69,6 @@ class Bus(models.Model):
     organisation = models.ForeignKey(
         Organisation, null=True, blank=True, on_delete=models.CASCADE, related_name='owned_buses'
     )
-    allocated_to = models.ManyToManyField(Organisation, blank=True, related_name='allocated_buses')
 
     # Transporter is now a Bus Agency Organisation
     transporter = models.ForeignKey(
@@ -127,3 +125,73 @@ class Camera(models.Model):
 
     def __str__(self):
         return f'{self.bus.internal_id} - {self.name}'
+
+
+class BusAllocation(models.Model):
+    """
+    Defines who shared a bus with whom, and at what level of authority.
+    This is the SSOT for non-owned access.
+    """
+
+    LEVEL_CHOICES = (
+        ('view', 'View Only'),
+        ('edit', 'Edit Details'),
+        ('admin', 'Full (Can Share/Allocate)'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='allocations')
+    granted_by = models.ForeignKey(
+        Organisation, on_delete=models.CASCADE, related_name='allocations_granted'
+    )
+    granted_to = models.ForeignKey(
+        Organisation, on_delete=models.CASCADE, related_name='allocations_received'
+    )
+    level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default='view')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('bus', 'granted_to')
+        verbose_name = 'Bus Allocation'
+        verbose_name_plural = 'Bus Allocations'
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        # 1. Self-allocation check
+        if self.granted_by == self.granted_to:
+            raise ValidationError('An organisation cannot allocate a bus to itself.')
+
+        # 2. Authority Check: Grantor must be the Owner or have 'admin' level allocation
+        is_owner = self.bus.organisation == self.granted_by
+
+        # Check if grantor has an existing allocation from someone else
+        grantor_alloc = BusAllocation.objects.filter(
+            bus=self.bus, granted_to=self.granted_by
+        ).first()
+
+        if not is_owner:
+            if not grantor_alloc or grantor_alloc.level != 'admin':
+                raise ValidationError(
+                    f"Organisation {self.granted_by.name} does not have 'admin' authority to allocate this bus."
+                )
+
+        # 3. Level Check: Cannot grant more power than you have
+        level_weights = {'admin': 3, 'edit': 2, 'view': 1}
+        requested_weight = level_weights.get(self.level, 0)
+
+        if not is_owner:
+            grantor_weight = level_weights.get(grantor_alloc.level, 0)
+            if requested_weight > grantor_weight:
+                raise ValidationError(
+                    f"Cannot grant '{self.get_level_display()}' level because you only have '{grantor_alloc.get_level_display()}' authority."
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.bus.internal_id} -> {self.granted_to.name} ({self.get_level_display()})'

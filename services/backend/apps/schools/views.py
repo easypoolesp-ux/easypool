@@ -16,8 +16,8 @@ class OrganisationViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
 
         queryset = super().get_queryset()
         return queryset.annotate(
-            vehicle_count=Count('owned_buses', distinct=True)
-            + Count('allocated_buses', distinct=True)
+            owned_count=Count('owned_buses', distinct=True),
+            allocated_count=Count('allocations_received', distinct=True),
         )
 
 
