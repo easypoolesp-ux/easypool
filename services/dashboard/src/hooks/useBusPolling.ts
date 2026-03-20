@@ -20,6 +20,7 @@ export function useBusPolling(): UseBusPollingReturn {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+    const [tick, setTick] = useState(0)
 
     // Refs for intervals and abort controllers
     const abortControllerRef = useRef<AbortController | null>(null)
@@ -92,6 +93,7 @@ export function useBusPolling(): UseBusPollingReturn {
         } finally {
             // Keep loading true on first mount, false on subsequent polls
             setLoading(prev => prev ? false : prev)
+            setTick(t => t + 1) // Force re-render to ensure relative times update
         }
     }, [])
 
