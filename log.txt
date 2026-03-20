@@ -1,0 +1,5 @@
+﻿feat(auth): enable b64 injected service accounts for hassle-free cloud run deployment
+fix(dashboard): bypass invalid api key firebase error during next.js docker SSG build phase
+feat(auth): complete migration from SimpleJWT to Firebase Authentication for enterprise B2B security
+fix(dashboard): unfreeze relative clock ticking during API timeouts by forcing state refresh
+style(map): fix info window close button background rendering in dark mode
