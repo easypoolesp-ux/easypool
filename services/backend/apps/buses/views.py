@@ -27,15 +27,12 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
         # Subquery for latest GPS point per bus
         latest_gps = GPSPoint.objects.filter(bus=OuterRef('pk')).order_by('-timestamp')
 
-        return (
-            queryset.select_related('route')
-            .annotate(
-                latest_lat=Subquery(latest_gps.values('lat')[:1]),
-                latest_lng=Subquery(latest_gps.values('lng')[:1]),
-                latest_speed=Subquery(latest_gps.values('speed')[:1]),
-                latest_heading=Subquery(latest_gps.values('heading')[:1]),
-                latest_heartbeat=Subquery(latest_gps.values('timestamp')[:1]),
-            )
+        return queryset.select_related('route').annotate(
+            latest_lat=Subquery(latest_gps.values('lat')[:1]),
+            latest_lng=Subquery(latest_gps.values('lng')[:1]),
+            latest_speed=Subquery(latest_gps.values('speed')[:1]),
+            latest_heading=Subquery(latest_gps.values('heading')[:1]),
+            latest_heartbeat=Subquery(latest_gps.values('timestamp')[:1]),
         )
 
     permission_classes = [IsAdmin | IsManager | IsViewer]

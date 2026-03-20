@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand
+
 from apps.buses.models import Bus, Route
 from apps.schools.models import Organisation
+
 
 class Command(BaseCommand):
     help = 'Seeds the database with initial enterprise-grade data'

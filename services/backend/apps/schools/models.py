@@ -1,12 +1,15 @@
 import uuid
+
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+
 
 # ── Organisation (Multi-Tenant, Hierarchical) ──────────────────────────────────
 class Organisation(models.Model):
     """
     Top-level entity for every tenant. Supports unlimited hierarchy.
     """
+
     ORG_TYPE_CHOICES = (
         ('school', 'School / Education'),
         ('bus_agency', 'Independent Bus Agency / Transporter'),
@@ -39,6 +42,7 @@ class Organisation(models.Model):
             result.extend(child.get_descendants())
         return result
 
+
 # ── User Manager ───────────────────────────────────────────────────────────────
 class UserManager(BaseUserManager):
     def create_user(self, email, full_name, password=None, **extra_fields):
@@ -55,6 +59,7 @@ class UserManager(BaseUserManager):
 
     def create_portal_user(self, email, full_name, group_name, **extra_fields):
         from django.contrib.auth.models import Group
+
         user = self.create_user(email, full_name, **extra_fields)
         group, _ = Group.objects.get_or_create(name=group_name)
         user.groups.add(group)
@@ -65,11 +70,13 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('is_superuser', True)
         return self.create_user(email, full_name, password, **extra_fields)
 
+
 # ── User ───────────────────────────────────────────────────────────────────────
 class User(AbstractBaseUser, PermissionsMixin):
     """
     Portal user. Belongs to an Organisation.
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=200)

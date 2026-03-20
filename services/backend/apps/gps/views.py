@@ -1,7 +1,8 @@
-from django.db.models import Q
 from rest_framework import decorators, permissions, response, viewsets
-from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin, apply_isolation
+
 from apps.buses.models import Bus
+from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin, apply_isolation
+
 from .models import Alert, GPSPoint
 from .serializers import (
     AlertSerializer,

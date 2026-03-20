@@ -1,6 +1,9 @@
 import uuid
+
 from django.db import models
+
 from apps.schools.models import Organisation
+
 
 # ── Route ──────────────────────────────────────────────────────────────────────
 class Route(models.Model):
@@ -18,12 +21,12 @@ class Route(models.Model):
     allocated_to = models.ManyToManyField(Organisation, blank=True, related_name='allocated_routes')
 
     transporter = models.ForeignKey(
-        Organisation, 
-        null=True, 
-        blank=True, 
-        on_delete=models.SET_NULL, 
+        Organisation,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
         related_name='operated_routes',
-        limit_choices_to={'org_type': 'bus_agency'}
+        limit_choices_to={'org_type': 'bus_agency'},
     )
 
     name = models.CharField(max_length=200)
@@ -33,6 +36,7 @@ class Route(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.get_type_display()})'
+
 
 # ── Vehicle ────────────────────────────────────────────────────────────────────
 class Bus(models.Model):
@@ -70,12 +74,12 @@ class Bus(models.Model):
 
     # Transporter is now a Bus Agency Organisation
     transporter = models.ForeignKey(
-        Organisation, 
-        null=True, 
-        blank=True, 
-        on_delete=models.SET_NULL, 
+        Organisation,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
         related_name='operated_buses',
-        limit_choices_to={'org_type': 'bus_agency'}
+        limit_choices_to={'org_type': 'bus_agency'},
     )
     route = models.ForeignKey(
         Route, null=True, blank=True, on_delete=models.SET_NULL, related_name='buses'
@@ -110,6 +114,7 @@ class Bus(models.Model):
 
     def __str__(self):
         return f'{self.internal_id} - {self.plate_number} ({self.get_vehicle_type_display()})'
+
 
 class Camera(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

@@ -90,8 +90,14 @@ def apply_isolation(user, queryset):
 
         from django.db.models import Q
 
+        from apps.schools.models import Organisation
+
+        # 0. If the model IS Organisation itself
+        if model == Organisation:
+            queryset = queryset.filter(id__in=[org.id for org in user_orgs])
+
         # 1. Model directly supports multi-tenant isolation
-        if hasattr(model, 'organisation'):
+        elif hasattr(model, 'organisation'):
             if hasattr(model, 'allocated_to'):
                 # Assets that user OWNS or is ALLOCATED to as guest
                 queryset = queryset.filter(

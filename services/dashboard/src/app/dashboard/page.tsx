@@ -292,7 +292,7 @@ export default function DashboardPage() {
                                 )})
                             ) : (
                                 <div className="text-center py-10 text-muted-foreground text-xs italic">
-                                    No buses matching "{searchQuery}"
+                                    {searchQuery ? `No buses matching "${searchQuery}"` : "No vehicles mapped to your organisation"}
                                 </div>
                             )}
                         </div>
