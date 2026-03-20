@@ -77,6 +77,10 @@ export default function LoginPage() {
             return
         }
 
+        // Set token in Cookie so Middleware can see it
+        document.cookie = `token=${idToken}; path=/; max-age=3600; SameSite=Strict`
+        localStorage.setItem('token', idToken)
+
         if (analytics) {
             setUserId(analytics, uid)
             logEvent(analytics, 'login', { method })
