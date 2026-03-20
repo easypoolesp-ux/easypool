@@ -1,6 +1,6 @@
 from django.db.models import Q
 from rest_framework import decorators, permissions, response, viewsets
-from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin
+from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin, apply_isolation
 from apps.buses.models import Bus
 from .models import Alert, GPSPoint
 from .serializers import (
@@ -33,15 +33,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
     def latest(self, request):
         """Return latest GPS point for every bus in the user's scope."""
         user = request.user
-        buses = Bus.objects.all()
-
-        if not user.is_superuser:
-            if hasattr(user, 'organisation') and user.organisation:
-                user_orgs = user.organisation.get_descendants()
-                user_orgs.append(user.organisation)
-                buses = buses.filter(Q(organisation__in=user_orgs) | Q(allocated_to__in=user_orgs))
-            else:
-                return response.Response([])
+        buses = apply_isolation(user, Bus.objects.all())
 
         latest_points = []
         for bus in buses.distinct():
@@ -60,17 +52,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             return response.Response({'error': 'bus_id is required'}, status=400)
 
         user = request.user
-        bus_qs = Bus.objects.filter(id=bus_id)
-
-        if not user.is_superuser:
-            if hasattr(user, 'organisation') and user.organisation:
-                user_orgs = user.organisation.get_descendants()
-                user_orgs.append(user.organisation)
-                bus_qs = bus_qs.filter(
-                    Q(organisation__in=user_orgs) | Q(allocated_to__in=user_orgs)
-                )
-            else:
-                return response.Response({'error': 'Unauthorized'}, status=403)
+        bus_qs = apply_isolation(user, Bus.objects.filter(id=bus_id))
 
         if not bus_qs.exists():
             return response.Response({'error': 'Unauthorized or invalid bus_id'}, status=403)

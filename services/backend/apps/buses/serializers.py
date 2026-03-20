@@ -12,17 +12,18 @@ class RouteSerializer(serializers.ModelSerializer):
 
 
 class BusListSerializer(serializers.ModelSerializer):
-    lat = serializers.SerializerMethodField()
-    lng = serializers.SerializerMethodField()
+    lat = serializers.FloatField(source='latest_lat', read_only=True)
+    lng = serializers.FloatField(source='latest_lng', read_only=True)
+    speed = serializers.FloatField(source='latest_speed', read_only=True)
+    heading = serializers.FloatField(source='latest_heading', read_only=True)
+    last_heartbeat = serializers.DateTimeField(source='latest_heartbeat', read_only=True)
+    
     route_name = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.CharField())
     def get_route_name(self, obj):
         return obj.route.name if obj.route else 'Unassigned'
 
-    last_heartbeat = serializers.SerializerMethodField()
-    speed = serializers.SerializerMethodField()
-    heading = serializers.SerializerMethodField()
     computed_status = serializers.SerializerMethodField()
 
     class Meta:
@@ -43,40 +44,18 @@ class BusListSerializer(serializers.ModelSerializer):
             'last_heartbeat',
         )
 
-    @extend_schema_field(serializers.DateTimeField())
-    def get_last_heartbeat(self, obj):
-        latest = obj.gps_points.first()
-        return latest.timestamp if latest else None
-
-    @extend_schema_field(serializers.FloatField())
-    def get_lat(self, obj):
-        latest = obj.gps_points.first()
-        return latest.lat if latest else None
-
-    @extend_schema_field(serializers.FloatField())
-    def get_lng(self, obj):
-        latest = obj.gps_points.first()
-        return latest.lng if latest else None
-
-    @extend_schema_field(serializers.FloatField())
-    def get_speed(self, obj):
-        latest = obj.gps_points.first()
-        return float(latest.speed) if latest and latest.speed is not None else 0.0
-
-    @extend_schema_field(serializers.FloatField())
-    def get_heading(self, obj):
-        latest = obj.gps_points.first()
-        return float(latest.heading) if latest and latest.heading is not None else 0.0
-
     @extend_schema_field(serializers.CharField())
     def get_computed_status(self, obj):
-        latest = obj.gps_points.first()
-        if not latest:
+        heartbeat = getattr(obj, 'latest_heartbeat', None)
+        if not heartbeat:
             return 'no_signal'
-        diff = timezone.now() - latest.timestamp
+        
+        diff = timezone.now() - heartbeat
         if diff > timedelta(hours=12):
             return 'no_signal'
-        return 'moving' if float(latest.speed or 0) > 2 else 'idle'
+            
+        speed = float(getattr(obj, 'latest_speed', 0) or 0)
+        return 'moving' if speed > 2 else 'idle'
 
 
 class CameraSerializer(serializers.ModelSerializer):
@@ -88,25 +67,11 @@ class CameraSerializer(serializers.ModelSerializer):
 class BusDetailSerializer(serializers.ModelSerializer):
     route = RouteSerializer(read_only=True)
     cameras = CameraSerializer(many=True, read_only=True)
-    lat = serializers.SerializerMethodField()
-    lng = serializers.SerializerMethodField()
-    last_heartbeat = serializers.SerializerMethodField()
+    
+    lat = serializers.FloatField(source='latest_lat', read_only=True)
+    lng = serializers.FloatField(source='latest_lng', read_only=True)
+    last_heartbeat = serializers.DateTimeField(source='latest_heartbeat', read_only=True)
 
     class Meta:
         model = Bus
         fields = '__all__'
-
-    @extend_schema_field(serializers.FloatField())
-    def get_lat(self, obj):
-        latest = obj.gps_points.first()
-        return latest.lat if latest else None
-
-    @extend_schema_field(serializers.FloatField())
-    def get_lng(self, obj):
-        latest = obj.gps_points.first()
-        return latest.lng if latest else None
-
-    @extend_schema_field(serializers.DateTimeField())
-    def get_last_heartbeat(self, obj):
-        latest = obj.gps_points.first()
-        return latest.timestamp if latest else None

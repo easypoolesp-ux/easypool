@@ -25,9 +25,10 @@ class UserSerializer(serializers.ModelSerializer):
             'full_name',
             'organisation',
             'organisation_name',
+            'groups',
             'photo_url',
         )
-        read_only_fields = ('id',)
+        read_only_fields = ('id', 'groups')
 
     @extend_schema_field(serializers.CharField())
     def get_organisation_name(self, obj):

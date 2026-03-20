@@ -71,51 +71,50 @@ class IsParent(permissions.BasePermission):
 # will issue a 403 before the data is even fetched.
 
 
+def apply_isolation(user, queryset):
+    """
+    Applies multi-tenant isolation filters to a queryset.
+    """
+    if not user.is_authenticated or not user.is_active:
+        return queryset.none()
+
+    if user.is_superuser:
+        return queryset
+
+    model = queryset.model
+
+    # ── Organisation-level isolation (Multi-Tenant) ───────────────────────────
+    if hasattr(user, 'organisation') and user.organisation:
+        user_orgs = user.organisation.get_descendants()
+        user_orgs.append(user.organisation)
+
+        from django.db.models import Q
+
+        # 1. Model directly supports multi-tenant isolation
+        if hasattr(model, 'organisation'):
+            if hasattr(model, 'allocated_to'):
+                # Assets that user OWNS or is ALLOCATED to as guest
+                queryset = queryset.filter(
+                    Q(organisation__in=user_orgs) | Q(allocated_to__in=user_orgs)
+                ).distinct()
+            else:
+                # Direct physical ownership only
+                queryset = queryset.filter(organisation__in=user_orgs)
+
+        # 2. Model is linked to a Bus (which defines the isolation scope)
+        elif hasattr(model, 'bus'):
+            queryset = queryset.filter(
+                Q(bus__organisation__in=user_orgs) | Q(bus__allocated_to__in=user_orgs)
+            ).distinct()
+
+    return queryset
+
+
 class SchoolIsolationMixin:
     """
-    Filters querysets by the user's organisation (or legacy school/transporter).
-    Works for all organisation types: school, bus_agency, carpool, corporate.
-
-    - SuperAdmin (group) / superuser : sees all data across all organisations
-    - SchoolAdmin / CarpoolAdmin     : sees only their organisation's data
-    - Transporter                    : sees only their transporter's data within the org
-    - Unauthenticated / no role      : sees nothing — safety net before permission_classes
+    Mixin for ViewSets to automatically apply organization isolation.
     """
 
     def get_queryset(self):
-        user = self.request.user
         queryset = super().get_queryset()
-
-        # Safety net: unauthenticated requests must be blocked by permission_classes.
-        # Return nothing here rather than leak any data.
-        if not user.is_authenticated or not user.is_active:
-            return queryset.none()
-
-        # Django superusers (root developers) see everything across all tenants
-        if user.is_superuser:
-            return queryset
-
-        model = queryset.model
-        filters = {}
-
-        # Organisation-level isolation (new multi-tenant field)
-        if hasattr(user, 'organisation') and user.organisation:
-            user_orgs = user.organisation.get_descendants()
-            user_orgs.append(user.organisation)
-
-            from django.db.models import Q
-
-            if hasattr(model, 'organisation') and hasattr(model, 'allocated_to'):
-                # For models like Bus that use the "Google Drive" style Read/Write model
-                # User sees assets they physically OWN or assets ALLOCATED to them as guests
-                filters = Q(organisation__in=user_orgs) | Q(allocated_to__in=user_orgs)
-                queryset = queryset.filter(filters).distinct()
-            elif hasattr(model, 'organisation'):
-                # For models that only have physical ownership
-                queryset = queryset.filter(organisation__in=user_orgs)
-
-        # Fallback: legacy school FK for backwards compatibility
-        elif hasattr(user, 'school') and user.school and hasattr(model, 'school'):
-            queryset = queryset.filter(school=user.school)
-
-        return queryset
+        return apply_isolation(self.request.user, queryset)

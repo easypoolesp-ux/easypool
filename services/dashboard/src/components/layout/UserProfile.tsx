@@ -12,8 +12,7 @@ interface UserData {
     id: string
     email: string
     full_name: string
-    role: string
-    school_name?: string
+    groups: (number | string | { name: string })[]
     photo_url?: string
 }
 
@@ -21,17 +20,19 @@ export default function UserProfile() {
     const { theme, setTheme } = useTheme()
     const router = useRouter()
     const [user, setUser] = useState<UserData | null>(null)
+    const [loading, setLoading] = useState(true)
     const [isOpen, setIsOpen] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
     const { enabled: highContrast, toggle: toggleHighContrast } = useMapHighContrast()
 
     useEffect(() => {
-        const fetchUser = async () => {
+        // Use a reactive listener to handle Firebase's late hydration
+        const unsubscribe = auth.onIdTokenChanged(async (firebaseUser) => {
+            if (!firebaseUser) {
+                setLoading(false)
+                return
+            }
             try {
-                const firebaseUser = auth.currentUser
-                if (!firebaseUser) return
-
-                // Always fetch a fresh token — never read from localStorage
                 const idToken = await firebaseUser.getIdToken()
                 const backendUrl = process.env.NEXT_PUBLIC_API_URL || ''
                 const res = await fetch(`${backendUrl}/api/users/me`, {
@@ -42,41 +43,60 @@ export default function UserProfile() {
                     setUser(data)
                 }
             } catch (err) {
-                console.error('Failed to fetch user profile:', err)
+                console.error('Profile fetch failed:', err)
+            } finally {
+                setLoading(false)
             }
-        }
-        fetchUser()
+        })
 
-        // Close dropdown when clicking outside
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsOpen(false)
             }
         }
         document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
+        return () => {
+            unsubscribe()
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
     }, [])
 
     const handleLogout = async () => {
-        // Sign out from Firebase (Gate 1) — this invalidates the ID token
         await signOut(auth)
-        // Clear all local storage — no stale data remains in the browser
         localStorage.clear()
         sessionStorage.clear()
         document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict'
         router.push('/login')
     }
 
-    if (!user) return null
+    if (loading) return <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse" />;
+    
+    if (!user) {
+        return (
+            <div className="flex items-center gap-3 p-1.5 pr-3 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 opacity-60 shadow-sm">
+                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-sm">
+                    ?
+                </div>
+                <div className="hidden md:block text-left">
+                    <p className="text-[11px] font-bold text-slate-900 dark:text-white leading-none">Guest</p>
+                    <p className="text-[9px] text-slate-500 font-medium font-mono tracking-tighter uppercase">No Session</p>
+                </div>
+            </div>
+        );
+    }
 
-    const getRoleLabel = (role: string) => {
-        const roles: Record<string, string> = {
-            'superadmin': 'Super Admin',
-            'school_admin': 'Fleet Admin',
-            'transporter': 'Transporter',
-            'parent': 'Parent'
+    const getRoleLabel = (groups: any[]) => {
+        if (!groups || groups.length === 0) return 'Viewer'
+        // Groups might be IDs or objects with .name
+        const first = groups[0]
+        const name = typeof first === 'string' ? first : (first?.name || 'User')
+        
+        const labels: Record<string, string> = {
+            'Admin': 'Organisation Admin',
+            'Manager': 'Fleet Manager',
+            'Viewer': 'Fleet Viewer',
         }
-        return roles[role] || role
+        return labels[name] || name
     }
 
     return (
@@ -89,12 +109,12 @@ export default function UserProfile() {
                     {user.photo_url ? (
                         <img src={user.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
                     ) : (
-                        user.full_name.charAt(0).toUpperCase()
+                        user.full_name?.charAt(0).toUpperCase() || 'U'
                     )}
                 </div>
                 <div className="hidden md:block text-left">
                     <p className="text-[11px] font-bold text-slate-900 dark:text-white leading-none">{user.full_name}</p>
-                    <p className="text-[9px] text-slate-500 font-medium">{getRoleLabel(user.role)}</p>
+                    <p className="text-[9px] text-slate-500 font-medium">{getRoleLabel(user.groups)}</p>
                 </div>
                 <ChevronDown className={`w-3 h-3 text-slate-400 group-hover:text-primary transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
             </button>

@@ -14,16 +14,19 @@ class RouteViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     permission_classes = [IsManager]
 
     def perform_create(self, serializer):
-        serializer.save(school=self.request.user.school)
+        serializer.save(organisation=self.request.user.organisation)
 
 
 class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     def get_queryset(self):
+        # Apply isolation first via super()
+        queryset = super().get_queryset()
+
         # Subquery for latest GPS point per bus
         latest_gps = GPSPoint.objects.filter(bus=OuterRef('pk')).order_by('-timestamp')
 
         return (
-            Bus.objects.select_related('route')
+            queryset.select_related('route')
             .annotate(
                 latest_lat=Subquery(latest_gps.values('lat')[:1]),
                 latest_lng=Subquery(latest_gps.values('lng')[:1]),
@@ -31,7 +34,6 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
                 latest_heading=Subquery(latest_gps.values('heading')[:1]),
                 latest_heartbeat=Subquery(latest_gps.values('timestamp')[:1]),
             )
-            .all()
         )
 
     permission_classes = [IsAdmin | IsManager | IsViewer]
@@ -43,11 +45,11 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
         return BusDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save(school=self.request.user.school)
+        serializer.save(organisation=self.request.user.organisation)
 
     @decorators.action(detail=False, methods=['get'])
     def online(self, request):
-        """Return only online buses for the school."""
+        """Return only online buses for the user's scope."""
         buses = self.get_queryset().filter(status='online')
         serializer = BusListSerializer(buses, many=True)
         return response.Response(serializer.data)
