@@ -137,6 +137,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         if (isHistoryMode) {
             markerRefs.current.forEach(m => m.setMap(null))
             markerRefs.current.clear()
+            markerStateRefs.current.clear() // Force rebuild when exiting history
             return
         }
 
@@ -403,25 +404,29 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             <div className="absolute top-[68px] right-4 z-10 flex flex-col gap-2">
                 <button
                     onClick={() => {
-                        if (cameraMode === 'free') setCameraMode(selectedBusId ? 'follow' : 'overview')
-                        else if (cameraMode === 'follow') setCameraMode('overview')
+                        if (cameraMode === 'free') setCameraMode('follow')
                         else setCameraMode('free')
                     }}
                     className={`p-3 relative rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${
-                        cameraMode !== 'free'
+                        cameraMode === 'follow'
                             ? 'bg-blue-600 text-white shadow-blue-500/20'
                             : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white'
                     }`}
-                    title={cameraMode === 'free' ? 'Free Browse' : cameraMode === 'follow' ? 'Following Bus' : 'Fit All'}
+                    title={cameraMode === 'free' ? 'Enable Auto-Track' : 'Disable Auto-Track'}
                 >
-                    {cameraMode === 'free' && <Unlock size={20} />}
-                    {cameraMode === 'follow' && <Crosshair size={20} className="animate-pulse" />}
-                    {cameraMode === 'overview' && <Maximize size={20} />}
-                    {cameraMode !== 'free' && (
+                    {cameraMode === 'free' ? <Unlock size={20} /> : <Crosshair size={20} className="animate-pulse" />}
+                    {cameraMode === 'follow' && (
                         <span className="absolute -bottom-1 -right-1 bg-white text-blue-600 text-[7px] font-bold px-1 rounded-sm shadow-sm border border-blue-100">
-                            {cameraMode === 'follow' ? 'LOCK' : 'ALL'}
+                            LOCK
                         </span>
                     )}
+                </button>
+                <button
+                    onClick={() => setCameraMode('overview')}
+                    className="p-3 relative rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white"
+                    title="Fit All Buses"
+                >
+                    <Maximize size={20} />
                 </button>
                 <button
                     onClick={() => {

@@ -160,13 +160,12 @@ export default function DashboardPage() {
                                     Fleet Status
                                 </h2>
                                 <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500 mt-1">
-                                    {error ? (
-                                        <span className="flex items-center gap-1 text-red-500"><WifiOff size={10}/> {error}</span>
-                                    ) : loading && !lastUpdated ? (
+                                    {loading && !lastUpdated ? (
                                         <span className="flex items-center gap-1 animate-pulse"><Clock size={10}/> Loading...</span>
                                     ) : (
-                                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-500">
-                                            <Clock size={10}/> Updated {lastUpdated ? lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'just now'}
+                                        <span className={`flex items-center gap-1 ${error ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-500'}`} title={error || 'Live Tracking'}>
+                                            {error ? <WifiOff size={10} className="animate-pulse" /> : <Clock size={10} />}
+                                            Updated {lastUpdated ? formatTimeDisplay(lastUpdated.toISOString()) : 'just now'}
                                         </span>
                                     )}
                                 </div>
