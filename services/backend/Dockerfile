@@ -19,8 +19,12 @@ COPY . .
 # Collect static files for WhiteNoise
 RUN python manage.py collectstatic --noinput
 
-# SAFETY NET: Fail the build immediately if someone forgot to run `makemigrations` locally.
-# This strictly prevents the "500 Server Error" caused by code expecting missing database columns.
+# SAFETY NET 1: Syntax & Configuration
+# Instantly catches missing imports, bad syntax, or broken URL patterns.
+RUN python manage.py check
+
+# SAFETY NET 2: Database Integrity
+# Fails the build immediately if someone forgot to run `makemigrations` locally.
 RUN python manage.py makemigrations --check --dry-run
 
 EXPOSE 8000
