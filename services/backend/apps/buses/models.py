@@ -148,6 +148,7 @@ class BusAllocation(models.Model):
         Organisation, on_delete=models.CASCADE, related_name='allocations_received'
     )
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default='view')
+    is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

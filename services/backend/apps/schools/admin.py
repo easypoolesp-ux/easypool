@@ -19,12 +19,16 @@ class OrganisationAdmin(admin.ModelAdmin):
     raw_id_fields = ('parent',)
 
     def get_queryset(self, request):
-        from django.db.models import Count
+        from django.db.models import Count, Q
 
         queryset = super().get_queryset(request)
         return queryset.annotate(
             _owned_count=Count('owned_buses', distinct=True),
-            _allocated_count=Count('allocations_received', distinct=True),
+            _allocated_count=Count(
+                'allocations_received',
+                filter=Q(allocations_received__is_active=True),
+                distinct=True,
+            ),
         )
 
     def owned_count_display(self, obj):
@@ -56,12 +60,16 @@ class UserAdmin(admin.ModelAdmin):
     filter_horizontal = ('groups', 'user_permissions')
 
     def get_queryset(self, request):
-        from django.db.models import Count
+        from django.db.models import Count, Q
 
         queryset = super().get_queryset(request)
         return queryset.annotate(
             _org_owned_count=Count('organisation__owned_buses', distinct=True),
-            _org_allocated_count=Count('organisation__allocations_received', distinct=True),
+            _org_allocated_count=Count(
+                'organisation__allocations_received',
+                filter=Q(organisation__allocations_received__is_active=True),
+                distinct=True,
+            ),
         )
 
     def org_owned_count(self, obj):

@@ -99,13 +99,15 @@ def apply_isolation(user, queryset):
         # 1. Model is a Bus
         elif model.__name__ == 'Bus':
             queryset = queryset.filter(
-                Q(organisation__in=user_orgs) | Q(allocations__granted_to__in=user_orgs)
+                Q(organisation__in=user_orgs)
+                | Q(allocations__granted_to__in=user_orgs, allocations__is_active=True)
             ).distinct()
 
         # 2. Model is linked to a Bus (GPSPoint, Camera, etc.)
         elif hasattr(model, 'bus'):
             queryset = queryset.filter(
-                Q(bus__organisation__in=user_orgs) | Q(bus__allocations__granted_to__in=user_orgs)
+                Q(bus__organisation__in=user_orgs)
+                | Q(bus__allocations__granted_to__in=user_orgs, bus__allocations__is_active=True)
             ).distinct()
 
         # 3. Model is a Route
