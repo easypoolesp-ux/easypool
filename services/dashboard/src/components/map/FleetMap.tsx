@@ -201,7 +201,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         })
 
         // Camera Mode Logic
-        if (mapRef.current) {
+        if (mapRef.current && !isHistoryMode) {
             if (cameraMode === 'follow' && selectedBusId) {
                 // Follow: pan to the selected bus
                 const target = buses.find(b => b.id === selectedBusId)
@@ -285,9 +285,9 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         } else {
             historyMarkerRef.current.setPosition(pos)
         }
-        // Auto-follow during playback
-        if (isPlaying) mapRef.current.panTo(pos)
-    }, [playbackIndex, isHistoryMode, historyPoints, isPlaying])
+        // Auto-follow during playback if user has selected the target mode
+        if (isPlaying && cameraMode === 'follow') mapRef.current.panTo(pos)
+    }, [playbackIndex, isHistoryMode, historyPoints, isPlaying, cameraMode])
 
     // ── History fetching ──────────────────────────────────────────────────────
     const loadHistory = useCallback(async (busId: string, date: string) => {

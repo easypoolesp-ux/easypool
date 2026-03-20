@@ -117,20 +117,6 @@ export default function DashboardPage() {
                     <div className="space-y-1 content-center">
                         <div className="flex items-center gap-3">
                             <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Fleet Overview</h1>
-                            <span className="font-bold text-sm bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 shadow-inner">
-                                {activeBuses.length} Buses
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                            {error ? (
-                                <span className="flex items-center gap-1 text-red-500"><WifiOff size={12}/> {error}</span>
-                            ) : loading && !lastUpdated ? (
-                                <span className="flex items-center gap-1 animate-pulse"><Clock size={12}/> Loading...</span>
-                            ) : (
-                                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-500">
-                                    <Clock size={12}/> Updated {lastUpdated ? lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'just now'}
-                                </span>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -167,11 +153,24 @@ export default function DashboardPage() {
                 {/* Bus Status List - Hide when map is fullscreen for focus */}
                 {!isFullscreen && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500 flex flex-col h-[500px]">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-bold flex items-center gap-2">
-                                <Bus className="w-5 h-5 text-primary" />
-                                Fleet Status
-                            </h2>
+                        <div className="flex items-start justify-between">
+                            <div className="flex flex-col">
+                                <h2 className="text-lg font-bold flex items-center gap-2">
+                                    <Bus className="w-5 h-5 text-primary" />
+                                    Fleet Status
+                                </h2>
+                                <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500 mt-1">
+                                    {error ? (
+                                        <span className="flex items-center gap-1 text-red-500"><WifiOff size={10}/> {error}</span>
+                                    ) : loading && !lastUpdated ? (
+                                        <span className="flex items-center gap-1 animate-pulse"><Clock size={10}/> Loading...</span>
+                                    ) : (
+                                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-500">
+                                            <Clock size={10}/> Updated {lastUpdated ? lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'just now'}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
                             <button
                                 onClick={() => setShowFilters(!showFilters)}
                                 className={`p-1.5 rounded-lg transition-all ${showFilters || hiddenStatuses.size > 0 ? 'text-blue-600 bg-blue-500/10' : 'text-muted-foreground hover:text-primary'}`}
