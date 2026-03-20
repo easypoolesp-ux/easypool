@@ -4,7 +4,7 @@ from django.db import models
 from pgvector.django import VectorField
 
 from apps.buses.models import Bus
-from apps.schools.models import School, User
+from apps.schools.models import User
 
 
 class Student(models.Model):
