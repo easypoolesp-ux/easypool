@@ -66,40 +66,42 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 
     @decorators.action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def telemetry(self, request):
-        """Update GPS point for a bus (called by MQTT subscriber)."""
+        """Update GPS point for a bus (called by TCP gateway)."""
         api_key = request.headers.get('X-API-KEY')
-        if api_key != "easypool_gps_secret_2026": # Should match GH Secret
+        if api_key != "easypool_gps_secret_2026":
             return response.Response({'error': 'Unauthorized'}, status=401)
 
         imei = request.data.get('imei')
         try:
             from apps.buses.models import Bus
             from django.utils import timezone
-            
-            bus = Bus.objects.get(gps_imei=imei)
-            lat = request.data.get('lat')
-            lng = request.data.get('lng')
-            speed = float(request.data.get('speed', 0))
+
+            bus      = Bus.objects.get(gps_imei=imei)
+            lat      = request.data.get('lat')
+            lng      = request.data.get('lng')
+            speed    = float(request.data.get('speed', 0))
+            heading  = float(request.data.get('heading', 0))   # 0-360°
             ignition = request.data.get('ignition', False)
-            
-            # Create the point
+
+            # Create the GPS point (heading now stored)
             GPSPoint.objects.create(
                 bus=bus,
                 lat=lat,
                 lng=lng,
                 speed=speed,
+                heading=heading,
                 ignition=ignition,
-                timestamp=timezone.now()
+                timestamp=timezone.now(),
             )
-            
-            # Update bus status based on telemetry
+
+            # Derive bus status from live telemetry
             if not ignition:
-                bus.status = 'ignition_off' # Red
-            elif speed > 5: # Threshold for moving
-                bus.status = 'moving'       # Green
+                bus.status = 'ignition_off'   # Red
+            elif speed > 5:
+                bus.status = 'moving'          # Green
             else:
-                bus.status = 'idle'         # Grey
-                
+                bus.status = 'idle'            # Grey
+
             bus.save()
             return response.Response({'status': 'success'})
         except Bus.DoesNotExist:

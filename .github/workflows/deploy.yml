@@ -206,7 +206,7 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Update VM Gateway
+      - name: Update VM Gateway (Docker)
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/gps-gateway:latest"
           ACCESS_TOKEN=$(gcloud auth print-access-token)
@@ -217,26 +217,47 @@ jobs:
             --project ${{ env.PROJECT_ID }} \
             --tunnel-through-iap \
             --quiet \
-            -- bash -s <<DEPLOY_SCRIPT
+            -- bash -s <<'DEPLOY_SCRIPT'
           set -euo pipefail
 
-          export DOCKER_CONFIG=\$(mktemp -d)
-          trap "rm -rf \${DOCKER_CONFIG}" EXIT
-          echo '{"auths":{}}' > \${DOCKER_CONFIG}/config.json
+          IMAGE="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/gps-gateway:latest"
 
-          echo "${ACCESS_TOKEN}" | docker login -u oauth2accesstoken --password-stdin https://${{ env.REGISTRY }}
+          # ── Auth Docker to Artifact Registry ─────────────────────────────────
+          export DOCKER_CONFIG=$(mktemp -d)
+          trap "rm -rf ${DOCKER_CONFIG}" EXIT
+          echo '{"auths":{}}' > ${DOCKER_CONFIG}/config.json
+          echo "${ACCESS_TOKEN}" | docker login -u oauth2accesstoken --password-stdin \
+            https://${{ env.REGISTRY }}
 
+          echo "[CI] Pulling latest gateway image..."
           docker pull ${IMAGE}
+
+          # ── Stop any running gateway (Docker container OR stale /tmp process) ─
           docker stop gps_gateway 2>/dev/null || true
           docker rm   gps_gateway 2>/dev/null || true
 
-          docker run -d --name gps_gateway \
+          # Kill any leftover bare-python processes (the old /tmp/gateway.py hack)
+          pkill -f "python.*gateway.py" 2>/dev/null || true
+
+          # ── Start gateway container ───────────────────────────────────────────
+          docker run -d \
+            --name gps_gateway \
             --restart always \
+            --network host \
             -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
             -e GPS_SERVICE_API_KEY=${GPS_API_KEY} \
             -e GATEWAY_PORT=5027 \
-            --network host \
             ${IMAGE}
 
-          echo "Deployment complete. Status: \$(docker ps --filter name=gps_gateway --format '{{.Status}}')"
+          # ── Verify ───────────────────────────────────────────────────────────
+          sleep 3
+          STATUS=$(docker inspect --format='{{.State.Status}}' gps_gateway 2>/dev/null || echo "not_found")
+          echo "[CI] Container status: ${STATUS}"
+          if [ "${STATUS}" != "running" ]; then
+            echo "[CI][ERROR] gps_gateway is not running! Logs:"
+            docker logs gps_gateway --tail=50 || true
+            exit 1
+          fi
+          echo "[CI] ✅ GPS Gateway deployed successfully from Docker image."
+          docker logs gps_gateway --tail=10
           DEPLOY_SCRIPT

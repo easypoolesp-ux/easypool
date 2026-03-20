@@ -140,13 +140,6 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <div className="text-center">
-                        <p className="text-xs text-slate-600">
-                            <span className="font-mono text-slate-500">admin@easypool.com</span>
-                            {' · '}
-                            <span className="font-mono text-slate-500">Admin@2026</span>
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>

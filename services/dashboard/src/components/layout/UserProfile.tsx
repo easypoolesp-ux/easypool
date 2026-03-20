@@ -62,7 +62,7 @@ export default function UserProfile() {
     const getRoleLabel = (role: string) => {
         const roles: Record<string, string> = {
             'superadmin': 'Super Admin',
-            'school_admin': 'School Admin',
+            'school_admin': 'Fleet Admin',
             'transporter': 'Transporter',
             'parent': 'Parent'
         }
@@ -94,12 +94,6 @@ export default function UserProfile() {
                     <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800">
                         <p className="text-xs font-bold text-slate-900 dark:text-white">{user.full_name}</p>
                         <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
-                        {user.school_name && (
-                            <div className="mt-2 flex items-center gap-1.5 px-2 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
-                                <ShieldCheck className="w-3 h-3 text-green-500" />
-                                <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-tight">{user.school_name}</span>
-                            </div>
-                        )}
                     </div>
                     
                     <div className="p-2 space-y-1">

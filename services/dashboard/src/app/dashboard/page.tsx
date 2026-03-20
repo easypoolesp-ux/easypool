@@ -128,7 +128,6 @@ export default function DashboardPage() {
                     </div>
                     <div className="space-y-1">
                         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Fleet Overview</h1>
-                        <p className="text-muted-foreground text-sm">Monitor real-time status of all active school buses in Kolkata.</p>
                     </div>
                 </div>
                 <UserProfile />

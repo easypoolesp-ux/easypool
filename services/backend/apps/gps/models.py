@@ -9,7 +9,7 @@ class GPSPoint(models.Model):
     lat = models.FloatField()
     lng = models.FloatField()
     speed = models.FloatField(default=0)
-    heading = models.FloatField(default=0)
+    heading = models.FloatField(default=0, help_text='Direction of travel in degrees (0-360)')
     accuracy = models.FloatField(null=True, blank=True)
     timestamp = models.DateTimeField(db_index=True)
     ignition = models.BooleanField(default=False)
