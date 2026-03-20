@@ -97,7 +97,7 @@ export default function DashboardPage() {
             case 'moving':    return { label: 'Moving',    color: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500 animate-pulse', speed: Math.round(bus.speed || 0) }
             case 'idle':      return { label: 'Idle',      color: 'text-amber-500 dark:text-amber-400', dot: 'bg-amber-400',              speed: null }
             case 'no_signal': return { label: 'No Signal', color: 'text-red-500 dark:text-red-400',   dot: 'bg-red-500',                 speed: null }
-            case 'offline':   return { label: 'Stopped',   color: 'text-slate-900 dark:text-slate-200', dot: 'bg-slate-900 dark:bg-slate-200', speed: null }
+            case 'stopped':   return { label: 'Stopped',   color: 'text-slate-900 dark:text-slate-200', dot: 'bg-slate-900 dark:bg-slate-200', speed: null }
             default:          return { label: 'Unknown',   color: 'text-slate-400',                    dot: 'bg-slate-400',               speed: null }
         }
     }
@@ -110,7 +110,13 @@ export default function DashboardPage() {
         })
     }
 
-    const filteredBuses = buses.filter(bus => {
+    // Filter out offline (untracked) buses — they don't belong on the live dashboard
+    const activeBuses = buses.filter(b => {
+        const cs = (b as any).computed_status || b.status
+        return cs !== 'offline'
+    })
+
+    const filteredBuses = activeBuses.filter(bus => {
         const cs = (bus as any).computed_status || bus.status
         if (hiddenStatuses.has(cs)) return false
         return bus.internal_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -190,13 +196,12 @@ export default function DashboardPage() {
                         {/* ── Fleet Health Donut ── */}
                         <FleetStatusDonut
                             statuses={[
-                                { key: 'moving',    label: 'Moving',      count: buses.filter(b => ((b as any).computed_status || b.status) === 'moving').length,    color: '#3b82f6', tailwind: 'bg-blue-500' },
-                                { key: 'idle',      label: 'Idle',        count: buses.filter(b => ((b as any).computed_status || b.status) === 'idle').length,      color: '#f59e0b', tailwind: 'bg-amber-400' },
-                                { key: 'stopped',   label: 'Stopped',     count: buses.filter(b => ((b as any).computed_status || b.status) === 'stopped').length,   color: '#0f172a', tailwind: 'bg-slate-900' },
-                                { key: 'offline',   label: 'Maintenance', count: buses.filter(b => ((b as any).computed_status || b.status) === 'offline').length,   color: '#94a3b8', tailwind: 'bg-slate-400' },
-                                { key: 'no_signal', label: 'No Signal',   count: buses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').length, color: '#ef4444', tailwind: 'bg-red-500' },
+                                { key: 'moving',    label: 'Moving',    count: activeBuses.filter(b => ((b as any).computed_status || b.status) === 'moving').length,    color: '#3b82f6', tailwind: 'bg-blue-500' },
+                                { key: 'idle',      label: 'Idle',      count: activeBuses.filter(b => ((b as any).computed_status || b.status) === 'idle').length,      color: '#f59e0b', tailwind: 'bg-amber-400' },
+                                { key: 'stopped',   label: 'Stopped',   count: activeBuses.filter(b => ((b as any).computed_status || b.status) === 'stopped').length,   color: '#0f172a', tailwind: 'bg-slate-900' },
+                                { key: 'no_signal', label: 'No Signal', count: activeBuses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').length, color: '#ef4444', tailwind: 'bg-red-500' },
                             ]}
-                            criticalBuses={buses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').map(b => ({ id: (b as any).id, internal_id: b.internal_id }))}
+                            criticalBuses={activeBuses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').map(b => ({ id: (b as any).id, internal_id: b.internal_id }))}
                             onCriticalClick={(busId) => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: busId }))}
                         />
 
@@ -216,11 +221,10 @@ export default function DashboardPage() {
                         {showFilters && (
                         <div className="flex flex-wrap gap-1.5">
                             {[
-                                { key: 'moving',    label: 'Moving',      dot: 'bg-blue-500' },
-                                { key: 'idle',      label: 'Idle',        dot: 'bg-amber-400' },
-                                { key: 'stopped',   label: 'Stopped',     dot: 'bg-slate-900 dark:bg-slate-200' },
-                                { key: 'no_signal', label: 'No Signal',   dot: 'bg-red-500' },
-                                { key: 'offline',   label: 'Maintenance', dot: 'bg-slate-400' },
+                                { key: 'moving',    label: 'Moving',    dot: 'bg-blue-500' },
+                                { key: 'idle',      label: 'Idle',      dot: 'bg-amber-400' },
+                                { key: 'stopped',   label: 'Stopped',   dot: 'bg-slate-900 dark:bg-slate-200' },
+                                { key: 'no_signal', label: 'No Signal', dot: 'bg-red-500' },
                             ].map(f => (
                                 <button
                                     key={f.key}

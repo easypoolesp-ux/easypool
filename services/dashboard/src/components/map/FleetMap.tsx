@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader, Polyline } from '@react-google-maps/api'
 import { Play, Pause, X, Route, Calendar } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { MONOCHROME_DARK, MONOCHROME_LIGHT } from './mapStyles'
+import { MONOCHROME_DARK, MONOCHROME_LIGHT, DARK_DEFAULT } from './mapStyles'
 import { useMapHighContrastListener } from '@/hooks/useMapHighContrast'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ function getStatusColor(status: string): string {
         case 'idle':      return '#f59e0b'   // Amber
         case 'no_signal': return '#ef4444'   // Red
         case 'stopped':   return '#0f172a'   // Midnight Black
-        case 'offline':   return '#94a3b8'   // Faded Grey (Maintenance)
+        case 'offline':   return '#94a3b8'   // Grey (Untracked)
         default:          return '#94a3b8'
     }
 }
@@ -66,7 +66,7 @@ function getStatusLabel(status: string): string {
         case 'idle':      return 'Idle'
         case 'no_signal': return 'No Signal'
         case 'stopped':   return 'Stopped'
-        case 'offline':   return 'Maintenance'
+        case 'offline':   return 'Untracked'
         default:          return 'Unknown'
     }
 }
@@ -140,14 +140,18 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        styles: highContrast ? (isDark ? MONOCHROME_DARK : MONOCHROME_LIGHT) : [],
+        styles: highContrast
+            ? (isDark ? MONOCHROME_DARK : MONOCHROME_LIGHT)
+            : (isDark ? DARK_DEFAULT : []),
     }), [isDark, highContrast])
 
     // Imperatively sync theme + high-contrast changes to live map
     useEffect(() => {
         if (mapRef.current) {
             mapRef.current.setOptions({
-                styles: highContrast ? (isDark ? MONOCHROME_DARK : MONOCHROME_LIGHT) : []
+                styles: highContrast
+            ? (isDark ? MONOCHROME_DARK : MONOCHROME_LIGHT)
+            : (isDark ? DARK_DEFAULT : [])
             })
         }
     }, [isDark, highContrast])
@@ -342,7 +346,6 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         idle:      buses.filter(b => (b.computed_status || b.status) === 'idle').length,
         stopped:   buses.filter(b => (b.computed_status || b.status) === 'stopped').length,
         no_signal: buses.filter(b => (b.computed_status || b.status) === 'no_signal').length,
-        offline:   buses.filter(b => (b.computed_status || b.status) === 'offline').length,
     }), [buses])
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -414,12 +417,6 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                         <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
                             <div className="w-2 h-2 rounded-full bg-red-500" />
                             <span className="text-[10px] font-bold text-white">{counts.no_signal} No Signal</span>
-                        </div>
-                    )}
-                    {counts.offline > 0 && (
-                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
-                            <div className="w-2 h-2 rounded-full bg-slate-400" />
-                            <span className="text-[10px] font-bold text-white">{counts.offline} Maintenance</span>
                         </div>
                     )}
                 </div>

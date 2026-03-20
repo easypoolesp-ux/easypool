@@ -86,10 +86,10 @@ export default function FleetStatusDonut({ statuses, criticalBuses = [], onCriti
 
             {/* ── Right side: Legend + critical callout ── */}
             <div className="flex-1 min-w-0 space-y-2">
-                {/* Legend row */}
+                {/* Legend row — always show all statuses */}
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
-                    {statuses.filter(s => s.count > 0 && s.key !== 'no_signal').map(s => (
-                        <div key={s.key} className="flex items-center gap-1.5">
+                    {statuses.filter(s => s.key !== 'no_signal').map(s => (
+                        <div key={s.key} className={`flex items-center gap-1.5 ${s.count === 0 ? 'opacity-40' : ''}`}>
                             <div className={`w-2 h-2 rounded-full ${s.tailwind}`} />
                             <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">{s.count}</span>
                             <span className="text-[9px] text-slate-400">{s.label}</span>
@@ -97,8 +97,8 @@ export default function FleetStatusDonut({ statuses, criticalBuses = [], onCriti
                     ))}
                 </div>
 
-                {/* Critical alert callout — always visible, never lost in the donut */}
-                {criticalCount > 0 && (
+                {/* No Signal — always visible */}
+                {criticalCount > 0 ? (
                     <div className="bg-red-50 dark:bg-red-900/15 border border-red-200/50 dark:border-red-800/30 rounded-xl px-3 py-2 space-y-1">
                         <p className="text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -116,6 +116,11 @@ export default function FleetStatusDonut({ statuses, criticalBuses = [], onCriti
                         {criticalBuses.length > 3 && (
                             <p className="text-[9px] text-red-400 italic">+{criticalBuses.length - 3} more</p>
                         )}
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/10 rounded-lg border border-emerald-200/50 dark:border-emerald-800/30">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">All buses connected</span>
                     </div>
                 )}
             </div>
