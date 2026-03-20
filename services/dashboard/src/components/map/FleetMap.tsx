@@ -95,6 +95,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
+        mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || 'b0c049e7fb978545fe9416bf', // Use secret, with fallback
         styles: isDark ? DARK_STYLE : LIGHT_STYLE,
     }), [isDark])
 
