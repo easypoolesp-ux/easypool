@@ -473,16 +473,34 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                             <option key={b.id} value={b.id}>{b.internal_id}</option>
                         ))}
                     </select>
-                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
-                    <button 
-                        onClick={() => toggleHistoryMode()}
-                        className="p-1 px-2 text-slate-400 dark:text-slate-300 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                        title="Close History"
-                    >
-                        <X size={14} />
-                    </button>
                 </div>
             )}
+
+            {/* Global override for Google Maps native InfoWindow Close button visibility in dark mode */}
+            <style dangerouslySetInnerHTML={{ __html: `
+                .gm-ui-hover-effect {
+                    background: #ffffffdd !important;
+                    border-radius: 50% !important;
+                    margin: 8px !important;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+                    padding: 4px !important;
+                    display: block !important;
+                    width: 32px !important;
+                    height: 32px !important;
+                    transition: all 0.2s !important;
+                    opacity: 1 !important;
+                    visibility: visible !important;
+                }
+                .gm-ui-hover-effect:hover {
+                    background: #ffffffff !important;
+                    transform: scale(1.1);
+                }
+                .gm-ui-hover-effect img, .gm-ui-hover-effect svg {
+                    filter: brightness(0) !important;
+                    width: 14px !important;
+                    height: 14px !important;
+                }
+            `}} />
 
             {/* Playback Timeline */}
             {isHistoryMode && (

@@ -139,51 +139,6 @@ export default function DashboardPage() {
                 <UserProfile />
             </header>
 
-            {/* Top Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="border-none shadow-sm bg-primary text-primary-foreground transition-all hover:scale-[1.02]">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase opacity-90">Total Buses</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold italic">{buses.length}</div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Company Groups</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold text-blue-500 font-mono tracking-tighter">
-                            {transporters.length}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Active Now</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold text-green-500 font-mono tracking-tighter">
-                            {buses.filter(b => b.status === 'online').length}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm bg-white dark:bg-slate-900 border border-border">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">System Alerts</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className={`text-3xl font-bold font-mono tracking-tighter ${alerts.length > 0 ? 'text-red-500' : 'text-slate-400'}`}>
-                            {alerts.length}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
             <div className={`grid grid-cols-1 ${isFullscreen ? 'lg:grid-cols-1' : 'lg:grid-cols-3'} gap-6 transition-all duration-500`}>
                 {/* Main Fleet Map with Fullscreen Toggle */}
                 <div className={`${isFullscreen ? 'lg:col-span-1 fixed inset-4 z-50 bg-background shadow-2xl' : 'lg:col-span-2 min-h-[500px] bg-muted relative shadow-inner'} rounded-xl overflow-hidden border border-border`}>
@@ -237,18 +192,10 @@ export default function DashboardPage() {
                             <input
                                 type="text"
                                 placeholder="Search Plate, ID, or Route..."
-                                className="w-full pl-10 pr-10 py-2 bg-white dark:bg-slate-900 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm text-slate-900 dark:text-white"
+                                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
-                            {searchQuery && (
-                                <button
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-200 transition-colors"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            )}
                         </div>
 
                         {/* Status filter chips — toggled by filter button */}
