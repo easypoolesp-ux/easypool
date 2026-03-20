@@ -82,22 +82,24 @@ function getStatusLabel(status: string): string {
     }
 }
 
-/** Returns an SVG data URI icon with:
- *  - Outer colored ring (status color)
- *  - Rotated arrow inside (pointing in heading direction)
- *  - Clean white center
+/**
+ * Industry-standard fleet marker:
+ * - Colored circle (status) with white border
+ * - Soft outer glow ring
+ * - Small triangular "headlight" notch showing direction of travel
+ * - Entire group rotates with heading
  */
 function buildMarkerSvg(color: string, heading: number): string {
-    const svg = `<svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
-      <!-- Outer glow ring -->
-      <circle cx="22" cy="22" r="20" fill="none" stroke="${color}" stroke-width="2.5" opacity="0.35"/>
-      <!-- Inner solid ring -->
-      <circle cx="22" cy="22" r="16" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2"/>
-      <!-- White fill center -->
-      <circle cx="22" cy="22" r="13" fill="white"/>
-      <!-- Rotated arrow -->
-      <g transform="rotate(${heading}, 22, 22)">
-        <polygon points="22,6 16,32 22,27 28,32" fill="${color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+    const svg = `<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+      <g transform="rotate(${heading}, 24, 24)">
+        <!-- Outer pulse ring -->
+        <circle cx="24" cy="24" r="22" fill="none" stroke="${color}" stroke-width="2" opacity="0.25"/>
+        <!-- Heading notch / headlight triangle -->
+        <polygon points="24,2 19,12 29,12" fill="${color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+        <!-- Main circle -->
+        <circle cx="24" cy="24" r="13" fill="${color}" stroke="white" stroke-width="3"/>
+        <!-- Inner highlight dot -->
+        <circle cx="24" cy="24" r="4" fill="white" opacity="0.9"/>
       </g>
     </svg>`
     return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
@@ -175,8 +177,8 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             const heading = bus.heading || 0
             const pos     = { lat: bus.lat, lng: bus.lng }
             const iconUrl = buildMarkerSvg(color, heading)
-            const iconSize = new google.maps.Size(44, 44)
-            const iconAnchor = new google.maps.Point(22, 22)
+            const iconSize = new google.maps.Size(48, 48)
+            const iconAnchor = new google.maps.Point(24, 24)
 
             const existing = markerRefs.current.get(bus.id)
             if (existing) {
