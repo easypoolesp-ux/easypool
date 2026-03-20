@@ -1,6 +1,5 @@
 from django.contrib import admin
-from .models import Organisation, Transporter, User
-
+from .models import Organisation, User
 
 @admin.register(Organisation)
 class OrganisationAdmin(admin.ModelAdmin):
@@ -8,15 +7,6 @@ class OrganisationAdmin(admin.ModelAdmin):
     list_filter = ('org_type', 'is_active')
     search_fields = ('name',)
     raw_id_fields = ('parent',)
-
-
-@admin.register(Transporter)
-class TransporterAdmin(admin.ModelAdmin):
-    list_display = ('name', 'organisation', 'contact_person', 'phone', 'is_active')
-    search_fields = ('name', 'contact_person', 'email')
-    list_filter = ('is_active',)
-    raw_id_fields = ('organisation',)
-
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):

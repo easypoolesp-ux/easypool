@@ -1,21 +1,18 @@
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
-from .models import Organisation, Transporter, User
-
+from .models import Organisation, User
 
 class OrganisationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organisation
         fields = '__all__'
 
-
+# Compatibility: The frontend still expects a "transporters" API. 
+# We point it to Organisation but filter for bus_agency in the view.
 class TransporterSerializer(serializers.ModelSerializer):
-    organisation_name = serializers.CharField(source='organisation.name', read_only=True)
-
     class Meta:
-        model = Transporter
-        fields = '__all__'
-
+        model = Organisation
+        fields = ('id', 'name', 'address', 'contact_email', 'phone', 'is_active', 'created_at')
 
 class UserSerializer(serializers.ModelSerializer):
     organisation_name = serializers.SerializerMethodField()
@@ -28,7 +25,6 @@ class UserSerializer(serializers.ModelSerializer):
             'full_name',
             'organisation',
             'organisation_name',
-            'transporter',
             'photo_url',
         )
         read_only_fields = ('id',)

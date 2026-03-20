@@ -1,20 +1,19 @@
 from rest_framework import decorators, response, viewsets
 from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin
-from .models import Organisation, Transporter, User
+from .models import Organisation, User
 from .serializers import OrganisationSerializer, TransporterSerializer, UserSerializer
-
 
 class OrganisationViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Organisation.objects.all()
     serializer_class = OrganisationSerializer
     permission_classes = [IsAdmin | IsManager]
 
-
+# Compatibility Bridge: Maps the old Transporter API 
+# to the new pure-Organisation model (type: bus_agency).
 class TransporterViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
-    queryset = Transporter.objects.all()
-    serializer_class = TransporterSerializer
+    queryset = Organisation.objects.filter(org_type='bus_agency')
+    serializer_class = OrganisationSerializer
     permission_classes = [IsAdmin | IsManager | IsViewer]
-
 
 class UserViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -23,6 +22,5 @@ class UserViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
 
     @decorators.action(detail=False, methods=['get'], permission_classes=[IsManager | IsViewer])
     def me(self, request):
-        """Return the current authenticated user's profile info."""
         serializer = self.get_serializer(request.user)
         return response.Response(serializer.data)
