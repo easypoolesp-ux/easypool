@@ -6,7 +6,7 @@ import { Play, Pause, X, Route, Calendar } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { MONOCHROME_DARK, MONOCHROME_LIGHT, DARK_DEFAULT } from './mapStyles'
 import { useMapHighContrastListener } from '@/hooks/useMapHighContrast'
-import { getStatusColor, getStatusConfig } from '@/constants/fleetStatus'
+import { getStatusColor, getStatusConfig, FLEET_STATUSES } from '@/constants/fleetStatus'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Bus {
@@ -368,30 +368,16 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             {/* Status Legend — bottom left */}
             {!isHistoryMode && (
                 <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-1.5 pointer-events-none max-w-[320px]">
-                    {counts.moving > 0 && (
-                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
-                            <div className="w-2 h-2 rounded-full bg-blue-500" />
-                            <span className="text-[10px] font-bold text-white">{counts.moving} Moving</span>
-                        </div>
-                    )}
-                    {counts.idle > 0 && (
-                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
-                            <div className="w-2 h-2 rounded-full bg-amber-400" />
-                            <span className="text-[10px] font-bold text-white">{counts.idle} Idle</span>
-                        </div>
-                    )}
-                    {counts.stopped > 0 && (
-                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
-                            <div className="w-2 h-2 rounded-full bg-slate-900 border border-white/20" />
-                            <span className="text-[10px] font-bold text-white">{counts.stopped} Stopped</span>
-                        </div>
-                    )}
-                    {counts.no_signal > 0 && (
-                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
-                            <div className="w-2 h-2 rounded-full bg-red-500" />
-                            <span className="text-[10px] font-bold text-white">{counts.no_signal} No Signal</span>
-                        </div>
-                    )}
+                    {FLEET_STATUSES.map(s => {
+                        const count = (counts as any)[s.key] || 0
+                        if (count === 0) return null
+                        return (
+                            <div key={s.key} className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 shadow-lg">
+                                <div className={`w-2 h-2 rounded-full ${s.dot} border border-white/20`} />
+                                <span className="text-[10px] font-bold text-white tracking-tight">{count} {s.label}</span>
+                            </div>
+                        )
+                    })}
                 </div>
             )}
 

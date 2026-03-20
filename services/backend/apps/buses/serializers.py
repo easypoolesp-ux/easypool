@@ -81,24 +81,25 @@ class BusListSerializer(serializers.ModelSerializer):
         diff = now - heartbeat
 
         # Red — long-term failure
+        # 1. 12-hour absolute silence = NO SIGNAL (Red)
         if diff > timedelta(hours=12):
             return 'no_signal'
         
-        # Black — short-term inactive
-        if diff > timedelta(minutes=10):
-            return 'stopped'
-
-        # Within 10 mins — check ignition
+        # Pull ignition state
         ignition = getattr(obj, 'latest_ignition', None)
         if ignition is None: ignition = latest.ignition if latest else False
+
+        # 2. Critical Alert: Engine was ON but silence > 15m = NO SIGNAL (Red)
+        if ignition and diff > timedelta(minutes=15):
+            return 'no_signal'
         
+        # 3. Parked: Engine is OFF and seen < 12h ago = STOPPED (Slate)
         if not ignition:
             return 'stopped'
 
+        # 4. Engine is ON + Recent (< 5m): check speed for Moving vs Idle
         speed = getattr(obj, 'latest_speed', None)
         if speed is None: speed = float(latest.speed or 0) if latest else 0
-
-        # Ignition is ON
         return 'moving' if float(speed) > 2 else 'idle'
 
 class CameraSerializer(serializers.ModelSerializer):
