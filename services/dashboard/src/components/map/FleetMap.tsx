@@ -65,10 +65,12 @@ const LIGHT_STYLE: google.maps.MapTypeStyle[] = []
  */
 function getStatusColor(status: string): string {
     switch (status) {
-        case 'moving':    return '#3b82f6'   // blue — visible on all map themes
-        case 'idle':      return '#f59e0b'
-        case 'no_signal': return '#ef4444'
-        default:          return '#0f172a' // Midnight black for stopped/parked
+        case 'moving':    return '#3b82f6'   // Blue
+        case 'idle':      return '#f59e0b'   // Amber
+        case 'no_signal': return '#ef4444'   // Red
+        case 'stopped':   return '#0f172a'   // Midnight Black
+        case 'offline':   return '#94a3b8'   // Faded Grey (Maintenance)
+        default:          return '#94a3b8'
     }
 }
 
@@ -77,7 +79,8 @@ function getStatusLabel(status: string): string {
         case 'moving':    return 'Moving'
         case 'idle':      return 'Idle'
         case 'no_signal': return 'No Signal'
-        case 'offline':   return 'Offline'
+        case 'stopped':   return 'Stopped'
+        case 'offline':   return 'Maintenance'
         default:          return 'Unknown'
     }
 }
@@ -348,6 +351,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     const counts = useMemo(() => ({
         moving:    buses.filter(b => (b.computed_status || b.status) === 'moving').length,
         idle:      buses.filter(b => (b.computed_status || b.status) === 'idle').length,
+        stopped:   buses.filter(b => (b.computed_status || b.status) === 'stopped').length,
         no_signal: buses.filter(b => (b.computed_status || b.status) === 'no_signal').length,
         offline:   buses.filter(b => (b.computed_status || b.status) === 'offline').length,
     }), [buses])
@@ -398,7 +402,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
             {/* Status Legend — bottom left */}
             {!isHistoryMode && (
-                <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-1.5 pointer-events-none max-w-[260px]">
+                <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-1.5 pointer-events-none max-w-[320px]">
                     {counts.moving > 0 && (
                         <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
                             <div className="w-2 h-2 rounded-full bg-blue-500" />
@@ -411,6 +415,12 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                             <span className="text-[10px] font-bold text-white">{counts.idle} Idle</span>
                         </div>
                     )}
+                    {counts.stopped > 0 && (
+                        <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                            <div className="w-2 h-2 rounded-full bg-slate-900 border border-white/20" />
+                            <span className="text-[10px] font-bold text-white">{counts.stopped} Stopped</span>
+                        </div>
+                    )}
                     {counts.no_signal > 0 && (
                         <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
                             <div className="w-2 h-2 rounded-full bg-red-500" />
@@ -419,8 +429,8 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     )}
                     {counts.offline > 0 && (
                         <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
-                            <div className="w-2 h-2 rounded-full bg-slate-500" />
-                            <span className="text-[10px] font-bold text-white">{counts.offline} Offline</span>
+                            <div className="w-2 h-2 rounded-full bg-slate-400" />
+                            <span className="text-[10px] font-bold text-white">{counts.offline} Maintenance</span>
                         </div>
                     )}
                 </div>

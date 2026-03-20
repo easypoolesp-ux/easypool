@@ -63,14 +63,14 @@ class BusListSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.CharField())
     def get_computed_status(self, obj):
         """
-        Refined Logic:
-        - > 12h silence: 'no_signal' (Red)
-        - > 10m silence: 'offline'   (Black / Stopped)
-        - < 10m signal:
-                - ignition is OFF: 'offline' (Black / Stopped) 
-                - speed > 2      : 'moving'  (Blue)
-                - else           : 'idle'    (Amber)
+        Ultimate 5-status hierarchy:
+        1. 'no_signal' (Red)   : silence > 12h
+        2. 'offline'   (Grey)  : manually deactivated (maintenance)
+        3. 'moving'    (Blue)  : < 10m signal + engine ON + speed > 2
+        4. 'idle'      (Amber) : < 10m signal + engine ON + speed <= 2
+        5. 'stopped'   (Black) : < 10m signal + engine OFF (parked) OR silence > 10m
         """
+        # Grey — manually deactivated for maintenance
         if obj.status == 'offline': return 'offline'
 
         latest    = obj.gps_points.first()
@@ -80,22 +80,25 @@ class BusListSerializer(serializers.ModelSerializer):
         now  = timezone.now()
         diff = now - heartbeat
 
+        # Red — long-term failure
         if diff > timedelta(hours=12):
             return 'no_signal'
         
+        # Black — short-term inactive
         if diff > timedelta(minutes=10):
-            return 'offline'
+            return 'stopped'
 
-        # Within 10 mins — check ignition and speed
+        # Within 10 mins — check ignition
         ignition = getattr(obj, 'latest_ignition', None)
         if ignition is None: ignition = latest.ignition if latest else False
         
         if not ignition:
-            return 'offline'
+            return 'stopped'
 
         speed = getattr(obj, 'latest_speed', None)
         if speed is None: speed = float(latest.speed or 0) if latest else 0
 
+        # Ignition is ON
         return 'moving' if float(speed) > 2 else 'idle'
 
 class CameraSerializer(serializers.ModelSerializer):
