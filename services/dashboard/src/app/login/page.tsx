@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2, Shield } from 'lucide-react'
 import Image from 'next/image'
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { setUserId, logEvent } from 'firebase/analytics'
+import { auth, analytics } from '@/lib/firebase'
 
 export default function LoginPage() {
     const router = useRouter()
@@ -42,7 +43,14 @@ export default function LoginPage() {
 
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password)
-            const token = await userCredential.user.getIdToken(true) // Force fresh token
+            const user = userCredential.user
+            const token = await user.getIdToken(true) // Force fresh token
+            
+            // Log analytics for identification and activity tracking
+            if (analytics) {
+                setUserId(analytics, user.uid);
+                logEvent(analytics, 'login', { method: 'email' });
+            }
             
             localStorage.setItem('token', token)
             document.cookie = `token=${token}; path=/; max-age=3600`
@@ -66,7 +74,14 @@ export default function LoginPage() {
         try {
             const provider = new GoogleAuthProvider()
             const userCredential = await signInWithPopup(auth, provider)
-            const token = await userCredential.user.getIdToken(true)
+            const user = userCredential.user
+            const token = await user.getIdToken(true)
+            
+            // Log analytics for identification and activity tracking
+            if (analytics) {
+                setUserId(analytics, user.uid);
+                logEvent(analytics, 'login', { method: 'google' });
+            }
             
             localStorage.setItem('token', token)
             document.cookie = `token=${token}; path=/; max-age=3600`

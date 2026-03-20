@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getAnalytics, isSupported } from "firebase/analytics";
+import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
+import { getPerformance, FirebasePerformance } from "firebase/performance";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,7 +18,7 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
 // Initialize Analytics only if supported (prevents server-side errors)
-let analytics = null;
+let analytics: Analytics | null = null;
 if (typeof window !== "undefined") {
   isSupported().then((supported) => {
     if (supported) {
@@ -26,4 +27,10 @@ if (typeof window !== "undefined") {
   });
 }
 
-export { app, auth, analytics };
+// Initialize Performance Monitoring
+let performance: FirebasePerformance | null = null;
+if (typeof window !== "undefined") {
+  performance = getPerformance(app);
+}
+
+export { app, auth, analytics, performance };
