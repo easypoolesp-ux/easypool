@@ -68,7 +68,7 @@ function getStatusColor(status: string): string {
         case 'moving':    return '#3b82f6'   // blue — visible on all map themes
         case 'idle':      return '#f59e0b'
         case 'no_signal': return '#ef4444'
-        default:          return '#64748b' // offline / unknown
+        default:          return '#0f172a' // Midnight black for stopped/parked
     }
 }
 

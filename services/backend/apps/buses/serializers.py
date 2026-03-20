@@ -63,31 +63,40 @@ class BusListSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.CharField())
     def get_computed_status(self, obj):
         """
-        Compute real-time status from live data:
-        - 'offline'   : manually marked as inactive/maintenance
-        - 'no_signal' : no GPS data in the last 12 hours (device issue)
-        - 'moving'    : GPS received AND speed > 2 km/h
-        - 'idle'      : GPS received AND speed <= 2 km/h (engine on, stationary)
+        Refined Logic:
+        - > 12h silence: 'no_signal' (Red)
+        - > 10m silence: 'offline'   (Black / Stopped)
+        - < 10m signal:
+                - ignition is OFF: 'offline' (Black / Stopped) 
+                - speed > 2      : 'moving'  (Blue)
+                - else           : 'idle'    (Amber)
         """
-        # Grey — manually deactivated (maintenance, not in service, etc.)
-        if obj.status == 'offline':
+        if obj.status == 'offline': return 'offline'
+
+        latest    = obj.gps_points.first()
+        heartbeat = getattr(obj, 'latest_heartbeat', None) or (latest.timestamp if latest else None)
+        if not heartbeat: return 'no_signal'
+
+        now  = timezone.now()
+        diff = now - heartbeat
+
+        if diff > timedelta(hours=12):
+            return 'no_signal'
+        
+        if diff > timedelta(minutes=10):
             return 'offline'
 
-        heartbeat = getattr(obj, 'latest_heartbeat', None)
-        if not heartbeat:
-            latest = obj.gps_points.first()
-            heartbeat = latest.timestamp if latest else None
+        # Within 10 mins — check ignition and speed
+        ignition = getattr(obj, 'latest_ignition', None)
+        if ignition is None: ignition = latest.ignition if latest else False
+        
+        if not ignition:
+            return 'offline'
 
-        # Red — no GPS signal in 12 hours (device problem or bus not used)
-        if not heartbeat or (timezone.now() - heartbeat) > timedelta(hours=12):
-            return 'no_signal'
+        speed = getattr(obj, 'latest_speed', None)
+        if speed is None: speed = float(latest.speed or 0) if latest else 0
 
-        speed = getattr(obj, 'latest_speed', None) or 0
-        # Green — actively moving
-        if float(speed) > 2:
-            return 'moving'
-        # Amber — ignition on, not moving
-        return 'idle'
+        return 'moving' if float(speed) > 2 else 'idle'
 
 class CameraSerializer(serializers.ModelSerializer):
     class Meta:

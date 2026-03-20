@@ -96,8 +96,8 @@ export default function DashboardPage() {
             case 'moving':    return { label: 'Moving',    color: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500 animate-pulse', speed: Math.round(bus.speed || 0) }
             case 'idle':      return { label: 'Idle',      color: 'text-amber-500 dark:text-amber-400', dot: 'bg-amber-400',              speed: null }
             case 'no_signal': return { label: 'No Signal', color: 'text-red-500 dark:text-red-400',   dot: 'bg-red-500',                 speed: null }
-            case 'offline':   return { label: 'Offline',   color: 'text-slate-400',                    dot: 'bg-slate-400',               speed: null }
-            default:          return { label: 'Unknown',   color: 'text-slate-300',                    dot: 'bg-slate-300',               speed: null }
+            case 'offline':   return { label: 'Stopped',   color: 'text-slate-900 dark:text-slate-200', dot: 'bg-slate-900 dark:bg-slate-200', speed: null }
+            default:          return { label: 'Unknown',   color: 'text-slate-400',                    dot: 'bg-slate-400',               speed: null }
         }
     }
 
