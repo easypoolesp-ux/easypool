@@ -13,10 +13,12 @@ class BusListSerializer(serializers.ModelSerializer):
     lng = serializers.SerializerMethodField()
     route_name = serializers.CharField(source='route.name', read_only=True)
     last_heartbeat = serializers.SerializerMethodField()
+    speed = serializers.SerializerMethodField()
+    heading = serializers.SerializerMethodField()
     
     class Meta:
         model = Bus
-        fields = ('id', 'internal_id', 'plate_number', 'status', 'lat', 'lng', 'route_name', 'driver_name', 'gps_imei', 'last_heartbeat')
+        fields = ('id', 'internal_id', 'plate_number', 'status', 'lat', 'lng', 'speed', 'heading', 'route_name', 'driver_name', 'gps_imei', 'last_heartbeat')
 
     @extend_schema_field(serializers.DateTimeField())
     def get_last_heartbeat(self, obj):
@@ -40,6 +42,20 @@ class BusListSerializer(serializers.ModelSerializer):
         latest = obj.gps_points.first()
         return latest.lng if latest else None
 
+    @extend_schema_field(serializers.FloatField())
+    def get_speed(self, obj):
+        if hasattr(obj, 'latest_speed'):
+            return obj.latest_speed
+        latest = obj.gps_points.first()
+        return latest.speed if latest else 0
+
+    @extend_schema_field(serializers.FloatField())
+    def get_heading(self, obj):
+        if hasattr(obj, 'latest_heading'):
+            return obj.latest_heading
+        latest = obj.gps_points.first()
+        return latest.heading if latest else 0
+
 class CameraSerializer(serializers.ModelSerializer):
     class Meta:
         model = Camera
@@ -56,6 +72,16 @@ class BusDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Bus
         fields = '__all__'
+
+    @extend_schema_field(serializers.FloatField())
+    def get_speed(self, obj):
+        latest = obj.gps_points.first()
+        return latest.speed if latest else 0
+
+    @extend_schema_field(serializers.FloatField())
+    def get_heading(self, obj):
+        latest = obj.gps_points.first()
+        return latest.heading if latest else 0
 
     @extend_schema_field(serializers.FloatField())
     def get_lat(self, obj):

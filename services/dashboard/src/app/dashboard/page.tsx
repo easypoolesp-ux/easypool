@@ -244,14 +244,21 @@ export default function DashboardPage() {
                                                         <p className="text-[11px] text-muted-foreground truncate italic">{bus.route_name || 'No Route assigned'}</p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2 text-[10px]">
+                                                <div className="flex flex-col items-end gap-1 text-[10px]">
                                                     {(() => {
                                                         const status = getStatusInfo((bus as any).last_heartbeat)
                                                         return (
-                                                            <span className={`${status.color} flex items-center gap-1.5 font-bold uppercase tracking-wider`}>
-                                                                <div className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-                                                                {status.label}
-                                                            </span>
+                                                            <>
+                                                                <span className={`${status.color} flex items-center gap-1.5 font-bold uppercase tracking-wider`}>
+                                                                    <div className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                                                                    {status.label}
+                                                                </span>
+                                                                {(bus as any).speed > 5 && (
+                                                                    <span className="font-mono font-bold text-slate-500 dark:text-slate-400">
+                                                                        {Math.round((bus as any).speed)} KM/H
+                                                                    </span>
+                                                                )}
+                                                            </>
                                                         )
                                                     })()}
                                                 </div>

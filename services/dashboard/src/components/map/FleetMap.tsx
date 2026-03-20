@@ -14,6 +14,8 @@ interface Bus {
     lng: number
     plate: string
     route?: string
+    speed?: number      // Added speed
+    heading?: number    // Added heading
 }
 
 interface GPSPoint {
@@ -99,6 +101,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
 
     // ── UI state ──────────────────────────────────────────────────────────────
     const [isHistoryMode, setIsHistoryMode] = useState(false)
+    const [isLiveTrail, setIsLiveTrail]     = useState(false) // Added Live Trail toggle
     const [isMapReady, setIsMapReady]       = useState(false)
     const [selectedBusId, setSelectedBusId] = useState<string | null>(initialBusId || null)
     const [playbackDate, setPlaybackDate]   = useState(() =>
@@ -128,7 +131,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        mapId: 'DEMO_MAP_ID',
+        // mapId removed to allow local JSON styles to override.
         // Styles applied imperatively below so they can react to theme changes
     }), [])
 
@@ -164,6 +167,16 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
 
             if (existing) {
                 existing.position = position
+                // Update rotation if heading exists
+                const content = existing.content as HTMLElement
+                const busIcon = content.querySelector('.bus-icon-container') as HTMLElement
+                if (busIcon && bus.heading != null) {
+                    busIcon.style.transform = `rotate(${bus.heading}deg)`
+                }
+                const speedLabel = content.querySelector('.speed-label') as HTMLElement
+                if (speedLabel) {
+                    speedLabel.textContent = bus.speed ? `${Math.round(bus.speed)} km/h` : ''
+                }
             } else {
                 const color = getBusColor(bus.status)
                 const live  = isLive(bus.status)
@@ -172,11 +185,8 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 const el = document.createElement('div')
                 el.style.cssText = `display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;width:${SIZE}px;`
 
-                // Speed label (shown when bus is moving — placeholder until speed is in BusList)
-                const statusLabel = live ? 'LIVE' : (bus.status === 'idle' ? 'IDLE' : bus.status === 'ignition_off' ? 'OFF' : 'OFFLINE')
-
                 el.innerHTML = `
-                    <div style="position:relative;width:${SIZE}px;height:${SIZE}px;">
+                    <div class="bus-icon-container" style="position:relative;width:${SIZE}px;height:${SIZE}px;transition:transform 0.5s ease;${bus.heading ? `transform:rotate(${bus.heading}deg);` : ''}">
                         ${live ? `
                         <div style="
                             position:absolute;inset:-5px;border-radius:50%;
@@ -197,6 +207,14 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                                 <path d="M4 16c0 1.1.9 2 2 2h1v1a1 1 0 0 0 2 0v-1h6v1a1 1 0 0 0 2 0v-1h1c1.1 0 2-.9 2-2V8c0-2.2-1.79-4-4-4H8C5.79 4 4 5.8 4 8v8zm3.5-1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM8 6h8l1.5 4H6.5L8 6z"/>
                             </svg>
                         </div>
+                        ${bus.speed && bus.speed > 5 ? `
+                        <div class="speed-label" style="
+                            position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);
+                            background:white;color:${color};font-[9px];font-weight:900;
+                            padding:0 4px;border-radius:4px;border:1px solid ${color};
+                            white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.1);
+                        ">${Math.round(bus.speed)} km/h</div>
+                        ` : ''}
                     </div>
                     <div style="
                         display:flex;align-items:center;gap:4px;
@@ -211,7 +229,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 `
 
                 const marker = new google.maps.marker.AdvancedMarkerElement({
-                    map: mapRef.current!, position, title: `${bus.internal_id} — ${statusLabel}`, content: el,
+                    map: mapRef.current!, position, title: `${bus.internal_id}`, content: el,
                 })
                 marker.addListener('gmp-click', () => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: bus.id })))
                 markerRefs.current.set(bus.id, marker)
@@ -450,7 +468,18 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                     </div>
                 )}
 
-                <div className="ml-auto pointer-events-auto">
+                <div className="ml-auto pointer-events-auto flex gap-2">
+                    <button
+                        onClick={() => setIsLiveTrail(!isLiveTrail)}
+                        className={`p-3 rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 ${
+                            isLiveTrail
+                                ? 'bg-green-600 text-white'
+                                : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white'
+                        }`}
+                        title={isLiveTrail ? 'Hide Live Trail' : 'Show Live Trail (2h)'}
+                    >
+                        <Route size={20} className={isLiveTrail ? 'animate-pulse' : ''} />
+                    </button>
                     <button
                         onClick={() => toggleHistoryMode()}
                         className={`p-3 rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 ${
@@ -460,7 +489,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                         }`}
                         title={isHistoryMode ? 'Exit History' : 'View Route History'}
                     >
-                        {isHistoryMode ? <X size={20} /> : <Route size={20} />}
+                        {isHistoryMode ? <X size={20} /> : <Calendar size={20} />}
                     </button>
                 </div>
             </div>
