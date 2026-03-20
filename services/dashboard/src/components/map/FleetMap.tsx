@@ -128,6 +128,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
+        mapId: 'DEMO_MAP_ID',
         // Styles applied imperatively below so they can react to theme changes
     }), [])
 
@@ -212,7 +213,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 const marker = new google.maps.marker.AdvancedMarkerElement({
                     map: mapRef.current!, position, title: `${bus.internal_id} — ${statusLabel}`, content: el,
                 })
-                marker.addListener('click', () => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: bus.id })))
+                marker.addListener('gmp-click', () => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: bus.id })))
                 markerRefs.current.set(bus.id, marker)
             }
         })
