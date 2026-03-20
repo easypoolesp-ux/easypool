@@ -417,12 +417,12 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                 </div>
             )}
 
-            {/* Map Control Buttons — top right (shifted left of fullscreen btn) */}
-            <div className="absolute top-4 right-[116px] z-10 flex gap-2">
+            {/* Map Control Buttons — stacked vertically below expand button */}
+            <div className="absolute top-[68px] right-4 z-10 flex flex-col gap-2">
                 <button
                     onClick={() => setIsLiveTrail(!isLiveTrail)}
                     className={`p-3 rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${ isLiveTrail ? 'bg-blue-600 text-white' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white' }`}
-                    title={isLiveTrail ? 'Hide Trail (2h)' : 'Show Trail (2h)'}
+                    title={isLiveTrail ? 'Hide Trail' : 'Show Trail (2h)'}
                 >
                     <Route size={20} className={isLiveTrail ? 'animate-pulse' : ''} />
                 </button>

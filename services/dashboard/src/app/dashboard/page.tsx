@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut } from 'lucide-react'
+import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut, Filter } from 'lucide-react'
 import Link from 'next/link'
 import nextDynamic from 'next/dynamic'
 import { components } from '@/types/api'
@@ -27,6 +27,8 @@ export default function DashboardPage() {
     const [alerts, setAlerts] = useState<components['schemas']['Alert'][]>([])
     const [loading, setLoading] = useState(true)
     const [transporters, setTransporters] = useState<any[]>([])
+    const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set())
+    const [showFilters, setShowFilters] = useState(false)
 
     useEffect(() => {
         setMounted(true)
@@ -99,11 +101,21 @@ export default function DashboardPage() {
         }
     }
 
-    const filteredBuses = buses.filter(bus =>
-        bus.internal_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        bus.plate_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (bus.route_name || '').toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const toggleStatusFilter = (status: string) => {
+        setHiddenStatuses(prev => {
+            const next = new Set(prev)
+            if (next.has(status)) next.delete(status); else next.add(status)
+            return next
+        })
+    }
+
+    const filteredBuses = buses.filter(bus => {
+        const cs = (bus as any).computed_status || bus.status
+        if (hiddenStatuses.has(cs)) return false
+        return bus.internal_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            bus.plate_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (bus.route_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    })
 
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6 bg-slate-50/50 dark:bg-transparent min-h-screen">
@@ -177,7 +189,7 @@ export default function DashboardPage() {
                 <div className={`${isFullscreen ? 'lg:col-span-1 fixed inset-4 z-50 bg-background shadow-2xl' : 'lg:col-span-2 min-h-[500px] bg-muted relative shadow-inner'} rounded-xl overflow-hidden border border-border`}>
                     <button
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="absolute top-4 right-[60px] z-10 p-3 bg-white/90 dark:bg-slate-800/90 rounded-xl shadow-2xl backdrop-blur-md hover:bg-white transition-all active:scale-95 border border-border group"
+                        className="absolute top-4 right-4 z-20 p-3 bg-white/90 dark:bg-slate-800/90 rounded-xl shadow-2xl backdrop-blur-md hover:bg-white transition-all active:scale-95 border border-border group"
                         title={isFullscreen ? "Exit Fullscreen" : "See Map in Fullscreen"}
                     >
                         {isFullscreen ? <Minimize2 className="w-5 h-5 group-hover:scale-110 transition-transform" /> : <Maximize2 className="w-5 h-5 group-hover:scale-110 transition-transform" />}
@@ -187,10 +199,13 @@ export default function DashboardPage() {
                             id: (b as any).id,
                             internal_id: b.internal_id,
                             status: b.status || 'offline',
+                            computed_status: (b as any).computed_status,
                             lat: b.lat,
                             lng: b.lng,
-                            plate: b.plate_number,
-                            route: b.route_name
+                            plate_number: b.plate_number,
+                            route_name: b.route_name,
+                            speed: (b as any).speed,
+                            heading: (b as any).heading,
                         }))}
                         isFullscreen={isFullscreen}
                     />
@@ -204,6 +219,16 @@ export default function DashboardPage() {
                                 <Bus className="w-5 h-5 text-primary" />
                                 Fleet Status
                             </h2>
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`p-1.5 rounded-lg transition-all ${showFilters || hiddenStatuses.size > 0 ? 'text-blue-600 bg-blue-500/10' : 'text-muted-foreground hover:text-primary'}`}
+                                title="Filter by status"
+                            >
+                                <Filter className="w-4 h-4" />
+                                {hiddenStatuses.size > 0 && (
+                                    <span className="absolute -mt-3 ml-2 w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                )}
+                            </button>
                         </div>
 
                         {/* Search Bar */}
@@ -217,6 +242,34 @@ export default function DashboardPage() {
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
+
+                        {/* Status filter chips — toggled by filter button */}
+                        {showFilters && (
+                        <div className="flex flex-wrap gap-1.5">
+                            {[
+                                { key: 'moving',    label: 'Moving',    dot: 'bg-blue-500' },
+                                { key: 'idle',      label: 'Idle',      dot: 'bg-amber-400' },
+                                { key: 'no_signal', label: 'No Signal', dot: 'bg-red-500' },
+                                { key: 'offline',   label: 'Offline',   dot: 'bg-slate-400' },
+                            ].map(f => (
+                                <button
+                                    key={f.key}
+                                    onClick={() => toggleStatusFilter(f.key)}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border ${
+                                        hiddenStatuses.has(f.key)
+                                            ? 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 line-through opacity-50'
+                                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+                                    }`}
+                                >
+                                    <div className={`w-2 h-2 rounded-full ${f.dot} ${hiddenStatuses.has(f.key) ? 'opacity-30' : ''}`} />
+                                    {f.label}
+                                    <span className="text-[9px] opacity-50">
+                                        {buses.filter(b => ((b as any).computed_status || b.status) === f.key).length}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                        )}
 
                         <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
                             {filteredBuses.length > 0 ? (
