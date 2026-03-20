@@ -154,20 +154,15 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
         })
 
         // FOCUS / BOUNDS optimization
-        if (buses.length > 0) {
-            const bounds = new google.maps.LatLngBounds()
-            let count = 0
-            buses.forEach(b => {
-                if (b.lat && b.lng) { bounds.extend({ lat: b.lat, lng: b.lng }); count++ }
-            })
-            if (count > 0) {
-                if (count === 1 && !hasFittedRef.current) {
-                    mapRef.current.panTo({ lat: buses[0].lat, lng: buses[0].lng })
-                    mapRef.current.setZoom(15)
-                    hasFittedRef.current = true
-                } else if (count > 1) {
-                    mapRef.current.fitBounds(bounds, 80)
-                }
+        const valid = buses.filter(b => b.lat != null && b.lng != null)
+        if (valid.length > 0 && mapRef.current) {
+            if (valid.length === 1) {
+                mapRef.current.panTo({ lat: valid[0].lat, lng: valid[0].lng })
+                if (mapRef.current.getZoom()! < 15) mapRef.current.setZoom(15)
+            } else {
+                const bounds = new google.maps.LatLngBounds()
+                valid.forEach(v => bounds.extend({ lat: v.lat, lng: v.lng }))
+                mapRef.current.fitBounds(bounds, 80)
             }
         }
     }, [isLoaded, buses, isHistoryMode, isDark])
@@ -274,9 +269,21 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 onLoad={m => { mapRef.current = m; setIsMapReady(true) }}
                 options={mapOptions}
             >
-                {/* Live Trails */}
+                {/* Live Trails (Last 2h) — Blue Dashed for better visibility */}
                 {isLiveTrail && Array.from(liveTrails.values()).map((t, idx) => (
-                    <Polyline key={`t-${idx}`} path={t.map(p => ({ lat: p.lat, lng: p.lng }))} options={{ strokeColor: '#22c55e', strokeOpacity: 0.6, strokeWeight: 4 }} />
+                    <Polyline 
+                        key={`t-${idx}`} 
+                        path={t.map(p => ({ lat: p.lat, lng: p.lng }))} 
+                        options={{ 
+                            strokeColor: '#3b82f6', 
+                            strokeOpacity: 0, 
+                            icons: [{
+                                icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, scale: 3, strokeWeight: 3 },
+                                offset: '0',
+                                repeat: '15px'
+                            }]
+                        }} 
+                    />
                 ))}
 
                 {/* History Line */}
