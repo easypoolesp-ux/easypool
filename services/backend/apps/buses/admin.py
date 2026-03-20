@@ -32,12 +32,12 @@ class BusAllocationAdmin(admin.ModelAdmin):
     list_filter = ('level', 'is_active')
     search_fields = ('bus__internal_id', 'granted_to__name')
     raw_id_fields = ('bus', 'granted_by', 'granted_to')
-    actions = ['deactivate_allocations', 'reactivate_allocations']
+    actions = ['delete_allocations_archive', 'reactivate_allocations']
 
-    def deactivate_allocations(self, request, queryset):
+    def delete_allocations_archive(self, request, queryset):
         queryset.update(is_active=False)
 
-    deactivate_allocations.short_description = 'Deactivate (Archive) selected allocations'
+    delete_allocations_archive.short_description = 'Delete (Archive) selected allocations'
 
     def reactivate_allocations(self, request, queryset):
         queryset.update(is_active=True)
