@@ -1,7 +1,8 @@
+from django.db.models import Q
 from rest_framework import decorators, permissions, response, viewsets
 
 from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin
-
+from apps.buses.models import Bus
 from .models import Alert, GPSPoint
 from .serializers import (
     AlertSerializer,
@@ -29,19 +30,32 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 
         return qs[:1000]
 
-    @decorators.action(detail=False, methods=['get'])
+    @decorators.action(detail=False, methods=['get'], permission_classes=[IsManager | IsViewer])
     def latest(self, request):
-        """Return latest GPS point for every bus in the school."""
-        buses = self.request.user.school.buses.all()
+        """Return latest GPS point for every bus in the user's scope."""
+        # Scope buses based on the same isolation logic as the queryset
+        # If user has organisation, prioritize that
+        user = request.user
+        buses = Bus.objects.all()
+
+        if not user.is_superuser:
+            if hasattr(user, 'organisation') and user.organisation:
+                user_orgs = user.organisation.get_descendants()
+                user_orgs.append(user.organisation)
+                buses = buses.filter(Q(organisation__in=user_orgs) | Q(allocated_to__in=user_orgs))
+            elif hasattr(user, 'school') and user.school:
+                buses = buses.filter(school=user.school)
+            else:
+                return response.Response([])
+
         latest_points = []
-        for bus in buses:
-            # We use first() because for each bus, we want the most recent point (ordered by -timestamp)
+        for bus in buses.distinct():
             point = GPSPoint.objects.filter(bus=bus).first()
             if point:
                 latest_points.append(GPSLatestSerializer(point).data)
         return response.Response(latest_points)
 
-    @decorators.action(detail=False, methods=['get'])
+    @decorators.action(detail=False, methods=['get'], permission_classes=[IsManager | IsViewer])
     def playback(self, request):
         """Return historical points for a bus on a specific date."""
         bus_id = request.query_params.get('bus')
@@ -50,8 +64,21 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         if not bus_id:
             return response.Response({'error': 'bus_id is required'}, status=400)
 
-        # Security: Ensure bus belongs to the user's school (Standardized on UUID)
-        if not request.user.school.buses.filter(id=bus_id).exists():
+        # Security: Reuse the same isolation logic for checking permission
+        user = request.user
+        bus_qs = Bus.objects.filter(id=bus_id)
+
+        if not user.is_superuser:
+            if hasattr(user, 'organisation') and user.organisation:
+                user_orgs = user.organisation.get_descendants()
+                user_orgs.append(user.organisation)
+                bus_qs = bus_qs.filter(Q(organisation__in=user_orgs) | Q(allocated_to__in=user_orgs))
+            elif hasattr(user, 'school') and user.school:
+                bus_qs = bus_qs.filter(school=user.school)
+            else:
+                return response.Response({'error': 'Unauthorized'}, status=403)
+
+        if not bus_qs.exists():
             return response.Response({'error': 'Unauthorized or invalid bus_id'}, status=403)
 
         qs = GPSPoint.objects.filter(bus_id=bus_id)

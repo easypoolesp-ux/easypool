@@ -18,7 +18,12 @@ class RouteSerializer(serializers.ModelSerializer):
 class BusListSerializer(serializers.ModelSerializer):
     lat = serializers.SerializerMethodField()
     lng = serializers.SerializerMethodField()
-    route_name = serializers.CharField(source='route.name', read_only=True)
+    route_name = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.CharField())
+    def get_route_name(self, obj):
+        return obj.route.name if obj.route else "Unassigned"
+
     last_heartbeat = serializers.SerializerMethodField()
     speed = serializers.SerializerMethodField()
     heading = serializers.SerializerMethodField()

@@ -83,7 +83,7 @@ class School(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.organisation.name
+        return self.organisation.name if self.organisation else f"Legacy School {self.name}"
 
 
 # ── Transporter ────────────────────────────────────────────────────────────────
