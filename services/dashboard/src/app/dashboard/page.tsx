@@ -21,6 +21,33 @@ const FleetMap = nextDynamic(() => import('@/components/map/FleetMap'), { ssr: f
 
 type BusType = components['schemas']['BusList']
 
+/** 
+ * Final Smart Time Logic: 
+ * (Date if over 24h), Time (H:M am/pm), and Relative (Xm ago)
+ */
+function formatTimeDisplay(timestamp?: string) {
+    if (!timestamp) return 'No Signal'
+    const date = new Date(timestamp)
+    const now  = new Date()
+    
+    // 1. Check if different date
+    const isToday = date.toDateString() === now.toDateString()
+    const dateStr = isToday ? '' : date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ', '
+    
+    // 2. Exact Time
+    const timeStr = date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
+    
+    // 3. Relative Time
+    const diff = now.getTime() - date.getTime()
+    const mins = Math.floor(diff / 60000)
+    let relative = 'Just now'
+    if (mins >= 1 && mins < 60) relative = `${mins}m ago`
+    else if (mins >= 60 && mins < 1440) relative = `${Math.floor(mins/60)}h ago`
+    else if (mins >= 1440) relative = `${Math.floor(mins/1440)}d ago`
+    
+    return `${dateStr}${timeStr} (${relative})`
+}
+
 export default function DashboardPage() {
     const router = useRouter()
     const [mounted, setMounted] = useState(false)
@@ -197,7 +224,13 @@ export default function DashboardPage() {
 
                         {/* ── Alert Dashboard ── */}
                         <AlertCenter 
-                            criticalBuses={activeBuses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').map(b => ({ id: (b as any).id, internal_id: b.internal_id }))}
+                            criticalBuses={activeBuses
+                                .filter(b => ((b as any).computed_status || b.status) === 'no_signal')
+                                .map(b => ({ 
+                                    id: (b as any).id, 
+                                    internal_id: b.internal_id,
+                                    last_seen: (b as any).last_heartbeat
+                                }))}
                             onViewBus={(busId) => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: busId }))}
                         />
 
@@ -275,11 +308,7 @@ export default function DashboardPage() {
                                                 <div className="flex flex-col items-end gap-1 text-[10px]">
                                                     {(() => {
                                                         const st = getStatusDisplay(bus)
-                                                        // Last update timestamp
                                                         const hb = (bus as any).last_heartbeat
-                                                        const timeStr = hb
-                                                            ? new Date(hb).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
-                                                            : ''
                                                         return (
                                                             <>
                                                                 <span className={`${st.color} flex items-center gap-1.5 font-bold uppercase tracking-wider`}>
@@ -291,11 +320,9 @@ export default function DashboardPage() {
                                                                         {st.speed} km/h
                                                                     </span>
                                                                 )}
-                                                                {timeStr && (
-                                                                    <span className="text-[9px] text-muted-foreground font-medium">
-                                                                        {timeStr}
-                                                                    </span>
-                                                                )}
+                                                                <span className="text-[9px] text-muted-foreground font-medium text-right leading-tight">
+                                                                    {formatTimeDisplay(hb)}
+                                                                </span>
                                                             </>
                                                         )
                                                     })()}

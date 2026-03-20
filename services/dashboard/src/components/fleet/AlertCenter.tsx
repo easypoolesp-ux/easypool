@@ -6,6 +6,20 @@ import { MapPin } from 'lucide-react'
 interface AlertBus {
     id: string
     internal_id: string
+    last_seen?: string
+}
+
+function formatRelativeTime(timestamp?: string) {
+    if (!timestamp) return 'Time unknown'
+    const now = new Date()
+    const diff = now.getTime() - new Date(timestamp).getTime()
+    const mins = Math.floor(diff / 60000)
+    
+    if (mins < 1) return 'Just now'
+    if (mins < 60) return `${mins}m ago`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}h ago`
+    return new Date(timestamp).toLocaleDateString()
 }
 
 interface Props {
@@ -44,9 +58,12 @@ const AlertCenter: React.FC<Props> = ({ criticalBuses, onViewBus }) => {
                             <span className="text-[11px] font-black text-slate-700 dark:text-slate-200 uppercase tracking-tight">
                                 {bus.internal_id}
                             </span>
-                            <div className="flex items-center gap-1 text-red-500 group-hover:translate-x-0.5 transition-all">
-                                <span className="text-[9px] font-bold">Pin</span>
-                                <MapPin className="w-3 h-3" />
+                            <div className="flex flex-col items-end gap-0.5 group-hover:translate-x-0.5 transition-all">
+                                <div className="flex items-center gap-1 text-red-500">
+                                    <span className="text-[10px] font-black">{formatRelativeTime(bus.last_seen)}</span>
+                                    <MapPin className="w-3 h-3" />
+                                </div>
+                                <span className="text-[7px] opacity-70 font-black uppercase tracking-tighter">Signal Lost</span>
                             </div>
                         </button>
                     ))}
