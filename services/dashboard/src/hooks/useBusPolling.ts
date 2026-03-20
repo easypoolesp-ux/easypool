@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { components } from '@/types/api'
+import { auth } from '@/lib/firebase'
 
 type BusType = components['schemas']['BusList']
 type AlertType = components['schemas']['Alert']
@@ -63,7 +64,8 @@ export function useBusPolling(): UseBusPollingReturn {
         abortControllerRef.current = controller
 
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+            const user = auth.currentUser
+            const token = user ? await user.getIdToken() : (typeof window !== 'undefined' ? localStorage.getItem('token') : null)
             const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
             
             const res = await fetch(`/api/buses?_t=${Date.now()}`, { 
@@ -99,7 +101,8 @@ export function useBusPolling(): UseBusPollingReturn {
 
     const fetchMeta = useCallback(async () => {
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+            const user = auth.currentUser
+            const token = user ? await user.getIdToken() : (typeof window !== 'undefined' ? localStorage.getItem('token') : null)
             const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
             const ts = Date.now()
             
