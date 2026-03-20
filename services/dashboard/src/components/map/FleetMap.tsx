@@ -133,6 +133,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     const [playbackIndex, setPlaybackIndex] = useState(0)
     const [isPlaying, setIsPlaying]         = useState(false)
     const [isLoading, setIsLoading]         = useState(false)
+    const [isMapReady, setIsMapReady]       = useState(false)
 
     // Refs
     const mapRef           = useRef<google.maps.Map | null>(null)
@@ -157,7 +158,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
     // ── Marker management ─────────────────────────────────────────────────────
     useEffect(() => {
-        if (!isLoaded || !mapRef.current) return
+        if (!isLoaded || !isMapReady || !mapRef.current) return
         if (isHistoryMode) {
             markerRefs.current.forEach(m => m.setMap(null))
             markerRefs.current.clear()
@@ -171,7 +172,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         })
 
         buses.forEach(bus => {
-            if (!bus.lat || !bus.lng) return
+            if (bus.lat == null || bus.lng == null) return
             const effectiveStatus = bus.computed_status || bus.status
             const color   = getStatusColor(effectiveStatus)
             const heading = bus.heading || 0
@@ -183,7 +184,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             const existing = markerRefs.current.get(bus.id)
             if (existing) {
                 existing.setPosition(pos)
-                existing.setIcon({ url: iconUrl, scaledSize: iconSize, anchor: iconAnchor })
+                existing.setIcon({ url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(24, 56) })
                 existing.setLabel({
                     text: bus.internal_id,
                     color: isDark ? '#ffffff' : '#0f172a',
@@ -196,7 +197,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     map: mapRef.current!,
                     position: pos,
                     title: bus.internal_id,
-                    icon: { url: iconUrl, scaledSize: iconSize, anchor: iconAnchor },
+                    icon: { url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(24, 56) },
                     label: {
                         text: bus.internal_id,
                         color: isDark ? '#ffffff' : '#0f172a',
@@ -224,7 +225,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                 mapRef.current.fitBounds(bounds, 80)
             }
         }
-    }, [isLoaded, buses, isHistoryMode, isDark])
+    }, [isLoaded, isMapReady, buses, isHistoryMode, isDark])
 
     // ── Live Trail Fetcher ────────────────────────────────────────────────────
     useEffect(() => {
@@ -359,7 +360,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                 mapContainerStyle={{ width: '100%', height: '100%' }}
                 center={MAP_CENTER}
                 zoom={12}
-                onLoad={m => { mapRef.current = m }}
+                onLoad={m => { mapRef.current = m; setIsMapReady(true) }}
                 options={mapOptions}
             >
                 {/* Live Trails — blue dashed */}

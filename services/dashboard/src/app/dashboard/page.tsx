@@ -246,6 +246,17 @@ export default function DashboardPage() {
                                                 <div className="flex flex-col items-end gap-1 text-[10px]">
                                                     {(() => {
                                                         const st = getStatusDisplay(bus)
+                                                        // Time ago from last_heartbeat
+                                                        const hb = (bus as any).last_heartbeat
+                                                        let ago = ''
+                                                        if (hb) {
+                                                            const diffMs = Date.now() - new Date(hb).getTime()
+                                                            const mins = Math.floor(diffMs / 60000)
+                                                            if (mins < 1) ago = 'Just now'
+                                                            else if (mins < 60) ago = `${mins}m ago`
+                                                            else if (mins < 1440) ago = `${Math.floor(mins / 60)}h ago`
+                                                            else ago = `${Math.floor(mins / 1440)}d ago`
+                                                        }
                                                         return (
                                                             <>
                                                                 <span className={`${st.color} flex items-center gap-1.5 font-bold uppercase tracking-wider`}>
@@ -255,6 +266,11 @@ export default function DashboardPage() {
                                                                 {st.speed !== null && st.speed > 0 && (
                                                                     <span className="font-mono font-bold text-slate-500 dark:text-slate-400">
                                                                         {st.speed} km/h
+                                                                    </span>
+                                                                )}
+                                                                {ago && (
+                                                                    <span className="text-[9px] text-muted-foreground font-medium">
+                                                                        {ago}
                                                                     </span>
                                                                 )}
                                                             </>
