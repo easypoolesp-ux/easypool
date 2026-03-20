@@ -278,9 +278,9 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                             strokeColor: '#3b82f6', 
                             strokeOpacity: 0, 
                             icons: [{
-                                icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, scale: 3, strokeWeight: 3 },
+                                icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, scale: 5, strokeWeight: 5 },
                                 offset: '0',
-                                repeat: '15px'
+                                repeat: '20px'
                             }]
                         }} 
                     />
@@ -301,7 +301,7 @@ export default function FleetMap({ buses, isFullscreen, initialBusId }: Props) {
                 <div className="flex gap-2 pointer-events-auto">
                     <button 
                         onClick={() => setIsLiveTrail(!isLiveTrail)}
-                        className={`p-3 rounded-xl shadow-lg backdrop-blur-md transition-all ${isLiveTrail ? 'bg-green-600 text-white' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200'}`}
+                        className={`p-3 rounded-xl shadow-lg backdrop-blur-md transition-all ${isLiveTrail ? 'bg-blue-600 text-white' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200'}`}
                     >
                         <Route size={20} className={isLiveTrail ? 'animate-pulse' : ''} />
                     </button>

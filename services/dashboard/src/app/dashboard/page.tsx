@@ -117,14 +117,16 @@ export default function DashboardPage() {
         <div className="p-6 max-w-7xl mx-auto space-y-6 bg-slate-50/50 dark:bg-transparent min-h-screen">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    <div className="relative w-12 h-12 overflow-hidden rounded-xl border border-border shadow-sm">
-                        <Image 
-                            src="/logo.jpeg" 
-                            alt="EasyPool Logo" 
-                            fill 
-                            className="object-cover"
-                            priority
-                        />
+                    <div className="relative w-12 h-12 overflow-hidden rounded-full border border-border shadow-md bg-white p-1.5 flex items-center justify-center">
+                        <div className="relative w-full h-full overflow-hidden rounded-full">
+                            <Image 
+                                src="/logo.jpeg" 
+                                alt="EasyPool Logo" 
+                                fill 
+                                className="object-cover"
+                                priority
+                            />
+                        </div>
                     </div>
                     <div className="space-y-1">
                         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Fleet Overview</h1>
