@@ -70,7 +70,8 @@ class School(models.Model):
     """
     id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organisation = models.OneToOneField(
-        Organisation, on_delete=models.CASCADE,
+        Organisation, null=True, blank=True,
+        on_delete=models.CASCADE,
         related_name='school_profile'
     )
     # Legacy fields kept for backwards compatibility
@@ -95,7 +96,8 @@ class Transporter(models.Model):
     """
     id             = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organisation   = models.ForeignKey(
-        Organisation, on_delete=models.CASCADE,
+        Organisation, null=True, blank=True,
+        on_delete=models.CASCADE,
         related_name='transporters'
     )
     # Legacy FK kept nullable for backwards compatibility
