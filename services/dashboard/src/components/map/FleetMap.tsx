@@ -83,24 +83,22 @@ function getStatusLabel(status: string): string {
 }
 
 /**
- * Industry-standard fleet marker:
- * - Colored circle (status) with white border
- * - Soft outer glow ring
- * - Small triangular "headlight" notch showing direction of travel
- * - Entire group rotates with heading
+ * Google Maps-style fleet marker:
+ * - Solid colored circle with white border
+ * - When moving: semi-transparent field-of-view cone in heading direction
+ * - When idle/offline: just the circle, no cone
  */
-function buildMarkerSvg(color: string, heading: number): string {
-    const svg = `<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-      <g transform="rotate(${heading}, 24, 24)">
-        <!-- Outer pulse ring -->
-        <circle cx="24" cy="24" r="22" fill="none" stroke="${color}" stroke-width="2" opacity="0.25"/>
-        <!-- Heading notch / headlight triangle -->
-        <polygon points="24,2 19,12 29,12" fill="${color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-        <!-- Main circle -->
-        <circle cx="24" cy="24" r="13" fill="${color}" stroke="white" stroke-width="3"/>
-        <!-- Inner highlight dot -->
-        <circle cx="24" cy="24" r="4" fill="white" opacity="0.9"/>
-      </g>
+function buildMarkerSvg(color: string, heading: number, isMoving: boolean): string {
+    const svg = `<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+      ${isMoving ? `
+      <!-- Field of view cone -->
+      <g transform="rotate(${heading}, 32, 32)">
+        <path d="M32,32 L20,2 A30,30 0 0,1 44,2 Z" fill="${color}" opacity="0.18"/>
+      </g>` : ''}
+      <!-- Outer soft ring -->
+      <circle cx="32" cy="32" r="14" fill="${color}" stroke="white" stroke-width="3"/>
+      <!-- Inner highlight -->
+      <circle cx="32" cy="32" r="5" fill="white" opacity="0.85"/>
     </svg>`
     return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
@@ -177,14 +175,15 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             const color   = getStatusColor(effectiveStatus)
             const heading = bus.heading || 0
             const pos     = { lat: bus.lat, lng: bus.lng }
-            const iconUrl = buildMarkerSvg(color, heading)
-            const iconSize = new google.maps.Size(48, 48)
-            const iconAnchor = new google.maps.Point(24, 24)
+            const isMoving = effectiveStatus === 'moving'
+            const iconUrl = buildMarkerSvg(color, heading, isMoving)
+            const iconSize = new google.maps.Size(64, 64)
+            const iconAnchor = new google.maps.Point(32, 32)
 
             const existing = markerRefs.current.get(bus.id)
             if (existing) {
                 existing.setPosition(pos)
-                existing.setIcon({ url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(24, 56) })
+                existing.setIcon({ url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(32, 72) })
                 existing.setLabel({
                     text: bus.internal_id,
                     color: isDark ? '#ffffff' : '#0f172a',
@@ -197,7 +196,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     map: mapRef.current!,
                     position: pos,
                     title: bus.internal_id,
-                    icon: { url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(24, 56) },
+                    icon: { url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(32, 72) },
                     label: {
                         text: bus.internal_id,
                         color: isDark ? '#ffffff' : '#0f172a',
