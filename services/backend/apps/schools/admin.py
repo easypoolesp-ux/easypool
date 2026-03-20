@@ -1,7 +1,5 @@
 from django.contrib import admin
-
-from .models import Organisation, School, Transporter, User
-
+from .models import Organisation, Transporter, User
 
 @admin.register(Organisation)
 class OrganisationAdmin(admin.ModelAdmin):
@@ -10,15 +8,6 @@ class OrganisationAdmin(admin.ModelAdmin):
     search_fields = ('name',)
     raw_id_fields = ('parent',)
 
-
-@admin.register(School)
-class SchoolAdmin(admin.ModelAdmin):
-    list_display = ('name', 'organisation', 'contact_email', 'phone', 'is_active', 'created_at')
-    search_fields = ('name', 'contact_email')
-    list_filter = ('is_active',)
-    raw_id_fields = ('organisation',)
-
-
 @admin.register(Transporter)
 class TransporterAdmin(admin.ModelAdmin):
     list_display = ('name', 'organisation', 'contact_person', 'phone', 'is_active')
@@ -26,10 +15,8 @@ class TransporterAdmin(admin.ModelAdmin):
     list_filter = ('is_active',)
     raw_id_fields = ('organisation',)
 
-
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    # Removed legacy `role` field since we rely on Django Groups natively
     list_display = ('email', 'full_name', 'organisation', 'is_active')
     search_fields = ('email', 'full_name')
     list_filter = ('is_active', 'groups')

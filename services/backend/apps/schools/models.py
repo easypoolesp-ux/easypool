@@ -61,46 +61,16 @@ class Organisation(models.Model):
         return result
 
 
-# ── School Profile (only for org_type='school') ───────────────────────────────
-class School(models.Model):
-    """
-    Optional school-specific profile for an Organisation.
-    Only created for organisations with org_type='school'.
-    Contains school-specific data: students, attendance etc are linked here.
-    """
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    organisation = models.OneToOneField(
-        Organisation, null=True, blank=True, on_delete=models.CASCADE, related_name='school_profile'
-    )
-    # Legacy fields kept for backwards compatibility
-    name = models.CharField(max_length=200, blank=True)
-    address = models.TextField(blank=True)
-    contact_email = models.EmailField(blank=True)
-    phone = models.CharField(max_length=20, blank=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.organisation.name if self.organisation else f"Legacy School {self.name}"
-
-
 # ── Transporter ────────────────────────────────────────────────────────────────
 class Transporter(models.Model):
     """
     A transport operator (company or individual) that operates vehicles
-    under an organisation. May be attached to a school or an independent
-    bus agency or carpool org.
+    under an organisation.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organisation = models.ForeignKey(
         Organisation, null=True, blank=True, on_delete=models.CASCADE, related_name='transporters'
-    )
-    # Legacy FK kept nullable for backwards compatibility
-    school = models.ForeignKey(
-        School, null=True, blank=True, on_delete=models.SET_NULL, related_name='transporters'
     )
     name = models.CharField(max_length=200)
     contact_person = models.CharField(max_length=200, blank=True)
@@ -153,29 +123,12 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     """
     Portal user. Authenticated via Firebase; authorised via Django Groups.
-    Belongs to an Organisation (not just a School).
-
-    Groups:
-      SuperAdmin    → full access across all organisations
-      SchoolAdmin   → scoped to their organisation (school type)
-      Transporter   → scoped to their transporter within an organisation
-      CarpoolAdmin  → scoped to their carpool organisation
-      Parent        → read-only, scoped to their child's route
+    Belongs to an Organisation.
     """
-
-    # Legacy role field kept for backwards compatibility during migration
-    ROLE_CHOICES = (
-        ('superadmin', 'Super Admin'),
-        ('transporter', 'Transporter'),
-        ('school_admin', 'School Admin'),
-        ('parent', 'Parent'),
-    )
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=200)
     firebase_uid = models.CharField(max_length=200, blank=True, db_index=True)
-    # Legacy field name kept for DB compatibility
     google_id = models.CharField(max_length=200, blank=True)
     photo_url = models.URLField(blank=True)
 
@@ -183,16 +136,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     organisation = models.ForeignKey(
         Organisation, null=True, blank=True, on_delete=models.SET_NULL, related_name='users'
     )
-    # Legacy school FK kept nullable for backwards compatibility
-    school = models.ForeignKey(
-        School, null=True, blank=True, on_delete=models.SET_NULL, related_name='users'
-    )
     transporter = models.ForeignKey(
         Transporter, null=True, blank=True, on_delete=models.SET_NULL, related_name='users'
     )
-
-    # Legacy role field — RBAC is now handled by Django Groups
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='school_admin')
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

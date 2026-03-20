@@ -22,10 +22,6 @@ class Student(models.Model):
         'schools.Organisation', blank=True, related_name='allocated_students'
     )
 
-    # Legacy FK kept nullable
-    school = models.ForeignKey(
-        School, null=True, blank=True, on_delete=models.CASCADE, related_name='students'
-    )
     bus = models.ForeignKey(
         Bus, null=True, blank=True, on_delete=models.SET_NULL, related_name='students'
     )

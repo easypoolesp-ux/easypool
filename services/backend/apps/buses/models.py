@@ -2,7 +2,7 @@ import uuid
 
 from django.db import models
 
-from apps.schools.models import Organisation, School, Transporter
+from apps.schools.models import Organisation, Transporter
 
 
 # ── Route ──────────────────────────────────────────────────────────────────────
@@ -21,10 +21,6 @@ class Route(models.Model):
     )
     allocated_to = models.ManyToManyField(Organisation, blank=True, related_name='allocated_routes')
 
-    # Legacy FK kept nullable for backwards compatibility
-    school = models.ForeignKey(
-        School, null=True, blank=True, on_delete=models.CASCADE, related_name='routes'
-    )
     transporter = models.ForeignKey(
         Transporter, null=True, blank=True, on_delete=models.SET_NULL, related_name='routes'
     )
@@ -82,10 +78,6 @@ class Bus(models.Model):
     # The clients/tenants who are currently renting/sharing this asset (Read-Only map access)
     allocated_to = models.ManyToManyField(Organisation, blank=True, related_name='allocated_buses')
 
-    # Legacy school FK kept nullable for backwards compatibility
-    school = models.ForeignKey(
-        School, null=True, blank=True, on_delete=models.CASCADE, related_name='buses'
-    )
     transporter = models.ForeignKey(
         Transporter, null=True, blank=True, on_delete=models.SET_NULL, related_name='buses'
     )
