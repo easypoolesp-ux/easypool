@@ -21,11 +21,9 @@ interface StatusCount {
 
 interface Props {
     statuses: StatusCount[]
-    criticalBuses?: { id: string; internal_id: string }[]
-    onCriticalClick?: (busId: string) => void
 }
 
-export default function FleetStatusDonut({ statuses, criticalBuses = [], onCriticalClick }: Props) {
+export default function FleetStatusDonut({ statuses }: Props) {
     const total = statuses.reduce((sum, s) => sum + s.count, 0)
     if (total === 0) return null
 
@@ -42,34 +40,27 @@ export default function FleetStatusDonut({ statuses, criticalBuses = [], onCriti
             const fraction = s.count / total
             const dashLength = fraction * CIRCUMFERENCE
             const gap = CIRCUMFERENCE - dashLength
-            const offset = -accumulatedOffset // negative = clockwise rotation
             accumulatedOffset += dashLength
-            return { ...s, dashLength, gap, offset }
+            return { 
+                key: s.key, 
+                color: s.color, 
+                dashLength, 
+                gap, 
+                offset: -(accumulatedOffset - dashLength) 
+            }
         })
-
-    const criticalCount = statuses.find(s => s.key === 'no_signal')?.count ?? 0
 
     return (
         <div className="flex items-center gap-4 px-1">
             {/* ── Donut ── */}
             <div className="relative shrink-0 w-[100px] h-[100px]">
                 <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                    {/* Background ring */}
-                    <circle
-                        cx="50" cy="50" r={RADIUS}
-                        fill="none"
-                        stroke="currentColor"
-                        className="text-slate-100 dark:text-slate-800"
-                        strokeWidth={STROKE}
-                    />
-                    {/* Status arcs */}
+                    <circle cx="50" cy="50" r={RADIUS} fill="none" stroke="currentColor" className="text-slate-100 dark:text-slate-800" strokeWidth={STROKE} />
                     {arcs.map(arc => (
                         <circle
                             key={arc.key}
                             cx="50" cy="50" r={RADIUS}
-                            fill="none"
-                            stroke={arc.color}
-                            strokeWidth={STROKE}
+                            fill="none" stroke={arc.color} strokeWidth={STROKE}
                             strokeDasharray={`${arc.dashLength} ${arc.gap}`}
                             strokeDashoffset={arc.offset}
                             strokeLinecap="round"
@@ -77,47 +68,23 @@ export default function FleetStatusDonut({ statuses, criticalBuses = [], onCriti
                         />
                     ))}
                 </svg>
-                {/* Center label */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-2xl font-black text-slate-900 dark:text-white leading-none">{total}</span>
                     <span className="text-[8px] uppercase tracking-widest text-slate-400 font-bold">Buses</span>
                 </div>
             </div>
 
-            {/* ── Right side: Legend + critical callout ── */}
-            <div className="flex-1 min-w-0 space-y-2">
-                {/* Legend row — only show statuses with count > 0 */}
+            {/* ── Right side: Legend ── */}
+            <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
-                    {statuses.filter(s => s.key !== 'no_signal' && s.count > 0).map(s => (
-                        <div key={s.key} className="flex items-center gap-1.5">
+                    {statuses.filter(s => s.key !== 'no_signal').map(s => (
+                        <div key={s.key} className={`flex items-center gap-1.5 ${s.count === 0 ? 'opacity-30' : ''}`}>
                             <div className={`w-2 h-2 rounded-full ${s.tailwind}`} />
                             <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">{s.count}</span>
-                            <span className="text-[9px] text-slate-400">{s.label}</span>
+                            <span className="text-[9px] text-slate-400 capitalize">{s.label}</span>
                         </div>
                     ))}
                 </div>
-
-                {/* No Signal — only visible when there is a critical failure */}
-                {criticalCount > 0 && (
-                    <div className="bg-red-50 dark:bg-red-900/15 border border-red-200/50 dark:border-red-800/30 rounded-xl px-3 py-2 space-y-1 mt-2">
-                        <p className="text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                            {criticalCount} No Signal
-                        </p>
-                        {criticalBuses.slice(0, 3).map(bus => (
-                            <button
-                                key={bus.id}
-                                onClick={() => onCriticalClick?.(bus.id)}
-                                className="block text-[10px] text-red-500 dark:text-red-400 font-bold hover:underline truncate"
-                            >
-                                → {bus.internal_id}
-                            </button>
-                        ))}
-                        {criticalBuses.length > 3 && (
-                            <p className="text-[9px] text-red-400 italic">+{criticalBuses.length - 3} more</p>
-                        )}
-                    </div>
-                )}
             </div>
         </div>
     )

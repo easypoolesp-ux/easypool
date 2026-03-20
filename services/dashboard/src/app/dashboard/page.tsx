@@ -11,6 +11,7 @@ import nextDynamic from 'next/dynamic'
 import { components } from '@/types/api'
 import Image from 'next/image'
 import FleetStatusDonut from '@/components/fleet/FleetStatusDonut'
+import AlertCenter from '@/components/fleet/AlertCenter'
 import { getStatusConfig, FLEET_STATUSES } from '@/constants/fleetStatus'
 
 
@@ -194,6 +195,12 @@ export default function DashboardPage() {
                             </button>
                         </div>
 
+                        {/* ── Alert Dashboard ── */}
+                        <AlertCenter 
+                            criticalBuses={activeBuses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').map(b => ({ id: (b as any).id, internal_id: b.internal_id }))}
+                            onViewBus={(busId) => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: busId }))}
+                        />
+
                         {/* ── Fleet Health Donut ── */}
                         <FleetStatusDonut
                             statuses={FLEET_STATUSES.map(s => ({
@@ -203,8 +210,6 @@ export default function DashboardPage() {
                                 color: s.hex,
                                 tailwind: s.dot,
                             }))}
-                            criticalBuses={activeBuses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').map(b => ({ id: (b as any).id, internal_id: b.internal_id }))}
-                            onCriticalClick={(busId) => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: busId }))}
                         />
 
                         {/* Search Bar */}
