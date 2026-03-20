@@ -6,6 +6,7 @@ import { Play, Pause, X, Route, Calendar } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { MONOCHROME_DARK, MONOCHROME_LIGHT, DARK_DEFAULT } from './mapStyles'
 import { useMapHighContrastListener } from '@/hooks/useMapHighContrast'
+import { getStatusColor, getStatusConfig } from '@/constants/fleetStatus'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Bus {
@@ -41,35 +42,7 @@ const LIBRARIES: ('marker' | 'maps' | 'places')[] = ['marker']
 
 // ── Map styles moved to mapStyles.ts (single-responsibility) ─────────────────
 
-// ── Status → visual helpers ───────────────────────────────────────────────────
-/**
- * Four real statuses (from computed_status):
- *  moving    → #22c55e  green
- *  idle      → #f59e0b  amber
- *  no_signal → #ef4444  red
- *  offline   → #64748b  slate (manual / maintenance)
- */
-function getStatusColor(status: string): string {
-    switch (status) {
-        case 'moving':    return '#3b82f6'   // Blue
-        case 'idle':      return '#f59e0b'   // Amber
-        case 'no_signal': return '#ef4444'   // Red
-        case 'stopped':   return '#0f172a'   // Midnight Black
-        case 'offline':   return '#94a3b8'   // Grey (Untracked)
-        default:          return '#94a3b8'
-    }
-}
-
-function getStatusLabel(status: string): string {
-    switch (status) {
-        case 'moving':    return 'Moving'
-        case 'idle':      return 'Idle'
-        case 'no_signal': return 'No Signal'
-        case 'stopped':   return 'Stopped'
-        case 'offline':   return 'Untracked'
-        default:          return 'Unknown'
-    }
-}
+// ── Status helpers: imported from @/constants/fleetStatus ─────────────────────
 
 /**
  * Google Maps-style premium fleet marker:

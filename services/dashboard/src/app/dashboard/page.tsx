@@ -11,6 +11,7 @@ import nextDynamic from 'next/dynamic'
 import { components } from '@/types/api'
 import Image from 'next/image'
 import FleetStatusDonut from '@/components/fleet/FleetStatusDonut'
+import { getStatusConfig, FLEET_STATUSES } from '@/constants/fleetStatus'
 
 
 import UserProfile from '@/components/layout/UserProfile'
@@ -90,15 +91,15 @@ export default function DashboardPage() {
 
     if (!mounted) return <div className="p-6 text-center">Loading Dashboard...</div>
 
-    /** Use computed_status from backend for accurate real-time status */
+    /** Use computed_status from backend — colour/label from fleetStatus.ts */
     const getStatusDisplay = (bus: any) => {
         const s = bus.computed_status || bus.status
-        switch (s) {
-            case 'moving':    return { label: 'Moving',    color: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500 animate-pulse', speed: Math.round(bus.speed || 0) }
-            case 'idle':      return { label: 'Idle',      color: 'text-amber-500 dark:text-amber-400', dot: 'bg-amber-400',              speed: null }
-            case 'no_signal': return { label: 'No Signal', color: 'text-red-500 dark:text-red-400',   dot: 'bg-red-500',                 speed: null }
-            case 'stopped':   return { label: 'Stopped',   color: 'text-slate-900 dark:text-slate-200', dot: 'bg-slate-900 dark:bg-slate-200', speed: null }
-            default:          return { label: 'Unknown',   color: 'text-slate-400',                    dot: 'bg-slate-400',               speed: null }
+        const cfg = getStatusConfig(s)
+        return {
+            label: cfg.label,
+            color: cfg.text,
+            dot: s === 'moving' ? `${cfg.dot} animate-pulse` : cfg.dot,
+            speed: s === 'moving' ? Math.round(bus.speed || 0) : null,
         }
     }
 
@@ -195,12 +196,13 @@ export default function DashboardPage() {
 
                         {/* ── Fleet Health Donut ── */}
                         <FleetStatusDonut
-                            statuses={[
-                                { key: 'moving',    label: 'Moving',    count: activeBuses.filter(b => ((b as any).computed_status || b.status) === 'moving').length,    color: '#3b82f6', tailwind: 'bg-blue-500' },
-                                { key: 'idle',      label: 'Idle',      count: activeBuses.filter(b => ((b as any).computed_status || b.status) === 'idle').length,      color: '#f59e0b', tailwind: 'bg-amber-400' },
-                                { key: 'stopped',   label: 'Stopped',   count: activeBuses.filter(b => ((b as any).computed_status || b.status) === 'stopped').length,   color: '#0f172a', tailwind: 'bg-slate-900' },
-                                { key: 'no_signal', label: 'No Signal', count: activeBuses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').length, color: '#ef4444', tailwind: 'bg-red-500' },
-                            ]}
+                            statuses={FLEET_STATUSES.map(s => ({
+                                key: s.key,
+                                label: s.label,
+                                count: activeBuses.filter(b => ((b as any).computed_status || b.status) === s.key).length,
+                                color: s.hex,
+                                tailwind: s.dot,
+                            }))}
                             criticalBuses={activeBuses.filter(b => ((b as any).computed_status || b.status) === 'no_signal').map(b => ({ id: (b as any).id, internal_id: b.internal_id }))}
                             onCriticalClick={(busId) => window.dispatchEvent(new CustomEvent('map:viewHistory', { detail: busId }))}
                         />
@@ -220,12 +222,7 @@ export default function DashboardPage() {
                         {/* Status filter chips — toggled by filter button */}
                         {showFilters && (
                         <div className="flex flex-wrap gap-1.5">
-                            {[
-                                { key: 'moving',    label: 'Moving',    dot: 'bg-blue-500' },
-                                { key: 'idle',      label: 'Idle',      dot: 'bg-amber-400' },
-                                { key: 'stopped',   label: 'Stopped',   dot: 'bg-slate-900 dark:bg-slate-200' },
-                                { key: 'no_signal', label: 'No Signal', dot: 'bg-red-500' },
-                            ].map(f => (
+                            {FLEET_STATUSES.map(f => (
                                 <button
                                     key={f.key}
                                     onClick={() => toggleStatusFilter(f.key)}
