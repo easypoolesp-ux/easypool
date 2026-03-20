@@ -1,5 +1,5 @@
 from rest_framework import viewsets, decorators, response, permissions
-from core.permissions import IsSchoolAdmin, SchoolIsolationMixin
+from core.permissions import IsSuperAdmin, IsSchoolAdmin, IsTransporter, SchoolIsolationMixin
 from .models import GPSPoint, Alert
 from .serializers import GPSPointSerializer, GPSLatestSerializer, GPSPlaybackSerializer, AlertSerializer
 
@@ -179,7 +179,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 class AlertViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Alert.objects.all()
     serializer_class = AlertSerializer
-    permission_classes = [permissions.AllowAny] # Relax for dashboard demo
+    permission_classes = [IsSuperAdmin | IsSchoolAdmin | IsTransporter]
 
     @decorators.action(detail=True, methods=['post'])
     def resolve(self, request, pk=None):

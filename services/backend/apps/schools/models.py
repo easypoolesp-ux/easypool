@@ -34,8 +34,35 @@ class UserManager(BaseUserManager):
             raise ValueError('The Email field must be set')
         email = self.normalize_email(email)
         user = self.model(email=email, full_name=full_name, **extra_fields)
-        user.set_password(password)
+        if password:
+            user.set_password(password)
+        else:
+            # Firebase-managed users have no Django password.
+            # set_unusable_password() is Django's official way to mark
+            # external-auth accounts — it is not a fake password, it is
+            # a sentinel that permanently blocks direct Django login.
+            user.set_unusable_password()
         user.save(using=self._db)
+        return user
+
+    def create_portal_user(self, email, full_name, group_name, **extra_fields):
+        """
+        Creates a user intended to authenticate via Firebase only.
+        Assigns them to a Django Group for RBAC.
+        No password is set — authentication is handled entirely by Firebase.
+
+        Usage (management command or Django Admin):
+            User.objects.create_portal_user(
+                email='admin@school.com',
+                full_name='School Admin',
+                group_name='SchoolAdmin',
+                school=school_instance,
+            )
+        """
+        from django.contrib.auth.models import Group
+        user = self.create_user(email, full_name, **extra_fields)
+        group, _ = Group.objects.get_or_create(name=group_name)
+        user.groups.add(group)
         return user
 
     def create_superuser(self, email, full_name, password=None, **extra_fields):

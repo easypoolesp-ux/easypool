@@ -1,6 +1,6 @@
 from django.db.models import OuterRef, Subquery
 from rest_framework import viewsets, decorators, response, permissions
-from core.permissions import IsSchoolAdmin, IsTransporter, SchoolIsolationMixin
+from core.permissions import IsSchoolAdmin, IsTransporter, IsSuperAdmin, SchoolIsolationMixin
 from apps.gps.models import GPSPoint
 from .models import Route, Bus
 from .serializers import RouteSerializer, BusListSerializer, BusDetailSerializer
@@ -26,7 +26,7 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
             latest_heartbeat=Subquery(latest_gps.values('timestamp')[:1])
         ).all()
 
-    permission_classes = [permissions.AllowAny] # Relax for dashboard demo
+    permission_classes = [IsSuperAdmin | IsSchoolAdmin | IsTransporter]
     filterset_fields = ['status', 'route', 'internal_id', 'transporter']
     
     def get_serializer_class(self):

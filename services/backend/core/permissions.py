@@ -1,47 +1,104 @@
 from rest_framework import permissions
 
+
+# ── Core Permission Classes ────────────────────────────────────────────────────
+#
+# These use Django's built-in Group system for RBAC.
+# Groups are managed in Django Admin — no code deploy needed to change a user's role.
+#
+# Standard Groups (create these once in Django Admin):
+#   SuperAdmin   → full access across all schools/organisations
+#   SchoolAdmin  → scoped to their own school's data
+#   Transporter  → scoped to their own transporter's buses/routes
+#   Parent       → read-only access to their child's route (future)
+#
+# Usage on any ViewSet:
+#   permission_classes = [IsSuperAdmin | IsSchoolAdmin]
+
+
+def _in_group(user, *group_names):
+    """Returns True if the user is in any of the named Django Groups, or is a superuser."""
+    if not user or not user.is_authenticated or not user.is_active:
+        return False
+    if user.is_superuser:
+        return True
+    return user.groups.filter(name__in=group_names).exists()
+
+
 class IsSuperAdmin(permissions.BasePermission):
+    """Full access. Only members of the 'SuperAdmin' Django Group."""
+    message = "This action requires Super Admin access. Please contact your administrator."
+
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == 'superadmin'
+        return _in_group(request.user, 'SuperAdmin')
+
 
 class IsSchoolAdmin(permissions.BasePermission):
+    """Access scoped to the user's own school. Members of 'SchoolAdmin' Group."""
+    message = "This action requires School Admin access. Please contact your administrator."
+
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == 'school_admin'
+        return _in_group(request.user, 'SuperAdmin', 'SchoolAdmin')
+
 
 class IsTransporter(permissions.BasePermission):
+    """Access scoped to the user's own transporter. Members of 'Transporter' Group."""
+    message = "This action requires Transporter access. Please contact your administrator."
+
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == 'transporter'
+        return _in_group(request.user, 'SuperAdmin', 'SchoolAdmin', 'Transporter')
+
 
 class IsParent(permissions.BasePermission):
+    """Read-only access for parents. Members of 'Parent' Group."""
+    message = "This action requires Parent access. Please contact your administrator."
+
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == 'parent'
+        if request.method in permissions.SAFE_METHODS:
+            return _in_group(request.user, 'SuperAdmin', 'SchoolAdmin', 'Transporter', 'Parent')
+        return False
+
+
+# ── School / Transporter Data Isolation Mixin ─────────────────────────────────
+#
+# Automatically filters querysets so users only see data belonging to their
+# school or transporter. SuperAdmins see everything.
+#
+# SECURITY: Unauthenticated requests are NEVER allowed through — they return
+# an empty queryset rather than leaking data, so the view's permission_classes
+# will issue a 403 before the data is even fetched.
 
 class SchoolIsolationMixin:
     """
-    Mixin to filter querysets by the user's school.
-    Superadmins can see everything.
+    Filters querysets by the user's school or transporter automatically.
+    - SuperAdmin (group): sees all data
+    - SchoolAdmin (group): sees only their school's data
+    - Transporter (group): sees only their transporter's data
+    - Unauthenticated / no role: sees nothing (returns empty queryset)
     """
     def get_queryset(self):
         user = self.request.user
         queryset = super().get_queryset()
-        
-        # If not authenticated, allow viewing all data (Public Dashboard Mode)
-        if not user.is_authenticated:
+
+        # Unauthenticated requests should be blocked by permission_classes first,
+        # but as a safety net, return nothing rather than leak data.
+        if not user.is_authenticated or not user.is_active:
+            return queryset.none()
+
+        # SuperAdmins and Django superusers see everything
+        if user.is_superuser or user.groups.filter(name='SuperAdmin').exists():
             return queryset
 
-        if hasattr(user, 'role') and user.role == 'superadmin':
-            return queryset
-        
-        # Determine filtering based on user role and model structure
         model = queryset.model
         filters = {}
-        
-        # If user is a Transporter, prioritize transporter-level isolation
-        if hasattr(user, 'role') and user.role == 'transporter' and hasattr(model, 'transporter'):
-            filters['transporter'] = user.transporter
-        
-        # Always enforce school-level isolation if applicable
-        if hasattr(user, 'role') and user.role != 'superadmin' and hasattr(model, 'school'):
+
+        # Transporter isolation takes priority over school isolation
+        if user.groups.filter(name='Transporter').exists():
+            if hasattr(user, 'transporter') and user.transporter and hasattr(model, 'transporter'):
+                filters['transporter'] = user.transporter
+
+        # School isolation for SchoolAdmin and Transporter (if they have a school)
+        if hasattr(user, 'school') and user.school and hasattr(model, 'school'):
             filters['school'] = user.school
-            
-        return queryset.filter(**filters) if filters else queryset.all()
+
+        return queryset.filter(**filters) if filters else queryset.none()
