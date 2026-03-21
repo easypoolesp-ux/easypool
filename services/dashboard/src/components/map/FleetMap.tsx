@@ -313,6 +313,14 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                 const bounds = new google.maps.LatLngBounds()
                 data.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }))
                 mapRef.current.fitBounds(bounds, 50)
+                
+                // Prevent over-zooming when displaying history track
+                const listener = google.maps.event.addListener(mapRef.current, 'idle', () => {
+                    if (mapRef.current && (mapRef.current.getZoom() ?? 0) > 15) {
+                        mapRef.current.setZoom(15)
+                    }
+                    google.maps.event.removeListener(listener)
+                })
             }
         } catch {} finally { setIsLoading(false) }
     }, [])
