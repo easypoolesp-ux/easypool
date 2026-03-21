@@ -86,5 +86,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['full_name']
 
+    def clean(self):
+        super().clean()
+        if not self.is_superuser and not self.organisation:
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError({'organisation': 'Every user (except SuperAdmins) must belong to an organisation.'})
+
     def __str__(self):
         return self.email
