@@ -68,7 +68,9 @@ export default function LoginPage() {
         if (!firebaseUser) { setError('Authentication state lost. Please try again.'); return }
 
         const idToken = await firebaseUser.getIdToken(true)
+        console.log('[LOGIN] Got Firebase ID token, verifying backend access...')
         const { ok, message } = await verifyBackendAccess(idToken)
+        console.log('[LOGIN] Backend verification result:', { ok, message })
 
         if (!ok) {
             await signOut(auth)
@@ -80,13 +82,15 @@ export default function LoginPage() {
         // Set token in Cookie so Middleware can see it
         document.cookie = `__session=${idToken}; path=/; max-age=3600; SameSite=Lax; Secure`
         localStorage.setItem('token', idToken)
+        console.log('[LOGIN] Cookie and localStorage set, navigating to dashboard...')
 
         if (analytics) {
             setUserId(analytics, uid)
             logEvent(analytics, 'login', { method })
         }
 
-        router.push('/dashboard')
+        // Use hard navigation to ensure cookies are sent through Firebase Hosting proxy
+        window.location.href = '/dashboard'
     }
 
     const handleEmailLogin = async (e: React.FormEvent) => {
