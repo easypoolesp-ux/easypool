@@ -3,7 +3,7 @@ from rest_framework import decorators, response, viewsets
 from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin
 
 from .models import Organisation, User
-from .serializers import OrganisationSerializer, UserSerializer
+from .serializers import OrganisationSerializer, TransporterSerializer, UserSerializer
 
 
 class OrganisationViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
@@ -25,7 +25,7 @@ class OrganisationViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
 # to the new pure-Organisation model (type: bus_agency).
 class TransporterViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     queryset = Organisation.objects.filter(org_type='bus_agency')
-    serializer_class = OrganisationSerializer
+    serializer_class = TransporterSerializer
     permission_classes = [IsAdmin | IsManager | IsViewer]
 
 

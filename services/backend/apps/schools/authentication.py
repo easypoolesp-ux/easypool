@@ -1,9 +1,12 @@
 import firebase_admin
 from decouple import config
 from firebase_admin import auth, credentials
+import logging
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import BasePermission
+
+logger = logging.getLogger(__name__)
 
 from apps.schools.models import User
 
@@ -35,10 +38,13 @@ class FirebaseAuthentication(BaseAuthentication):
         try:
             decoded_token = auth.verify_id_token(id_token)
         except auth.ExpiredIdTokenError:
+            logger.warning("Firebase Auth: Expired token")
             raise AuthenticationFailed('Your session has expired. Please sign in again.')
-        except auth.InvalidIdTokenError:
+        except auth.InvalidIdTokenError as e:
+            logger.warning(f"Firebase Auth: Invalid token - {e}")
             raise AuthenticationFailed('Invalid session token. Please sign in again.')
         except Exception as e:
+            logger.error(f"Firebase Auth Error: {str(e)}")
             raise AuthenticationFailed(f'Authentication failed: {str(e)}')
 
         uid = decoded_token.get('uid')
@@ -53,6 +59,7 @@ class FirebaseAuthentication(BaseAuthentication):
             )
 
         if not user.is_active:
+            logger.warning(f"Firebase Auth: User {email} is inactive")
             raise AuthenticationFailed(
                 'Your account has been deactivated. Please contact your administrator.'
             )
@@ -63,6 +70,9 @@ class FirebaseAuthentication(BaseAuthentication):
             user.save(update_fields=['firebase_uid'])
 
         return (user, None)
+
+    def authenticate_header(self, request):
+        return 'Bearer realm="api"'
 
 
 # ── Role-Based Permission Classes (Django Groups) ─────────────────────────────
