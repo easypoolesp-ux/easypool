@@ -12,10 +12,14 @@ export function middleware(request: NextRequest) {
         }
     }
 
-    return NextResponse.next()
+    // Prevent Firebase Hosting CDN from caching dynamic pages
+    const response = NextResponse.next()
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    return response
 }
 
 export const config = {
-    // Only run on /dashboard routes — NOT on /api/ routes (avoids redirect loop on fetch calls)
-    matcher: ['/dashboard/:path*'],
+    // Run on dashboard AND login routes — NOT on /api/ routes
+    matcher: ['/dashboard/:path*', '/login'],
 }
