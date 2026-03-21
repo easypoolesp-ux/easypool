@@ -57,8 +57,8 @@ class FirebaseAuthentication(BaseAuthentication):
                 'Your account has been deactivated. Please contact your administrator.'
             )
 
-        # Store Firebase UID on first login
-        if not user.firebase_uid:
+        # Sync Firebase UID if it has changed (e.g. after a project migration)
+        if user.firebase_uid != uid:
             user.firebase_uid = uid
             user.save(update_fields=['firebase_uid'])
 
