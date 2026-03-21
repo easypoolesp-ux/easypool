@@ -112,6 +112,10 @@ def apply_isolation(user, queryset):
             # Routes currently don't have an allocation model yet, but we'll follow similar logic
             queryset = queryset.filter(organisation=user_org)
 
+    else:
+        # If the user is not a superuser and has NO organisation, they see NOTHING.
+        return queryset.none()
+
     return queryset
 
 
