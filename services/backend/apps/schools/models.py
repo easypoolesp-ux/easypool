@@ -20,7 +20,9 @@ class Organisation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200)
     org_type = models.CharField(max_length=30, choices=ORG_TYPE_CHOICES, default='bus_agency')
-    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='children')
+    parent = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.CASCADE, related_name='children'
+    )
     address = models.TextField(blank=True)
     contact_email = models.EmailField(blank=True)
     phone = models.CharField(max_length=20, blank=True)
@@ -92,7 +94,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         if not self.is_superuser and not self.organisation:
             from django.core.exceptions import ValidationError
 
-            raise ValidationError({'organisation': 'Every user (except SuperAdmins) must belong to an organisation.'})
+            raise ValidationError(
+                {'organisation': 'Every user (except SuperAdmins) must belong to an organisation.'}
+            )
 
     def __str__(self):
         return self.email
