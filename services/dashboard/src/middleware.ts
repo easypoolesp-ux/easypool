@@ -6,7 +6,7 @@ export function middleware(request: NextRequest) {
 
     // Only protect the dashboard — check for token cookie
     if (pathname.startsWith('/dashboard')) {
-        const token = request.cookies.get('token')?.value
+        const token = request.cookies.get('__session')?.value
         if (!token) {
             return NextResponse.redirect(new URL('/login', request.url))
         }

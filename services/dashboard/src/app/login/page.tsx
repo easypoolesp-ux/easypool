@@ -18,7 +18,7 @@ import { auth, analytics } from '@/lib/firebase'
 function clearAllSessionData() {
     localStorage.clear()
     sessionStorage.clear()
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax'
+    document.cookie = '__session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax; Secure'
 }
 
 async function verifyBackendAccess(idToken: string): Promise<{ ok: boolean; message: string }> {
@@ -78,7 +78,7 @@ export default function LoginPage() {
         }
 
         // Set token in Cookie so Middleware can see it
-        document.cookie = `token=${idToken}; path=/; max-age=3600; SameSite=Lax`
+        document.cookie = `__session=${idToken}; path=/; max-age=3600; SameSite=Lax; Secure`
         localStorage.setItem('token', idToken)
 
         if (analytics) {
