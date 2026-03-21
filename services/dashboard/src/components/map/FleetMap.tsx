@@ -216,14 +216,11 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                 if (valid.length > 0) {
                     const bounds = new google.maps.LatLngBounds()
                     valid.forEach(v => bounds.extend({ lat: v.lat, lng: v.lng }))
+                    // Cap at zoom 15 — maxZoom is the most reliable way to limit fitBounds
+                    mapRef.current.setOptions({ maxZoom: 15 })
                     mapRef.current.fitBounds(bounds, 80)
-                    
-                    // Prevent over-zooming when fitting bounds (especially if buses are close together)
-                    const listener = google.maps.event.addListener(mapRef.current, 'idle', () => {
-                        if (mapRef.current && (mapRef.current.getZoom() ?? 0) > 15) {
-                            mapRef.current.setZoom(15)
-                        }
-                        google.maps.event.removeListener(listener)
+                    google.maps.event.addListenerOnce(mapRef.current, 'idle', () => {
+                        mapRef.current?.setOptions({ maxZoom: undefined })
                     })
                 }
                 setCameraMode('free')
@@ -312,14 +309,11 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             if (Array.isArray(data) && data.length > 0 && mapRef.current) {
                 const bounds = new google.maps.LatLngBounds()
                 data.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }))
+                // Cap at zoom 15 — maxZoom is the most reliable way to limit fitBounds
+                mapRef.current.setOptions({ maxZoom: 15 })
                 mapRef.current.fitBounds(bounds, 50)
-                
-                // Prevent over-zooming when displaying history track
-                const listener = google.maps.event.addListener(mapRef.current, 'idle', () => {
-                    if (mapRef.current && (mapRef.current.getZoom() ?? 0) > 15) {
-                        mapRef.current.setZoom(15)
-                    }
-                    google.maps.event.removeListener(listener)
+                google.maps.event.addListenerOnce(mapRef.current, 'idle', () => {
+                    mapRef.current?.setOptions({ maxZoom: undefined })
                 })
             }
         } catch {} finally { setIsLoading(false) }
