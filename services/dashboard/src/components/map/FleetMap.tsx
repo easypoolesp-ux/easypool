@@ -217,6 +217,14 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     const bounds = new google.maps.LatLngBounds()
                     valid.forEach(v => bounds.extend({ lat: v.lat, lng: v.lng }))
                     mapRef.current.fitBounds(bounds, 80)
+                    
+                    // Prevent over-zooming when fitting bounds (especially if buses are close together)
+                    const listener = google.maps.event.addListener(mapRef.current, 'idle', () => {
+                        if (mapRef.current && (mapRef.current.getZoom() ?? 0) > 15) {
+                            mapRef.current.setZoom(15)
+                        }
+                        google.maps.event.removeListener(listener)
+                    })
                 }
                 setCameraMode('free')
             }
