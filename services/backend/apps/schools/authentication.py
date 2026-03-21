@@ -16,9 +16,12 @@ from apps.schools.models import User
 # (project-05588bf2) differs from the Firebase project (easypool-global).
 if not firebase_admin._apps:
     path = config('FIREBASE_SERVICE_ACCOUNT_PATH', default=None)
-    firebase_project_id = config('FIREBASE_PROJECT_ID')
+    firebase_project_id = config('FIREBASE_PROJECT_ID', default=None)
     cred = credentials.Certificate(path) if path else credentials.ApplicationDefault()
-    firebase_admin.initialize_app(cred, {'projectId': firebase_project_id})
+    options = {}
+    if firebase_project_id:
+        options['projectId'] = firebase_project_id
+    firebase_admin.initialize_app(cred, options)
 
 
 # ── Firebase Token Authentication ─────────────────────────────────────────────
