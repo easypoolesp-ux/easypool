@@ -20,9 +20,6 @@ class Organisation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200)
     org_type = models.CharField(max_length=30, choices=ORG_TYPE_CHOICES, default='bus_agency')
-    parent = models.ForeignKey(
-        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='children'
-    )
     address = models.TextField(blank=True)
     contact_email = models.EmailField(blank=True)
     phone = models.CharField(max_length=20, blank=True)
@@ -35,12 +32,6 @@ class Organisation(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.get_org_type_display()})'
-
-    def get_descendants(self):
-        result = list(self.children.all())
-        for child in self.children.all():
-            result.extend(child.get_descendants())
-        return result
 
 
 # ── User Manager ───────────────────────────────────────────────────────────────

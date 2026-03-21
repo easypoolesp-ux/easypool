@@ -85,8 +85,7 @@ def apply_isolation(user, queryset):
 
     # ── Organisation-level isolation (Multi-Tenant) ───────────────────────────
     if hasattr(user, 'organisation') and user.organisation:
-        user_orgs = user.organisation.get_descendants()
-        user_orgs.append(user.organisation)
+        user_org = user.organisation
 
         from django.db.models import Q
 
@@ -94,26 +93,24 @@ def apply_isolation(user, queryset):
 
         # 0. If the model IS Organisation itself
         if model == Organisation:
-            queryset = queryset.filter(id__in=[org.id for org in user_orgs])
+            queryset = queryset.filter(id=user_org.id)
 
         # 1. Model is a Bus
         elif model.__name__ == 'Bus':
             queryset = queryset.filter(
-                Q(organisation__in=user_orgs)
-                | Q(allocations__granted_to__in=user_orgs, allocations__is_active=True)
+                Q(organisation=user_org) | Q(allocations__granted_to=user_org)
             ).distinct()
 
         # 2. Model is linked to a Bus (GPSPoint, Camera, etc.)
         elif hasattr(model, 'bus'):
             queryset = queryset.filter(
-                Q(bus__organisation__in=user_orgs)
-                | Q(bus__allocations__granted_to__in=user_orgs, bus__allocations__is_active=True)
+                Q(bus__organisation=user_org) | Q(bus__allocations__granted_to=user_org)
             ).distinct()
 
         # 3. Model is a Route
         elif model.__name__ == 'Route':
             # Routes currently don't have an allocation model yet, but we'll follow similar logic
-            queryset = queryset.filter(organisation__in=user_orgs)
+            queryset = queryset.filter(organisation=user_org)
 
     return queryset
 

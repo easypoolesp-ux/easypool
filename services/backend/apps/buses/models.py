@@ -148,7 +148,6 @@ class BusAllocation(models.Model):
         Organisation, on_delete=models.CASCADE, related_name='allocations_received'
     )
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default='view')
-    is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -196,3 +195,59 @@ class BusAllocation(models.Model):
 
     def __str__(self):
         return f'{self.bus.internal_id} -> {self.granted_to.name} ({self.get_level_display()})'
+
+
+class BusAllocationLog(models.Model):
+    """
+    Permanent, append-only ledger of all bus allocation events.
+    """
+
+    ACTION_CHOICES = (
+        ('CREATED', 'Created'),
+        ('UPDATED', 'Updated'),
+        ('DELETED', 'Deleted'),
+    )
+
+    bus_internal_id = models.CharField(max_length=50)
+    granted_by_name = models.CharField(max_length=255)
+    granted_to_name = models.CharField(max_length=255)
+    level = models.CharField(max_length=50)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Allocation Ledger'
+        verbose_name_plural = 'Allocation Ledger'
+
+    def __str__(self):
+        return f'{self.timestamp} - {self.action}: {self.bus_internal_id}'
+
+
+# ── Signals for Audit Trail ───────────────────────────────────────────────────
+
+from django.db.models.signals import post_delete, post_save
+from django.dispatch import receiver
+
+
+@receiver(post_save, sender=BusAllocation)
+def log_allocation_save(sender, instance, created, **kwargs):
+    action = 'CREATED' if created else 'UPDATED'
+    BusAllocationLog.objects.create(
+        bus_internal_id=instance.bus.internal_id,
+        granted_by_name=instance.granted_by.name,
+        granted_to_name=instance.granted_to.name,
+        level=instance.get_level_display(),
+        action=action,
+    )
+
+
+@receiver(post_delete, sender=BusAllocation)
+def log_allocation_delete(sender, instance, **kwargs):
+    BusAllocationLog.objects.create(
+        bus_internal_id=instance.bus.internal_id,
+        granted_by_name=instance.granted_by.name,
+        granted_to_name=instance.granted_to.name,
+        level=instance.get_level_display(),
+        action='DELETED',
+    )

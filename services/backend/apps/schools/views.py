@@ -12,16 +12,12 @@ class OrganisationViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     permission_classes = [IsAdmin | IsManager]
 
     def get_queryset(self):
-        from django.db.models import Count, Q
+        from django.db.models import Count
 
         queryset = super().get_queryset()
         return queryset.annotate(
             owned_count=Count('owned_buses', distinct=True),
-            allocated_count=Count(
-                'allocations_received',
-                filter=Q(allocations_received__is_active=True),
-                distinct=True,
-            ),
+            allocated_count=Count('allocations_received', distinct=True),
         )
 
 

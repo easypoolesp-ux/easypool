@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Bus, BusAllocation, Camera, Route
+from .models import Bus, BusAllocation, BusAllocationLog, Camera, Route
 
 
 @admin.register(Route)
@@ -28,25 +28,10 @@ class BusAdmin(admin.ModelAdmin):
 
 @admin.register(BusAllocation)
 class BusAllocationAdmin(admin.ModelAdmin):
-    list_display = ('bus', 'granted_by', 'granted_to', 'level', 'is_active', 'created_at')
-    list_filter = ('level', 'is_active')
+    list_display = ('bus', 'granted_by', 'granted_to', 'level', 'created_at')
+    list_filter = ('level',)
     search_fields = ('bus__internal_id', 'granted_to__name')
     raw_id_fields = ('bus', 'granted_by', 'granted_to')
-    actions = ['delete_allocations_archive', 'reactivate_allocations']
-
-    def delete_allocations_archive(self, request, queryset):
-        queryset.update(is_active=False)
-
-    delete_allocations_archive.short_description = 'Delete (Archive) selected allocations'
-
-    def reactivate_allocations(self, request, queryset):
-        queryset.update(is_active=True)
-
-    reactivate_allocations.short_description = 'Reactivate selected allocations'
-
-    def has_delete_permission(self, request, obj=None):
-        # Enforce soft-delete for Audit Trail: No one can hard-delete except SuperAdmins
-        return request.user.is_superuser
 
     def has_change_permission(self, request, obj=None):
         if obj and not request.user.is_superuser:
@@ -57,8 +42,41 @@ class BusAllocationAdmin(admin.ModelAdmin):
                 return False
         return super().has_change_permission(request, obj)
 
+    def has_delete_permission(self, request, obj=None):
+        if obj and not request.user.is_superuser:
+            # Only the grantor (or owner of the bus) can delete it
+            is_grantor = obj.granted_by == getattr(request.user, 'organisation', None)
+            is_owner = obj.bus.organisation == getattr(request.user, 'organisation', None)
+            if not (is_grantor or is_owner):
+                return False
+        return super().has_delete_permission(request, obj)
+
     def save_model(self, request, obj, form, change):
         # Auto-set grantor from user's organisation if not superuser
         if not request.user.is_superuser and not obj.granted_by:
             obj.granted_by = getattr(request.user, 'organisation', None)
         super().save_model(request, obj, form, change)
+
+
+@admin.register(BusAllocationLog)
+class BusAllocationLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'timestamp',
+        'action',
+        'bus_internal_id',
+        'granted_by_name',
+        'granted_to_name',
+        'level',
+    )
+    list_filter = ('action', 'timestamp')
+    search_fields = ('bus_internal_id', 'granted_by_name', 'granted_to_name')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Only SuperAdmins can prune the ledger
+        return request.user.is_superuser
