@@ -119,7 +119,11 @@ SPECTACULAR_SETTINGS = {
 
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True
-CSRF_TRUSTED_ORIGINS = ['https://easypool-backend-222076803846.asia-south1.run.app']
+CSRF_TRUSTED_ORIGINS = [
+    'https://easypool-backend-222076803846.asia-south1.run.app',
+    'https://fleet.easypool.in',
+    'http://fleet.easypool.in'
+]
 
 # Custom User Model
 AUTH_USER_MODEL = 'schools.User'
