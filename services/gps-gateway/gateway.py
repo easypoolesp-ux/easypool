@@ -2,11 +2,23 @@ import socket
 import struct
 import requests
 import os
+import redis
+import json
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://backend-api/api/gps/telemetry")
 API_KEY         = os.getenv("GPS_SERVICE_API_KEY", "easypool_gps_secret_2026")
 GATEWAY_PORT    = int(os.getenv("GATEWAY_PORT", 5027))
+REDIS_URL       = os.getenv("REDIS_URL", "redis://:easypool_live_redis_2026@127.0.0.1:6379/0")
+
+# ── Redis Client ──────────────────────────────────────────────────────────────
+try:
+    redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+    redis_client.ping()
+    print(f"[REDIS] Successfully connected to {REDIS_URL}")
+except Exception as e:
+    print(f"[ERROR] Redis connection failed: {e}")
+    redis_client = None
 
 # Teltonika DIN1 (ignition wire) IO IDs.
 # Newer FMB920 firmware uses 239 (0xEF); older firmware may use 1.
@@ -122,7 +134,7 @@ def parse_codec8_packet(packet: bytes):
 
 
 def forward_to_backend(imei: str, data: dict):
-    """Posts parsed telemetry to the Django backend."""
+    """Posts parsed telemetry to the Django backend and publishes to Redis."""
     payload = {
         "imei":      imei,
         "lat":       data["lat"],
@@ -136,6 +148,16 @@ def forward_to_backend(imei: str, data: dict):
         f"[→BACKEND] IMEI={imei}  lat={data['lat']:.6f}  lng={data['lng']:.6f}  "
         f"spd={data['speed']}  hdg={data['heading']}°  ign={'ON' if data['ignition'] else 'OFF'}"
     )
+    
+    # ── 1. Publish to Redis (Instant Live Update) ──────────────────────────
+    if redis_client:
+        try:
+            redis_client.publish('live_bus_updates', json.dumps(payload))
+            print(f"[OK] Redis   published IMEI={imei}")
+        except Exception as e:
+            print(f"[WARN] Redis publish failed: {e}")
+
+    # ── 2. Forward to Backend HTTP (History/DB saving) ─────────────────────
     try:
         r = requests.post(BACKEND_API_URL, json=payload,
                           headers={"X-API-KEY": API_KEY}, timeout=5)

@@ -7,6 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-development-key')
 DEBUG = config('DEBUG', default=True, cast=bool)
+REDIS_URL = config('REDIS_URL', default='redis://:easypool_live_redis_2026@10.128.0.2:6379/0')
 
 ALLOWED_HOSTS = ['*']
 

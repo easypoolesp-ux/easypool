@@ -1,3 +1,7 @@
+import json
+import redis
+from django.conf import settings
+from django.http import StreamingHttpResponse
 from django.db.models import OuterRef, Subquery
 from rest_framework import decorators, response, viewsets
 
@@ -6,6 +10,25 @@ from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin
 
 from .models import Bus, Route
 from .serializers import BusDetailSerializer, BusListSerializer, RouteSerializer
+
+
+def sse_event_stream():
+    """Generator that listens to Redis and yields SSE blocks."""
+    try:
+        r = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        pubsub = r.pubsub()
+        pubsub.subscribe('live_bus_updates')
+        
+        # Send an initial connection establish event
+        yield f"data: {json.dumps({'status': 'connected'})}\n\n"
+
+        for message in pubsub.listen():
+            if message['type'] == 'message':
+                # SSE format is strict: "data: {json}\n\n"
+                yield f"data: {message['data']}\n\n"
+    except Exception as e:
+        print(f"[SSE ERROR] {e}")
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
 
 class RouteViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
@@ -52,6 +75,17 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
         buses = self.get_queryset().filter(status='online')
         serializer = BusListSerializer(buses, many=True)
         return response.Response(serializer.data)
+
+    @decorators.action(detail=False, methods=['get'])
+    def stream(self, request):
+        """SSE endpoint for live bus locations streaming directly from Redis."""
+        # Note: In a true multi-tenant production app, you might want to filter the 
+        # Redis events here to only yield buses belonging to `request.user.organisation`.
+        # For now, this yields the raw global stream for performance.
+        resp = StreamingHttpResponse(sse_event_stream(), content_type='text/event-stream')
+        resp['Cache-Control'] = 'no-cache'
+        resp['X-Accel-Buffering'] = 'no'  # Prevents Nginx/Cloud Run from buffering the stream
+        return resp
 
     @decorators.action(detail=True, methods=['post'])
     def request_evidence(self, request, pk=None):
