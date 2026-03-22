@@ -10,8 +10,21 @@ env/
 .env.*.local
 .DS_Store
 *.log
+tmp_*
+gcloud_logs.json
+*.json.log
 .terraform/
 .terragrunt-cache/
-# infra/ (Uncommented to support Terragrunt in Git)
-# infra/
+infra/
+
+# Personal local files
+.env
+.env.*.local
+venv/
+env/
+__pycache__/
+*.pyc
+node_modules/
+.next/
+.DS_Store
 simulation/

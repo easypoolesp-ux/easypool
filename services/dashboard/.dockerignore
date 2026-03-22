@@ -2,4 +2,12 @@ node_modules
 .next
 .env*
 .git
+.gitignore
+.vercel
+.firebase
+.firebaserc
+firebase.json
 README.md
+*.log
+tmp_*
+schema.yml
