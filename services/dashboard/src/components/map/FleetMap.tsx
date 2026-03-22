@@ -444,13 +444,18 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       lastHistoryPosRef.current = pos;
     } else {
       // ── Smooth history movement ──────────────────────────────
-      const ANIM_DURATION = isPlaying ? 450 : 200; // Faster when manually scrubbing
+      const ANIM_DURATION = isPlaying ? 450 : 150; // Faster transition for manual scrubbing
       const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
       if (historyAnimationRef.current)
         cancelAnimationFrame(historyAnimationRef.current);
 
-      const from = lastHistoryPosRef.current || pos;
+      // Start from where the marker *is* right now visually
+      const startPos = historyMarkerRef.current.getPosition();
+      const from = startPos
+        ? { lat: startPos.lat(), lng: startPos.lng() }
+        : lastHistoryPosRef.current || pos;
+
       const to = pos;
       const startTime = performance.now();
 
