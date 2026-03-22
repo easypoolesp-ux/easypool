@@ -271,14 +271,32 @@ jobs:
             "${IMAGE}"
 
           # ── Verify ───────────────────────────────────────────────────────────
-          sleep 5
-          STATUS=$(docker inspect --format='{{.State.Status}}' gps_gateway 2>/dev/null || echo "not_found")
-          echo "[CI] Container status: ${STATUS}"
-          if [ "${STATUS}" != "running" ]; then
-            echo "[CI][ERROR] gps_gateway is not running! Logs:"
-            docker logs gps_gateway --tail=50 || true
-            exit 1
-          fi
-          echo "[CI] ✅ GPS Gateway deployed successfully from Docker image."
-          docker logs gps_gateway --tail=10
+          echo "[CI] Waiting for container health check..."
+          MAX_RETRIES=12  # 12 * 5s = 60s
+          RETRY_COUNT=0
+          while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
+            HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' gps_gateway 2>/dev/null || echo "unhealthy")
+            RUNNING_STATUS=$(docker inspect --format='{{.State.Status}}' gps_gateway 2>/dev/null || echo "not_found")
+            
+            echo "[CI] Attempt $((RETRY_COUNT+1)): Running=${RUNNING_STATUS}, Health=${HEALTH_STATUS}"
+            
+            if [ "${HEALTH_STATUS}" == "healthy" ]; then
+              echo "[CI] ✅ GPS Gateway is healthy and listening."
+              docker logs gps_gateway --tail=10
+              exit 0
+            fi
+            
+            if [ "${RUNNING_STATUS}" != "running" ]; then
+              echo "[CI][ERROR] Container stopped unexpectedly. Logs:"
+              docker logs gps_gateway --tail=50
+              exit 1
+            fi
+            
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            sleep 5
+          done
+
+          echo "[CI][ERROR] Health check timed out after 60s. Logs:"
+          docker logs gps_gateway --tail=50
+          exit 1
           DEPLOY_SCRIPT
