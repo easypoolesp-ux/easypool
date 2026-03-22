@@ -15,6 +15,13 @@
     ],
     "rewrites": [
       {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "easypool-backend",
+          "region": "asia-south1"
+        }
+      },
+      {
         "source": "**",
         "run": {
           "serviceId": "easypool-dashboard-schools",

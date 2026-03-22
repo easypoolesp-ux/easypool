@@ -73,6 +73,7 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default='adminpassword'),
         'HOST': config('DB_HOST', default='db'),
         'PORT': config('DB_PORT', default='5432'),
+        'CONN_MAX_AGE': 60,
     }
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { GoogleMap, useJsApiLoader, Polyline } from '@react-google-maps/api'
 import { Play, Pause, X, Route, Calendar, Crosshair, Maximize, Unlock } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -100,14 +101,33 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     const [historyPoints, setHistoryPoints] = useState<GPSPoint[]>([])
     const [playbackIndex, setPlaybackIndex] = useState(0)
     const [isPlaying, setIsPlaying]         = useState(false)
-    const [isLoading, setIsLoading]         = useState(false)
     const [isMapReady, setIsMapReady]       = useState(false)
+
+    // Smart Caching with React Query
+    const { data: historyPoints = [], isFetching: isHistoryLoading } = useQuery<GPSPoint[]>({
+        queryKey: ['gps-playback', selectedBusId, playbackDate],
+        queryFn: async () => {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`${BACKEND_URL}/api/gps/playback?bus=${selectedBusId}&date=${playbackDate}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            if (!res.ok) throw new Error('History fetch failed')
+            return res.json()
+        },
+        enabled: isHistoryMode && !!selectedBusId,
+        // If date is today, stale after 30s. If past date, cache "forever" (24h)
+        staleTime: playbackDate === new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+            ? 30 * 1000 
+            : 24 * 60 * 60 * 1000, 
+    })
 
     // Refs
     const mapRef           = useRef<google.maps.Map | null>(null)
     const markerRefs       = useRef<Map<string, google.maps.Marker>>(new Map())
     const markerStateRefs  = useRef<Map<string, string>>(new Map()) // Hash of lat,lng,status,heading
     const historyMarkerRef = useRef<google.maps.Marker | null>(null)
+    const historyAnimationRef = useRef<number | undefined>(undefined)
+    const lastHistoryPosRef = useRef<{ lat: number; lng: number } | null>(null)
     // Smooth-animation refs: cancel any in-flight animation before starting a new one
     const animationRefs    = useRef<Map<string, number>>(new Map())   // busId → RAF handle
     const currentPosRefs   = useRef<Map<string, { lat: number; lng: number }>>(new Map()) // busId → last rendered pos
@@ -305,8 +325,10 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     // ── Playback Marker + Auto-Follow ─────────────────────────────────────────
     useEffect(() => {
         if (!isHistoryMode || !historyPoints[playbackIndex] || !mapRef.current) {
+            if (historyAnimationRef.current) cancelAnimationFrame(historyAnimationRef.current)
             historyMarkerRef.current?.setMap(null)
             historyMarkerRef.current = null
+            lastHistoryPosRef.current = null
             return
         }
 
@@ -327,49 +349,66 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                 },
                 zIndex: 1000
             })
+            lastHistoryPosRef.current = pos
         } else {
-            historyMarkerRef.current.setPosition(pos)
+            // ── Smooth history movement ──────────────────────────────
+            const ANIM_DURATION = isPlaying ? 450 : 200 // Faster when manually scrubbing
+            const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
+
+            if (historyAnimationRef.current) cancelAnimationFrame(historyAnimationRef.current)
+            
+            const from = lastHistoryPosRef.current || pos
+            const to = pos
+            const startTime = performance.now()
+
+            const animate = (now: number) => {
+                const elapsed = now - startTime
+                const t = Math.min(elapsed / ANIM_DURATION, 1)
+                const ease = easeOutCubic(t)
+                const interpPos = {
+                    lat: from.lat + (to.lat - from.lat) * ease,
+                    lng: from.lng + (to.lng - from.lng) * ease,
+                }
+                historyMarkerRef.current?.setPosition(interpPos)
+                if (t < 1) {
+                    historyAnimationRef.current = requestAnimationFrame(animate)
+                } else {
+                    lastHistoryPosRef.current = to
+                    historyAnimationRef.current = undefined
+                }
+            }
+            historyAnimationRef.current = requestAnimationFrame(animate)
+            // ────────────────────────────────────────────────────────────
         }
+
         // Auto-follow during playback if user has selected the target mode
         if (isPlaying && cameraMode === 'follow') mapRef.current.panTo(pos)
     }, [playbackIndex, isHistoryMode, historyPoints, isPlaying, cameraMode])
 
-    // ── History fetching ──────────────────────────────────────────────────────
-    const loadHistory = useCallback(async (busId: string, date: string) => {
-        setIsLoading(true)
-        try {
-            const token = localStorage.getItem('token')
-            const res   = await fetch(`${BACKEND_URL}/api/gps/playback?bus=${busId}&date=${date}`, {
-                headers: { Authorization: `Bearer ${token}` }
+    // Fit bounds on new history data
+    useEffect(() => {
+        if (isHistoryMode && historyPoints.length > 0 && mapRef.current) {
+            const bounds = new google.maps.LatLngBounds()
+            historyPoints.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }))
+            mapRef.current.setOptions({ maxZoom: 15 })
+            mapRef.current.fitBounds(bounds, 50)
+            google.maps.event.addListenerOnce(mapRef.current, 'idle', () => {
+                mapRef.current?.setOptions({ maxZoom: undefined })
             })
-            const data = await res.json()
-            setHistoryPoints(Array.isArray(data) ? data : [])
-            setPlaybackIndex(0)
-            if (Array.isArray(data) && data.length > 0 && mapRef.current) {
-                const bounds = new google.maps.LatLngBounds()
-                data.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }))
-                // Cap at zoom 15 — maxZoom is the most reliable way to limit fitBounds
-                mapRef.current.setOptions({ maxZoom: 15 })
-                mapRef.current.fitBounds(bounds, 50)
-                google.maps.event.addListenerOnce(mapRef.current, 'idle', () => {
-                    mapRef.current?.setOptions({ maxZoom: undefined })
-                })
-            }
-        } catch {} finally { setIsLoading(false) }
-    }, [])
+        }
+    }, [historyPoints, isHistoryMode])
 
     const toggleHistoryMode = useCallback((bid?: string) => {
         if (isHistoryMode && !bid) {
             setIsHistoryMode(false)
-            setHistoryPoints([])
             return
         }
         const id = bid || selectedBusId || buses[0]?.id
         if (!id) return
         setSelectedBusId(id)
         setIsHistoryMode(true)
-        loadHistory(id, playbackDate)
-    }, [isHistoryMode, selectedBusId, buses, playbackDate, loadHistory])
+        setPlaybackIndex(0)
+    }, [isHistoryMode, selectedBusId, buses])
 
     // Select + Follow bus (from sidebar/alert clicks)
     useEffect(() => {
@@ -509,13 +548,13 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     <input
                         type="date"
                         value={playbackDate}
-                        onChange={e => { setPlaybackDate(e.target.value); if (selectedBusId) loadHistory(selectedBusId, e.target.value) }}
+                        onChange={e => { setPlaybackDate(e.target.value); setPlaybackIndex(0) }}
                         className="bg-transparent text-xs font-bold border-none focus:ring-0 p-0 text-slate-800 dark:text-white cursor-pointer pr-2"
                     />
                     <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
                     <select
                         value={selectedBusId || ''}
-                        onChange={e => { setSelectedBusId(e.target.value); loadHistory(e.target.value, playbackDate) }}
+                        onChange={e => { setSelectedBusId(e.target.value); setPlaybackIndex(0) }}
                         className="bg-transparent text-xs font-bold border-none focus:ring-0 py-1 px-2 text-slate-800 dark:text-white cursor-pointer"
                     >
                         {buses.map(b => (
@@ -555,7 +594,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             {isHistoryMode && (
                 <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-[92%] max-w-[420px] z-50">
                     <div className="bg-slate-900/92 backdrop-blur-2xl p-4 rounded-3xl shadow-2xl border border-white/10 text-white flex flex-col gap-3">
-                        {isLoading ? (
+                        {isHistoryLoading && historyPoints.length === 0 ? (
                             <div className="flex items-center justify-center py-3">
                                 <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
                             </div>
