@@ -108,6 +108,9 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     const markerRefs       = useRef<Map<string, google.maps.Marker>>(new Map())
     const markerStateRefs  = useRef<Map<string, string>>(new Map()) // Hash of lat,lng,status,heading
     const historyMarkerRef = useRef<google.maps.Marker | null>(null)
+    // Smooth-animation refs: cancel any in-flight animation before starting a new one
+    const animationRefs    = useRef<Map<string, number>>(new Map())   // busId → RAF handle
+    const currentPosRefs   = useRef<Map<string, { lat: number; lng: number }>>(new Map()) // busId → last rendered pos
 
     // Map options — JSON styles only, no mapId (mapId disables styles)
     const mapOptions = useMemo<google.maps.MapOptions>(() => ({
@@ -170,7 +173,42 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
             const existing = markerRefs.current.get(bus.id)
             if (existing) {
-                existing.setPosition(pos)
+                // ── Smooth position transition ──────────────────────────────
+                const ANIM_DURATION = 800 // ms — matches typical GPS polling interval
+                const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
+
+                // Cancel any in-flight animation for this marker
+                const pendingRaf = animationRefs.current.get(bus.id)
+                if (pendingRaf !== undefined) cancelAnimationFrame(pendingRaf)
+
+                // Start position: wherever the marker currently is (or last known)
+                const from = currentPosRefs.current.get(bus.id) ?? (
+                    existing.getPosition()
+                        ? { lat: existing.getPosition()!.lat(), lng: existing.getPosition()!.lng() }
+                        : pos
+                )
+                const to = pos
+                const startTime = performance.now()
+
+                const animate = (now: number) => {
+                    const elapsed = now - startTime
+                    const t = Math.min(elapsed / ANIM_DURATION, 1)
+                    const ease = easeOutCubic(t)
+                    const interpPos = {
+                        lat: from.lat + (to.lat - from.lat) * ease,
+                        lng: from.lng + (to.lng - from.lng) * ease,
+                    }
+                    existing.setPosition(interpPos)
+                    if (t < 1) {
+                        animationRefs.current.set(bus.id, requestAnimationFrame(animate))
+                    } else {
+                        currentPosRefs.current.set(bus.id, to)
+                        animationRefs.current.delete(bus.id)
+                    }
+                }
+                animationRefs.current.set(bus.id, requestAnimationFrame(animate))
+                // ────────────────────────────────────────────────────────────
+
                 existing.setIcon({ url: iconUrl, scaledSize: iconSize, anchor: iconAnchor, labelOrigin: new google.maps.Point(40, 72) })
                 existing.setLabel({
                     text: bus.internal_id,
@@ -198,6 +236,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     setCameraMode('follow')
                 })
                 markerRefs.current.set(bus.id, m)
+                currentPosRefs.current.set(bus.id, pos)
             }
         })
 
