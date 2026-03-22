@@ -1,8 +1,9 @@
 import json
+
 import redis
 from django.conf import settings
-from django.http import StreamingHttpResponse
 from django.db.models import OuterRef, Subquery
+from django.http import StreamingHttpResponse
 from rest_framework import decorators, response, viewsets
 
 from apps.gps.models import GPSPoint
@@ -18,17 +19,17 @@ def sse_event_stream():
         r = redis.from_url(settings.REDIS_URL, decode_responses=True)
         pubsub = r.pubsub()
         pubsub.subscribe('live_bus_updates')
-        
+
         # Send an initial connection establish event
-        yield f"data: {json.dumps({'status': 'connected'})}\n\n"
+        yield f'data: {json.dumps({"status": "connected"})}\n\n'
 
         for message in pubsub.listen():
             if message['type'] == 'message':
                 # SSE format is strict: "data: {json}\n\n"
-                yield f"data: {message['data']}\n\n"
+                yield f'data: {message["data"]}\n\n'
     except Exception as e:
-        print(f"[SSE ERROR] {e}")
-        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        print(f'[SSE ERROR] {e}')
+        yield f'data: {json.dumps({"error": str(e)})}\n\n'
 
 
 class RouteViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
@@ -79,7 +80,7 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     @decorators.action(detail=False, methods=['get'])
     def stream(self, request):
         """SSE endpoint for live bus locations streaming directly from Redis."""
-        # Note: In a true multi-tenant production app, you might want to filter the 
+        # Note: In a true multi-tenant production app, you might want to filter the
         # Redis events here to only yield buses belonging to `request.user.organisation`.
         # For now, this yields the raw global stream for performance.
         resp = StreamingHttpResponse(sse_event_stream(), content_type='text/event-stream')

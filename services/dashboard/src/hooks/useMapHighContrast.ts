@@ -1,9 +1,9 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 
-const STORAGE_KEY = 'map_high_contrast'
-const EVENT_NAME  = 'map:highContrastChange'
+const STORAGE_KEY = "map_high_contrast";
+const EVENT_NAME = "map:highContrastChange";
 
 /**
  * Persists the "Monochrome Map" toggle state in localStorage.
@@ -13,24 +13,24 @@ const EVENT_NAME  = 'map:highContrastChange'
  * Default: ON (true).
  */
 export function useMapHighContrast() {
-    const [enabled, setEnabled] = useState(true)
+  const [enabled, setEnabled] = useState(true);
 
-    // Hydrate from localStorage after mount
-    useEffect(() => {
-        const saved = localStorage.getItem(STORAGE_KEY)
-        if (saved !== null) setEnabled(saved === 'true')
-    }, [])
+  // Hydrate from localStorage after mount
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved !== null) setEnabled(saved === "true");
+  }, []);
 
-    const toggle = () => {
-        setEnabled(prev => {
-            const next = !prev
-            localStorage.setItem(STORAGE_KEY, String(next))
-            window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: next }))
-            return next
-        })
-    }
+  const toggle = () => {
+    setEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem(STORAGE_KEY, String(next));
+      window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: next }));
+      return next;
+    });
+  };
 
-    return { enabled, toggle }
+  return { enabled, toggle };
 }
 
 /**
@@ -38,17 +38,18 @@ export function useMapHighContrast() {
  * Use this in FleetMap to avoid prop-drilling through the page.
  */
 export function useMapHighContrastListener() {
-    const [enabled, setEnabled] = useState(() => {
-        if (typeof window === 'undefined') return true
-        const saved = localStorage.getItem(STORAGE_KEY)
-        return saved === null ? true : saved === 'true'
-    })
+  const [enabled, setEnabled] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved === null ? true : saved === "true";
+  });
 
-    useEffect(() => {
-        const handler = (e: Event) => setEnabled((e as CustomEvent<boolean>).detail)
-        window.addEventListener(EVENT_NAME, handler)
-        return () => window.removeEventListener(EVENT_NAME, handler)
-    }, [])
+  useEffect(() => {
+    const handler = (e: Event) =>
+      setEnabled((e as CustomEvent<boolean>).detail);
+    window.addEventListener(EVENT_NAME, handler);
+    return () => window.removeEventListener(EVENT_NAME, handler);
+  }, []);
 
-    return enabled
+  return enabled;
 }

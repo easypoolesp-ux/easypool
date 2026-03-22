@@ -1,18 +1,16 @@
-import re
-
-f = r'D:\easypool_2026\services\dashboard\src\app\dashboard\page.tsx'
-c = open(f, 'r', encoding='utf-8').read()
+f = r"D:\easypool_2026\services\dashboard\src\app\dashboard\page.tsx"
+c = open(f, "r", encoding="utf-8").read()
 
 # 1. Add hook import
 c = c.replace(
     "import { getStatusConfig, FLEET_STATUSES } from '@/constants/fleetStatus'",
-    "import { getStatusConfig, FLEET_STATUSES } from '@/constants/fleetStatus'\nimport { useBusPolling } from '@/hooks/useBusPolling'"
+    "import { getStatusConfig, FLEET_STATUSES } from '@/constants/fleetStatus'\nimport { useBusPolling } from '@/hooks/useBusPolling'",
 )
 
 # 2. Add Clock and WifiOff icon to lucide-react (if not there)
 c = c.replace(
     "import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut, Filter, X } from 'lucide-react'",
-    "import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut, Filter, X, Clock, WifiOff, ExternalLink } from 'lucide-react'"
+    "import { Bus, MapPin, AlertTriangle, Maximize2, Minimize2, Search, LogOut, Filter, X, Clock, WifiOff, ExternalLink } from 'lucide-react'",
 )
 
 # 3. Move getStatusDisplay outside
@@ -49,7 +47,7 @@ const getStatusDisplay = (bus: any) => {
     }
 }
 
-export default function DashboardPage() {"""
+export default function DashboardPage() {""",
 )
 
 # 4. Replace states and fetches with hook
@@ -140,9 +138,11 @@ c = c.replace(old_states_and_fetches, new_states_and_fetches)
 # 5. Fix import of useMemo
 c = c.replace(
     "import { useState, useEffect } from 'react'",
-    "import { useState, useEffect, useMemo } from 'react'"
+    "import { useState, useEffect, useMemo } from 'react'",
 )
-c = c.replace("    import { useMemo } from 'react' // We will put it at top in step 8\n    ", "")
+c = c.replace(
+    "    import { useMemo } from 'react' // We will put it at top in step 8\n    ", ""
+)
 
 # 6. Memoize activeBuses and filteredBuses
 old_filters = """    // Filter out offline (untracked) buses — they don't belong on the live dashboard
@@ -301,5 +301,5 @@ new_inner = """                                                <div className="f
                                                 </div>"""
 c = c.replace(old_inner, new_inner)
 
-open(f, 'w', encoding='utf-8').write(c)
+open(f, "w", encoding="utf-8").write(c)
 print("Done refactoring page.tsx")

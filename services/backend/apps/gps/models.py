@@ -2,6 +2,8 @@ import uuid
 
 from django.db import models
 
+from django.contrib.postgres.indexes import BrinIndex
+
 from apps.buses.models import Bus
 from apps.schools.models import User
 
@@ -14,13 +16,14 @@ class GPSPoint(models.Model):
     speed = models.FloatField(default=0)
     heading = models.FloatField(default=0, help_text='Direction of travel in degrees (0-360)')
     accuracy = models.FloatField(null=True, blank=True)
-    timestamp = models.DateTimeField(db_index=True)
+    timestamp = models.DateTimeField()
     ignition = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-timestamp']
         indexes = [
             models.Index(fields=['bus', '-timestamp']),
+            BrinIndex(fields=['timestamp']),
         ]
 
     def __str__(self):

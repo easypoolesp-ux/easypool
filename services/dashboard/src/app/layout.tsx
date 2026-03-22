@@ -5,33 +5,33 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-    title: "EasyPool | Fleet Monitoring & Safety Dashboard",
-    description: "Real-time monitoring and safety management",
-    icons: {
-        icon: '/logo.jpeg',
-    },
+  title: "EasyPool | Fleet Monitoring & Safety Dashboard",
+  description: "Real-time monitoring and safety management",
+  icons: {
+    icon: "/logo.jpeg",
+  },
 };
 
 import QueryProvider from "@/components/providers/QueryProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
 export default function RootLayout({
-    children,
+  children,
 }: Readonly<{
-    children: React.ReactNode;
+  children: React.ReactNode;
 }>) {
-    return (
-        <html lang="en" suppressHydrationWarning>
-            <body className={inter.className}>
-                <ThemeProvider
-                    attribute="class"
-                    defaultTheme="dark"
-                    enableSystem
-                    disableTransitionOnChange
-                >
-                    <QueryProvider>{children}</QueryProvider>
-                </ThemeProvider>
-            </body>
-        </html>
-    );
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <QueryProvider>{children}</QueryProvider>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
 }
