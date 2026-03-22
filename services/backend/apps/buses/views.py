@@ -51,7 +51,7 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
         # Subquery for latest GPS point per bus
         latest_gps = GPSPoint.objects.filter(bus=OuterRef('pk')).order_by('-timestamp')
 
-        return queryset.select_related('route').annotate(
+        return queryset.select_related('route', 'organisation').prefetch_related('allocations').annotate(
             latest_lat=Subquery(latest_gps.values('lat')[:1]),
             latest_lng=Subquery(latest_gps.values('lng')[:1]),
             latest_speed=Subquery(latest_gps.values('speed')[:1]),

@@ -1,8 +1,7 @@
 import uuid
 
-from django.db import models
-
 from django.contrib.postgres.indexes import BrinIndex
+from django.db import models
 
 from apps.buses.models import Bus
 from apps.schools.models import User

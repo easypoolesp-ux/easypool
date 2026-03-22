@@ -133,7 +133,6 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       new Date(),
     ),
   );
-  const [historyPoints, setHistoryPoints] = useState<GPSPoint[]>([]);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
