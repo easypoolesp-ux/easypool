@@ -5,7 +5,7 @@ from django.contrib.postgres.indexes import GistIndex
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('gps', '0008_sync_gps_points'),
+        ('gps', '0009_fix_null_locations'),
     ]
 
     operations = [
