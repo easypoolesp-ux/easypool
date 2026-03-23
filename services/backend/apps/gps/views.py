@@ -183,10 +183,73 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                 bus.status = 'moving'
             else:
                 bus.status = 'idle'
-            bus.save()
+            bus.save(update_fields=['status'])
             return response.Response({'status': 'success'})
         except Exception as e:
             return response.Response({'error': str(e)}, status=400)
+
+    @decorators.action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def bulk_telemetry(self, request):
+        """Batch update for GPS points (called by smarter Gateway)."""
+        api_key = request.headers.get('X-API-KEY')
+        if api_key != 'easypool_gps_secret_2026':
+            return response.Response({'error': 'Unauthorized'}, status=401)
+
+        data_list = request.data
+        if not isinstance(data_list, list):
+            return response.Response({'error': 'Expected a list of points'}, status=400)
+
+        from django.utils import timezone
+
+        points_to_create = []
+        buses_to_update = {}  # imei -> (bus, ignition, speed)
+        
+        # Batch lookup buses to avoid N+1 queries
+        imeis = {p.get('imei') for p in data_list if p.get('imei')}
+        bus_map = {b.gps_imei: b for b in Bus.objects.filter(gps_imei__in=imeis)}
+
+        for entry in data_list:
+            imei = entry.get('imei')
+            bus = bus_map.get(imei)
+            if not bus:
+                continue
+
+            coords = entry.get('coords')  # [lng, lat]
+            if not coords or len(coords) < 2:
+                continue
+
+            speed = float(entry.get('speed', 0))
+            ignition = entry.get('ignition', False)
+            if isinstance(ignition, str):
+                ignition = ignition.lower() == 'true'
+
+            points_to_create.append(
+                GPSPoint(
+                    bus=bus,
+                    location=Point(float(coords[0]), float(coords[1])),
+                    speed=speed,
+                    heading=float(entry.get('heading', 0)),
+                    ignition=ignition,
+                    timestamp=timezone.now(),
+                )
+            )
+            # Track latest status per bus in this batch
+            buses_to_update[imei] = (bus, ignition, speed)
+
+        if points_to_create:
+            GPSPoint.objects.bulk_create(points_to_create)
+
+        # Batch update bus statuses (one save per bus max)
+        for bus, ignition, speed in buses_to_update.values():
+            if not ignition:
+                bus.status = 'ignition_off'
+            elif speed > 5:
+                bus.status = 'moving'
+            else:
+                bus.status = 'idle'
+            bus.save(update_fields=['status'])
+
+        return response.Response({'status': 'success', 'count': len(points_to_create)})
 
 
 class AlertViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):

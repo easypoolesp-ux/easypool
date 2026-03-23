@@ -113,59 +113,72 @@ async def forward_to_backend(imei: str, data: dict):
     """Async forwarding to Redis and Django Backend."""
     payload = {
         "imei": imei,
-        "lat": data["lat"],
-        "lng": data["lng"],
+        "coords": [data["lng"], data["lat"]],
         "speed": data["speed"],
         "heading": data["heading"],
         "ignition": data["ignition"],
         "timestamp": data["timestamp"],
     }
 
-    # 1. Redis Publish for Live Map (Fire-and-forget)
+    # 1. Path A: Instant Live Hub (Redis Pub/Sub)
+    # This keeps the map 100% real-time regardless of DB batching.
     if redis_client:
         try:
             payload_str = json.dumps(payload)
             await redis_client.publish('live_bus_updates', payload_str)
-            # 2. Persist in Redis List for reliable Backend Sync
+            
+            # 2. Path B: Persistence Queue (for Bulk SQL)
             await redis_client.lpush('gps_offline_queue', payload_str)
         except Exception as e:
             print(f"[ERROR] Redis push failed: {e}")
 
 async def sync_queue_to_backend():
-    """Background task that ensures 100% data delivery to the backend."""
-    print("[SYNC] Started reliable queue sync to backend")
+    """Smarter background task with Adaptive Batching."""
+    print("[SYNC] Started high-performance adaptive sync")
+    bulk_url = BACKEND_API_URL.rstrip('/') + "/bulk/"
+    
     while True:
         if not redis_client or not http_session:
             await asyncio.sleep(5)
             continue
             
         try:
-            # Block until an item is available (BRPOP avoids CPU-heavy busy-waiting)
-            item = await redis_client.brpop('gps_offline_queue', timeout=5)
-            if not item:
+            # Check queue pressure
+            q_len = await redis_client.llen('gps_offline_queue')
+            if q_len == 0:
+                await asyncio.sleep(2) # Relaxed wait when idle
                 continue
+
+            # Intelligence: Scale batch size based on pressure
+            # If queue is flooding (>500), clear it faster with larger batches
+            batch_size = 200 if q_len > 500 else 50
             
-            queue_name, payload_str = item
-            payload = json.loads(payload_str)
+            # Multi-pop from Redis (efficient chunking)
+            # Note: r.lpop with count=N returns a list of values
+            batch_data = await redis_client.rpop('gps_offline_queue', count=batch_size)
+            if not batch_data:
+                continue
+
+            # Ensure we treat single result (if older redis version) as list
+            if isinstance(batch_data, str):
+                batch_data = [batch_data]
+
+            payload_batch = [json.loads(p) for p in batch_data]
             
-            # Try sending to backend
-            async with http_session.post(BACKEND_API_URL, json=payload) as resp:
+            # Try sending bulk to backend
+            async with http_session.post(bulk_url, json=payload_batch) as resp:
                 if resp.status not in [200, 201]:
-                    print(f"[ERROR] Backend returned {resp.status}, requeuing...")
-                    await redis_client.rpush('gps_offline_queue', payload_str)
-                    await asyncio.sleep(2) # Backoff if backend is struggling
-        except asyncio.TimeoutError:
-            pass # Standard timeout, just loop again
+                    print(f"[ERROR] Bulk Backend returned {resp.status}, requeuing {len(payload_batch)} items...")
+                    # Re-queue items in reverse order to preserve time-sequence as much as possible
+                    for p_str in reversed(batch_data):
+                        await redis_client.rpush('gps_offline_queue', p_str)
+                    await asyncio.sleep(5) 
+                else:
+                    if q_len > 500:
+                        print(f"[SYNC] Processed high-pressure batch: {len(payload_batch)} items")
         except Exception as e:
             print(f"[ERROR] Sync task failed: {e}")
-            if 'payload_str' in locals():
-                try:
-                    # Put it back on the queue so we don't drop it
-                    await redis_client.rpush('gps_offline_queue', payload_str)
-                except:
-                    pass
             await asyncio.sleep(5)
-            pass
 
 
 async def handle_bus(reader, writer):
