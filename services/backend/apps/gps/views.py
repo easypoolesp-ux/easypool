@@ -1,9 +1,8 @@
+from django.contrib.gis.geos import Point
 from rest_framework import decorators, permissions, response, viewsets
 
 from apps.buses.models import Bus
 from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin, apply_isolation
-
-from django.contrib.gis.geos import Point
 
 from .models import Alert, GPSPoint
 from .serializers import (

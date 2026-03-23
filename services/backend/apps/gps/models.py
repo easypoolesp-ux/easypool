@@ -1,10 +1,10 @@
 import uuid
-# Trigger: Spatial Migration Build (Unblocked CI)
 
+from django.contrib.gis.db import models as gis_models
+
+# Trigger: Spatial Migration Build (Unblocked CI)
 from django.contrib.postgres.indexes import BrinIndex, GistIndex
 from django.db import models
-from django.contrib.gis.db import models as gis_models
-from django.contrib.gis.geos import Point
 
 from apps.buses.models import Bus
 from apps.schools.models import User
@@ -17,7 +17,7 @@ class GPSPoint(models.Model):
     speed = models.FloatField(default=0)
     heading = models.FloatField(default=0)
     accuracy = models.FloatField(null=True, blank=True)
-    timestamp = models.DateTimeField()
+    timestamp = models.DateTimeField(db_index=True)
     ignition = models.BooleanField(default=False)
 
     @property

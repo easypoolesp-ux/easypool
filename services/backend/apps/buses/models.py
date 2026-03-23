@@ -226,8 +226,8 @@ class BusAllocationLog(models.Model):
 
 # ── Signals for Audit Trail ───────────────────────────────────────────────────
 
-from django.db.models.signals import post_delete, post_save
-from django.dispatch import receiver
+from django.db.models.signals import post_delete, post_save  # noqa: E402
+from django.dispatch import receiver  # noqa: E402
 
 
 @receiver(post_save, sender=BusAllocation)

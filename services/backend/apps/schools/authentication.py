@@ -9,7 +9,7 @@ from rest_framework.permissions import BasePermission
 
 logger = logging.getLogger(__name__)
 
-from apps.schools.models import User
+from apps.schools.models import User  # noqa: E402
 
 # ── Firebase Admin SDK Initialization ─────────────────────────────────────────
 # projectId must be set explicitly when the Cloud Run service account project
