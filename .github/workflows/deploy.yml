@@ -99,7 +99,7 @@ jobs:
             --command "python,manage.py,migrate" \
             --set-env-vars "DB_NAME=bustrak,DB_USER=easypool-backend-sa@project-05588bf2-f685-4769-a37.iam,DB_HOST=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
             --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
-            --set-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres?enable_iam_auth=true" \
+            --set-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
             --quiet
           gcloud run jobs execute backend-migrate \
             --region ${{ env.REGION }} \
@@ -126,7 +126,7 @@ jobs:
             --project ${{ env.PROJECT_ID }} \
             --update-env-vars "DB_NAME=bustrak,DB_USER=easypool-backend-sa@project-05588bf2-f685-4769-a37.iam,DB_HOST=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
             --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
-            --add-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres?enable_iam_auth=true" \
+            --add-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
             --cpu-boost \
             --quiet
 
