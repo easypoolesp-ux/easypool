@@ -187,31 +187,10 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       streetViewControl: false,
       fullscreenControl: false,
       mapId: "fleet_map", // Required for AdvancedMarkerElement
-      styles: highContrast
-        ? isDark
-          ? MONOCHROME_DARK
-          : MONOCHROME_LIGHT
-        : isDark
-          ? DARK_DEFAULT
-          : [],
     }),
     [isDark, highContrast],
   );
 
-  // Imperatively sync theme + high-contrast changes to live map
-  useEffect(() => {
-    if (mapRef.current) {
-      mapRef.current.setOptions({
-        styles: highContrast
-          ? isDark
-            ? MONOCHROME_DARK
-            : MONOCHROME_LIGHT
-          : isDark
-            ? DARK_DEFAULT
-            : [],
-      });
-    }
-  }, [isDark, highContrast]);
 
   // ── Marker management ─────────────────────────────────────────────────────
   useEffect(() => {
