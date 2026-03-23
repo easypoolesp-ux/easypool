@@ -100,7 +100,7 @@ jobs:
             --set-env-vars "DB_NAME=bustrak,DB_USER=easypool-backend-sa@project-05588bf2-f685-4769-a37.iam,DB_HOST=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
             --set-secrets "SECRET_KEY=django-secret-key:latest,REDIS_URL=redis-url:latest" \
             --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
-            --set-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
+            --set-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres?enable_iam_auth=true" \
             --quiet
           gcloud run jobs execute backend-migrate \
             --region ${{ env.REGION }} \
@@ -128,7 +128,7 @@ jobs:
             --update-env-vars "DB_NAME=bustrak,DB_USER=easypool-backend-sa@project-05588bf2-f685-4769-a37.iam,DB_HOST=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
             --set-secrets "SECRET_KEY=django-secret-key:latest,REDIS_URL=redis-url:latest" \
             --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
-            --add-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
+            --add-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres?enable_iam_auth=true" \
             --cpu-boost \
             --quiet
 
