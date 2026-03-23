@@ -24,11 +24,11 @@ RUN python manage.py collectstatic --noinput
 
 # SAFETY NET 1: Syntax & Configuration
 # Instantly catches missing imports, bad syntax, or broken URL patterns.
-RUN python manage.py check
+RUN DB_ENGINE=django.db.backends.dummy python manage.py check
 
 # SAFETY NET 2: Database Integrity
 # Fails the build immediately if someone forgot to run `makemigrations` locally.
-RUN python manage.py makemigrations --check --dry-run
+RUN DB_ENGINE=django.db.backends.dummy python manage.py makemigrations --check --dry-run
 
 EXPOSE 8000
 

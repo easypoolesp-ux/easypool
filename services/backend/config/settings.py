@@ -69,7 +69,7 @@ ASGI_APPLICATION = 'config.asgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        'ENGINE': config('DB_ENGINE', default='django.contrib.gis.db.backends.postgis'),
         'NAME': config('DB_NAME', default='bustrak'),
         'USER': config('DB_USER', default='admin'),
         'PASSWORD': config('DB_PASSWORD', default='adminpassword'),
