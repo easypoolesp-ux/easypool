@@ -12,6 +12,8 @@ class GPSPointSerializer(serializers.ModelSerializer):
 
 
 class GPSLatestSerializer(serializers.ModelSerializer):
+    lat = serializers.ReadOnlyField()
+    lng = serializers.ReadOnlyField()
     location = serializers.SerializerMethodField()
 
     class Meta:
@@ -25,6 +27,8 @@ class GPSLatestSerializer(serializers.ModelSerializer):
 
 
 class GPSPlaybackSerializer(serializers.ModelSerializer):
+    lat = serializers.ReadOnlyField()
+    lng = serializers.ReadOnlyField()
     location = serializers.SerializerMethodField()
 
     class Meta:
