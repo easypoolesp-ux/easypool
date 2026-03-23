@@ -145,14 +145,16 @@ jobs:
       - name: Deploy Backend to Cloud Run
         run: |
           # Deploy Multi-Container Service
-          gcloud run deploy easypool-backend \
+          gcloud beta run deploy easypool-backend \
             --container backend \
               --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
-              --port 8000 \
+              --port 8080 \
+              --cpu 1 --memory 1Gi \
               --set-env-vars "DB_NAME=bustrak,DB_USER=admin,DB_HOST=127.0.0.1,DB_PORT=6432,DB_ENGINE=django.contrib.gis.db.backends.postgis,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
               --set-secrets "SECRET_KEY=django-secret-key:latest,REDIS_URL=redis-url:latest,DB_PASSWORD=db-password:latest" \
             --container pgbouncer \
               --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:latest \
+              --cpu 0.5 --memory 256Mi \
               --set-env-vars "DB_PASSWORD_DUMMY=placeholder" \
               --set-secrets "DB_PASSWORD=db-password:latest" \
             --region ${{ env.REGION }} \
@@ -160,6 +162,7 @@ jobs:
             --add-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
             --vpc-connector "projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/easypool-vpcc-v2" \
             --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
+            --ingress all \
             --cpu-boost \
             --quiet
 
