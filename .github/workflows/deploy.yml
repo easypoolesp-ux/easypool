@@ -9,14 +9,22 @@ on:
       - '.github/workflows/**'
   workflow_dispatch:
     inputs:
-      force_deploy:
-        description: 'Force deploy all services (bypasses path filter)'
+      deploy_target:
+        description: 'Which service to force deploy? (Select "none" to use automatic path-filtering)'
         required: false
-        default: 'false'
+        default: 'none'
         type: choice
         options:
-          - 'false'
-          - 'true'
+          - 'none'
+          - 'all'
+          - 'backend'
+          - 'dashboard'
+          - 'gateway'
+      force_deploy:
+        description: 'Legacy force flag (deprecated, use deploy_target instead)'
+        required: false
+        default: 'false'
+        type: boolean
 
 env:
   PROJECT_ID: project-05588bf2-f685-4769-a37
@@ -54,7 +62,11 @@ jobs:
   # ── Backend ───────────────────────────────────────────────────────────────
   build-backend:
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || inputs.force_deploy == 'true'
+    if: |
+      (needs.changes.outputs.backend == 'true') || 
+      (inputs.deploy_target == 'all') || 
+      (inputs.deploy_target == 'backend') || 
+      (inputs.force_deploy == true)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -154,7 +166,11 @@ jobs:
   # ── Dashboard ─────────────────────────────────────────────────────────────
   build-dashboard:
     needs: changes
-    if: needs.changes.outputs.dashboard == 'true' || inputs.force_deploy == 'true'
+    if: |
+      (needs.changes.outputs.dashboard == 'true') || 
+      (inputs.deploy_target == 'all') || 
+      (inputs.deploy_target == 'dashboard') || 
+      (inputs.force_deploy == true)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -225,8 +241,12 @@ jobs:
 
   # ── GPS Gateway (VM) ──────────────────────────────────────────────────────
   build-gateway:
-    needs: changes
-    if: needs.changes.outputs.gateway == 'true' || inputs.force_deploy == 'true'
+    needs: [changes, build-backend]
+    if: |
+      (needs.changes.outputs.gateway == 'true') || 
+      (inputs.deploy_target == 'all') || 
+      (inputs.deploy_target == 'gateway') || 
+      (inputs.force_deploy == true)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -337,3 +357,42 @@ jobs:
           docker logs gps_gateway --tail=50
           exit 1
           DEPLOY_SCRIPT
+
+  # ── Execution Report ──────────────────────────────────────────────────────
+  deployment-report:
+    needs: [changes, build-backend, build-dashboard, build-gateway]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Deployment Summary
+        run: |
+          echo "### 🚀 EasyPool Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status | Trigger |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Backend
+          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
+            echo "| Backend | ✅ Deployed | Path Filter / Manual |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.build-backend.result }}" == "skipped" ]]; then
+            echo "| Backend | ⏭️ Skipped | No relevant changes |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Backend | ❌ Failed | Error in build/deploy |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Dashboard
+          if [[ "${{ needs.build-dashboard.result }}" == "success" ]]; then
+            echo "| Dashboard | ✅ Deployed | Path Filter / Manual |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.build-dashboard.result }}" == "skipped" ]]; then
+            echo "| Dashboard | ⏭️ Skipped | No relevant changes |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Dashboard | ❌ Failed | Error in build/deploy |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Gateway
+          if [[ "${{ needs.build-gateway.result }}" == "success" ]]; then
+            echo "| Gateway | ✅ Deployed | Path Filter / Manual |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.build-gateway.result }}" == "skipped" ]]; then
+            echo "| Gateway | ⏭️ Skipped | No relevant changes |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Gateway | ❌ Failed | Error in build/deploy |" >> $GITHUB_STEP_SUMMARY
+          fi
