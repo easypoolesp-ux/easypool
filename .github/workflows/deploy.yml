@@ -134,7 +134,7 @@ jobs:
           GCP_PROJECT="${{ env.PROJECT_ID }}"
           # Check if we are on staging branch
           if [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
-            GCP_PROJECT="${{ secrets.STAGING_PROJECT_ID || env.PROJECT_ID }}"
+            GCP_PROJECT="${{ secrets.STAGING_PROJECT_ID || 'easypool-staging-v2' }}"
           fi
 
           # Deploy Multi-Container Service
