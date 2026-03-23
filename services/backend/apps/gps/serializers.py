@@ -12,15 +12,29 @@ class GPSPointSerializer(serializers.ModelSerializer):
 
 
 class GPSLatestSerializer(serializers.ModelSerializer):
+    location = serializers.SerializerMethodField()
+
     class Meta:
         model = GPSPoint
-        fields = ('bus', 'lat', 'lng', 'speed', 'heading', 'timestamp', 'ignition')
+        fields = ('bus', 'lat', 'lng', 'location', 'speed', 'heading', 'timestamp', 'ignition')
+
+    def get_location(self, obj):
+        if obj.location:
+            return {"type": "Point", "coordinates": [obj.location.x, obj.location.y]}
+        return None
 
 
 class GPSPlaybackSerializer(serializers.ModelSerializer):
+    location = serializers.SerializerMethodField()
+
     class Meta:
         model = GPSPoint
-        fields = ('lat', 'lng', 'speed', 'timestamp', 'ignition')
+        fields = ('lat', 'lng', 'location', 'speed', 'timestamp', 'ignition')
+
+    def get_location(self, obj):
+        if obj.location:
+            return {"type": "Point", "coordinates": [obj.location.x, obj.location.y]}
+        return None
 
 
 class AlertSerializer(serializers.ModelSerializer):

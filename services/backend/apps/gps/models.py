@@ -12,14 +12,20 @@ from apps.schools.models import User
 class GPSPoint(models.Model):
     id = models.BigAutoField(primary_key=True)
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='gps_points')
-    lat = models.FloatField()
-    lng = models.FloatField()
-    location = gis_models.PointField(null=True, blank=True, srid=4326)
+    location = gis_models.PointField(srid=4326)  # No longer null
     speed = models.FloatField(default=0)
     heading = models.FloatField(default=0, help_text='Direction of travel in degrees (0-360)')
     accuracy = models.FloatField(null=True, blank=True)
     timestamp = models.DateTimeField()
     ignition = models.BooleanField(default=False)
+
+    @property
+    def lat(self):
+        return self.location.y if self.location else None
+
+    @property
+    def lng(self):
+        return self.location.x if self.location else None
 
     class Meta:
         ordering = ['-timestamp']
@@ -29,9 +35,6 @@ class GPSPoint(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        # Automatically sync location if lat/lng are present but location is not
-        if (self.lat and self.lng) and not self.location:
-            self.location = Point(self.lng, self.lat)
         super().save(*args, **kwargs)
 
     def __str__(self):

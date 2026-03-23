@@ -30,6 +30,7 @@ interface Bus {
   computed_status?: string; // derived: moving | idle | no_signal | offline
   lat: number;
   lng: number;
+  location?: { type: string; coordinates: [number, number] };
   plate_number?: string;
   route_name?: string;
   speed?: number;
@@ -39,6 +40,7 @@ interface Bus {
 interface GPSPoint {
   lat: number;
   lng: number;
+  location?: { type: string; coordinates: [number, number] };
   speed: number;
   timestamp: string;
 }
@@ -235,7 +237,12 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       const effectiveStatus = bus.computed_status || bus.status;
       const color = getStatusColor(effectiveStatus);
       const heading = bus.heading || 0;
-      const pos = { lat: bus.lat, lng: bus.lng };
+      
+      // Use location if available, fallback to lat/lng
+      const pos = bus.location 
+        ? { lat: bus.location.coordinates[1], lng: bus.location.coordinates[0] }
+        : { lat: bus.lat, lng: bus.lng };
+
       const isMoving = effectiveStatus === "moving";
 
       // Generate a state hash to skip redundant Google Maps DOM/Canvas updates
@@ -425,7 +432,9 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     }
 
     const pt = historyPoints[playbackIndex];
-    const pos = { lat: pt.lat, lng: pt.lng };
+    const pos = pt.location
+      ? { lat: pt.location.coordinates[1], lng: pt.location.coordinates[0] }
+      : { lat: pt.lat, lng: pt.lng };
 
     if (!historyMarkerRef.current) {
       historyMarkerRef.current = new google.maps.Marker({
@@ -487,7 +496,12 @@ export default function FleetMap({ buses, initialBusId }: Props) {
   useEffect(() => {
     if (isHistoryMode && historyPoints.length > 0 && mapRef.current) {
       const bounds = new google.maps.LatLngBounds();
-      historyPoints.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
+      historyPoints.forEach((p) => {
+        const pos = p.location
+          ? { lat: p.location.coordinates[1], lng: p.location.coordinates[0] }
+          : { lat: p.lat, lng: p.lng };
+        bounds.extend(pos);
+      });
       mapRef.current.setOptions({ maxZoom: 15 });
       mapRef.current.fitBounds(bounds, 50);
       google.maps.event.addListenerOnce(mapRef.current, "idle", () => {
@@ -589,7 +603,11 @@ export default function FleetMap({ buses, initialBusId }: Props) {
           Array.from(liveTrails.values()).map((trail, i) => (
             <Polyline
               key={`trail-${i}`}
-              path={trail.map((p) => ({ lat: p.lat, lng: p.lng }))}
+              path={trail.map((p) => 
+                p.location 
+                  ? { lat: p.location.coordinates[1], lng: p.location.coordinates[0] }
+                  : { lat: p.lat, lng: p.lng }
+              )}
               options={{
                 strokeColor: "#3b82f6",
                 strokeOpacity: 0,
@@ -612,7 +630,11 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         {/* History playback line */}
         {isHistoryMode && historyPoints.length > 1 && (
           <Polyline
-            path={historyPoints.map((p) => ({ lat: p.lat, lng: p.lng }))}
+            path={historyPoints.map((p) => 
+              p.location 
+                ? { lat: p.location.coordinates[1], lng: p.location.coordinates[0] }
+                : { lat: p.lat, lng: p.lng }
+            )}
             options={{
               strokeColor: "#3b82f6",
               strokeWeight: 3,

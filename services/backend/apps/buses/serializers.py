@@ -30,6 +30,8 @@ class BusListSerializer(serializers.ModelSerializer):
 
     permission_level = serializers.SerializerMethodField()
 
+    location = serializers.SerializerMethodField()
+
     class Meta:
         model = Bus
         fields = (
@@ -40,6 +42,7 @@ class BusListSerializer(serializers.ModelSerializer):
             'computed_status',
             'lat',
             'lng',
+            'location',
             'speed',
             'heading',
             'route_name',
@@ -48,6 +51,14 @@ class BusListSerializer(serializers.ModelSerializer):
             'last_heartbeat',
             'permission_level',
         )
+
+    def get_location(self, obj):
+        # We use the annotated latest_lat/lng or the property
+        lat = getattr(obj, 'latest_lat', None)
+        lng = getattr(obj, 'latest_lng', None)
+        if lat is not None and lng is not None:
+            return {"type": "Point", "coordinates": [lng, lat]}
+        return None
 
     @extend_schema_field(serializers.CharField())
     def get_permission_level(self, obj):
@@ -74,6 +85,11 @@ class BusListSerializer(serializers.ModelSerializer):
             return 'no_signal'
 
         speed = float(getattr(obj, 'latest_speed', 0) or 0)
+        ignition = getattr(obj, 'latest_ignition', True)
+
+        if not ignition:
+            return 'ignition_off'
+
         return 'moving' if speed > 2 else 'idle'
 
 

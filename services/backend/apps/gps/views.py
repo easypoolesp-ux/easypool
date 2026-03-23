@@ -3,6 +3,8 @@ from rest_framework import decorators, permissions, response, viewsets
 from apps.buses.models import Bus
 from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin, apply_isolation
 
+from django.contrib.gis.geos import Point
+
 from .models import Alert, GPSPoint
 from .serializers import (
     AlertSerializer,
@@ -91,11 +93,12 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             speed = float(request.data.get('speed', 0))
             heading = float(request.data.get('heading', 0))
             ignition = request.data.get('ignition', False)
+            if isinstance(ignition, str):
+                ignition = ignition.lower() == 'true'
 
             GPSPoint.objects.create(
                 bus=bus,
-                lat=lat,
-                lng=lng,
+                location=Point(lng, lat),
                 speed=speed,
                 heading=heading,
                 ignition=ignition,

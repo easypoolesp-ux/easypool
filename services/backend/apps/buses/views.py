@@ -3,6 +3,7 @@ import json
 import redis
 from django.conf import settings
 from django.db.models import OuterRef, Subquery
+from django.contrib.gis.db.models.functions import X, Y
 from django.http import StreamingHttpResponse
 from rest_framework import decorators, response, viewsets
 
@@ -52,11 +53,12 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
         latest_gps = GPSPoint.objects.filter(bus=OuterRef('pk')).order_by('-timestamp')
 
         return queryset.select_related('route', 'organisation').prefetch_related('allocations').annotate(
-            latest_lat=Subquery(latest_gps.values('lat')[:1]),
-            latest_lng=Subquery(latest_gps.values('lng')[:1]),
+            latest_lat=Subquery(latest_gps.annotate(y=Y('location')).values('y')[:1]),
+            latest_lng=Subquery(latest_gps.annotate(x=X('location')).values('x')[:1]),
             latest_speed=Subquery(latest_gps.values('speed')[:1]),
             latest_heading=Subquery(latest_gps.values('heading')[:1]),
             latest_heartbeat=Subquery(latest_gps.values('timestamp')[:1]),
+            latest_ignition=Subquery(latest_gps.values('ignition')[:1]),
         )
 
     permission_classes = [IsAdmin | IsManager | IsViewer]
