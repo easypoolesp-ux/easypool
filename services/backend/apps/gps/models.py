@@ -1,7 +1,7 @@
 import uuid
 # Trigger: Spatial Migration Build (Unblocked CI)
 
-from django.contrib.postgres.indexes import BrinIndex
+from django.contrib.postgres.indexes import BrinIndex, GistIndex
 from django.db import models
 from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import Point
@@ -31,8 +31,8 @@ class GPSPoint(models.Model):
     class Meta:
         ordering = ['-timestamp']
         indexes = [
-            models.Index(fields=['bus', '-timestamp']),
-            BrinIndex(fields=['timestamp']),
+            BrinIndex(fields=['timestamp'], name='gps_gpspoin_timesta_eb9802_brin'),
+            GistIndex(fields=['location'], name='gps_location_gist'),
         ]
 
     def save(self, *args, **kwargs):
