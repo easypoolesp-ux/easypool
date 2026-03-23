@@ -22,7 +22,9 @@ async function apiFetch<T>(
   });
 
   if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  // Handle DRF pagination: return 'results' if it exists, otherwise the data itself
+  return data.results !== undefined ? data.results : data;
 }
 
 export const fetchBuses = () => apiFetch<BusList[]>("/api/buses");

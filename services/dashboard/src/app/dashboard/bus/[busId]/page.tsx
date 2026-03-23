@@ -114,7 +114,8 @@ export default function BusDetailPage({ params }: Props) {
     lat: (bus as any).lat,
     lng: (bus as any).lng,
     location: (bus as any).location,
-    plate: bus.plate_number,
+    plate_number: bus.plate_number,
+    route_name: bus.route?.name || "Unassigned",
   };
 
   const recordings = [

@@ -111,7 +111,7 @@ export default function KmChart({ data, isLoading }: Props) {
         });
         seriesMap.current.set(bus.bus_id, series);
       }
-      series.setData(chartData);
+      series.setData(chartData as any);
     });
 
     if (data.length > 0) chart.timeScale().fitContent();

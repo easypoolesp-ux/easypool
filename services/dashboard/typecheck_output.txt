@@ -1,0 +1,11 @@
+
+> dashboard@0.1.0 typecheck
+> tsc --noEmit
+
+src/app/dashboard/bus/[busId]/page.tsx(419,35): error TS2322: Type '{ id: any; internal_id: string; status: "idle" | "online" | "offline"; lat: any; lng: any; location: any; plate: string; }' is not assignable to type 'Bus'.
+  Type '{ id: any; internal_id: string; status: "idle" | "online" | "offline"; lat: any; lng: any; location: any; plate: string; }' is missing the following properties from type '{ readonly id: string; internal_id: string; plate_number: string; status?: "idle" | "online" | "offline" | undefined; readonly lat: number; readonly lng: number; readonly route_name: string; driver_name?: string | undefined; }': plate_number, route_name
+src/components/analytics/KmChart.tsx(114,22): error TS2345: Argument of type 'ChartPoint[]' is not assignable to parameter of type '(LineData<Time> | WhitespaceData<Time>)[]'.
+  Type 'ChartPoint' is not assignable to type 'LineData<Time> | WhitespaceData<Time>'.
+    Type 'ChartPoint' is not assignable to type 'LineData<Time>'.
+      Types of property 'time' are incompatible.
+        Type 'number' is not assignable to type 'Time'.
