@@ -6,10 +6,10 @@ import redis.asyncio as redis
 import json
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://backend-api/api/gps/telemetry")
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "https://easypool-backend-ihsu77lpaa-el.a.run.app/api/gps/telemetry")
 API_KEY = os.getenv("GPS_SERVICE_API_KEY", "easypool_gps_secret_2026")
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", 5027))
-REDIS_URL = os.getenv("REDIS_URL", "redis://:easypool_live_redis_2026@127.0.0.1:6379/0")
+REDIS_URL = os.getenv("REDIS_URL", "redis://:easypool_live_redis_2026@10.128.0.2:6379/0")
 
 # ── Global Clients ────────────────────────────────────────────────────────────
 redis_client = None
@@ -22,17 +22,20 @@ IGNITION_IO_IDS = {239, 1}
 async def init_clients():
     global redis_client, http_session
     try:
+        # decode_responses=True is essential for string handling
         redis_client = redis.from_url(REDIS_URL, decode_responses=True)
         await redis_client.ping()
         print(f"[REDIS] Connected to {REDIS_URL}")
+        
+        timeout = aiohttp.ClientTimeout(total=5)
+        http_session = aiohttp.ClientSession(
+            timeout=timeout, headers={"X-API-KEY": API_KEY}
+        )
+        print("[HTTP] Session initialized")
     except Exception as e:
-        print(f"[ERROR] Redis failed: {e}")
+        print(f"[ERROR] Initialization failed: {e}")
         redis_client = None
-
-    timeout = aiohttp.ClientTimeout(total=5)
-    http_session = aiohttp.ClientSession(
-        timeout=timeout, headers={"X-API-KEY": API_KEY}
-    )
+        http_session = None
 
 
 def parse_codec8_packet(packet: bytes):
@@ -41,60 +44,39 @@ def parse_codec8_packet(packet: bytes):
         if len(packet) < 26:
             return None
 
-        codec_id = packet[0]
-        num_records = packet[1]
-        if num_records == 0:
-            return None
-
+        # Basic Codec 8 Check
+        # packet[0] = Codec ID (8 or 8E)
+        # packet[1] = Number of Data records
         ts_raw = struct.unpack(">Q", packet[2:10])[0]
         lng_raw = struct.unpack(">i", packet[11:15])[0]
         lat_raw = struct.unpack(">i", packet[15:19])[0]
+        alt = struct.unpack(">H", packet[19:21])[0]
         angle = struct.unpack(">H", packet[21:23])[0]
+        sat = packet[23]
         speed = struct.unpack(">H", packet[24:26])[0]
 
-        lat = lat_raw / 10_000_000.0
-        lng = lng_raw / 10_000_000.0
+        lat = lat_raw / 10000000.0
+        lng = lng_raw / 10000000.0
         timestamp = ts_raw / 1000.0
 
-        io_base = 26
+        # IO Elements (simplified check for ignition)
         ignition = False
-
-        if codec_id == 0x8E:
-            if io_base + 4 <= len(packet):
-                pos = io_base + 4
-                for val_size in (1, 2, 4, 8):
-                    if pos + 2 > len(packet):
-                        break
-                    n = struct.unpack(">H", packet[pos : pos + 2])[0]
-                    pos += 2
-                    for _ in range(n):
-                        if pos + 2 + val_size > len(packet):
-                            break
-                        io_id = struct.unpack(">H", packet[pos : pos + 2])[0]
-                        io_val = int.from_bytes(
-                            packet[pos + 2 : pos + 2 + val_size], "big"
-                        )
-                        pos += 2 + val_size
-                        if io_id in IGNITION_IO_IDS:
-                            ignition = bool(io_val)
-        else:
-            if io_base + 2 <= len(packet):
-                pos = io_base + 2
-                for val_size in (1, 2, 4, 8):
-                    if pos + 1 > len(packet):
-                        break
-                    n = packet[pos]
-                    pos += 1
-                    for _ in range(n):
-                        if pos + 1 + val_size > len(packet):
-                            break
-                        io_id = packet[pos]
-                        io_val = int.from_bytes(
-                            packet[pos + 1 : pos + 1 + val_size], "big"
-                        )
-                        pos += 1 + val_size
-                        if io_id in IGNITION_IO_IDS:
-                            ignition = bool(io_val)
+        pos = 26
+        if pos + 1 <= len(packet):
+            # Event ID (1 byte)
+            # Total IO count (1 byte)
+            pos += 2 
+            for val_size in (1, 2, 4, 8):
+                if pos + 1 > len(packet): break
+                n = packet[pos] # Count of IOs with this size
+                pos += 1
+                for _ in range(n):
+                    if pos + 1 + val_size > len(packet): break
+                    io_id = packet[pos]
+                    io_val = int.from_bytes(packet[pos+1 : pos+1+val_size], "big")
+                    pos += 1 + val_size
+                    if io_id in IGNITION_IO_IDS:
+                        ignition = bool(io_val)
 
         return {
             "lat": lat,
@@ -121,7 +103,6 @@ async def forward_to_backend(imei: str, data: dict):
     }
 
     # 1. Path A: Instant Live Hub (Redis Pub/Sub)
-    # This keeps the map 100% real-time regardless of DB batching.
     if redis_client:
         try:
             payload_str = json.dumps(payload)
@@ -131,6 +112,7 @@ async def forward_to_backend(imei: str, data: dict):
             await redis_client.lpush('gps_offline_queue', payload_str)
         except Exception as e:
             print(f"[ERROR] Redis push failed: {e}")
+
 
 async def sync_queue_to_backend():
     """Smarter background task with Adaptive Batching."""
@@ -143,39 +125,34 @@ async def sync_queue_to_backend():
             continue
             
         try:
-            # Check queue pressure
             q_len = await redis_client.llen('gps_offline_queue')
             if q_len == 0:
-                await asyncio.sleep(2) # Relaxed wait when idle
+                await asyncio.sleep(2)
                 continue
 
-            # Intelligence: Scale batch size based on pressure
-            # If queue is flooding (>500), clear it faster with larger batches
+            # Adaptive Batching
             batch_size = 200 if q_len > 500 else 50
             
-            # Multi-pop from Redis (efficient chunking)
-            # Note: r.lpop with count=N returns a list of values
-            batch_data = await redis_client.rpop('gps_offline_queue', count=batch_size)
-            if not batch_data:
+            # Multi-pop
+            items = await redis_client.rpop('gps_offline_queue', count=batch_size)
+            if not items:
                 continue
 
-            # Ensure we treat single result (if older redis version) as list
-            if isinstance(batch_data, str):
-                batch_data = [batch_data]
-
-            payload_batch = [json.loads(p) for p in batch_data]
+            if isinstance(items, (str, bytes)):
+                items = [items]
             
-            # Try sending bulk to backend
+            payload_batch = [json.loads(p) for p in items]
+            
+            # Send bulk to backend
             async with http_session.post(bulk_url, json=payload_batch) as resp:
                 if resp.status not in [200, 201]:
-                    print(f"[ERROR] Bulk Backend returned {resp.status}, requeuing {len(payload_batch)} items...")
-                    # Re-queue items in reverse order to preserve time-sequence as much as possible
-                    for p_str in reversed(batch_data):
+                    print(f"[ERROR] Bulk Backend returned {resp.status}, requeuing...")
+                    for p_str in reversed(items):
                         await redis_client.rpush('gps_offline_queue', p_str)
                     await asyncio.sleep(5) 
                 else:
                     if q_len > 500:
-                        print(f"[SYNC] Processed high-pressure batch: {len(payload_batch)} items")
+                        print(f"[SYNC] Flushed large batch: {len(payload_batch)} items")
         except Exception as e:
             print(f"[ERROR] Sync task failed: {e}")
             await asyncio.sleep(5)
@@ -191,63 +168,48 @@ async def handle_bus(reader, writer):
         # Handshake: IMEI Receipt
         try:
             first = await asyncio.wait_for(reader.read(1024), timeout=60)
-            if not first:
-                return
+            if not first: return
 
             if len(first) == 15 and first.isdigit():
                 imei = first.decode()
             elif len(first) > 2:
                 # Teltonika sends 2B length + IMEI string
-                imei_len = struct.unpack(">H", first[:2])[0]
-                imei = (
-                    first[2:].decode()
-                    if imei_len == len(first) - 2
-                    else first.decode()[-15:]
-                )
+                imei_raw = first[2:17]
+                if len(imei_raw) == 15:
+                    imei = imei_raw.decode()
+            
+            if imei:
+                print(f"[AUTH] {imei} identified")
+                writer.write(b'\x01') # Accept connection
+                await writer.drain()
             else:
+                print(f"[AUTH-FAIL] Could not identify {addr}")
                 return
 
-            print(f"[HANDSHAKE] IMEI={imei} from {addr}")
-            writer.write(b"\x01")
-            await writer.drain()
         except asyncio.TimeoutError:
-            print(f"[TIMEOUT] Handshake timed out from {addr}")
+            print(f"[TIMEOUT] No handshake from {addr}")
             return
 
-        # Data Loop
+        # Data Stream
         while True:
             try:
-                prefix = await asyncio.wait_for(reader.read(8), timeout=60)
-                if not prefix or len(prefix) < 8:
-                    break
-
-                data_len = struct.unpack(">I", prefix[4:8])[0]
-                raw = b""
-                while len(raw) < data_len + 4:
-                    chunk = await reader.read((data_len + 4) - len(raw))
-                    if not chunk:
-                        break
-                    raw += chunk
-
-                if len(raw) < data_len + 4:
-                    break
-
-                body = raw[:-4]
-                num_records = body[1]
-                writer.write(struct.pack(">I", num_records))
-                await writer.drain()
-
-                parsed = parse_codec8_packet(body)
-                if parsed:
-                    # Fire-and-forget forwarding (doesn't wait for backend to process next packet)
-                    asyncio.create_task(forward_to_backend(imei, parsed))
-
+                data = await asyncio.wait_for(reader.read(1024), timeout=120)
+                if not data: break
+                
+                # Teltonika packets usually start with 4 bytes of 0s
+                # Then 4 bytes of length, then Codec, then Data...
+                if len(data) > 12 and data[0:4] == b'\x00\x00\x00\x00':
+                    # Extract body (Codec ID onwards)
+                    body = data[8:-4] 
+                    parsed = parse_codec8_packet(body)
+                    if parsed:
+                        asyncio.create_task(forward_to_backend(imei, parsed))
+                
             except asyncio.TimeoutError:
-                print(f"[TIMEOUT] No data from {imei or addr} for 60s.")
                 break
 
     except Exception as exc:
-        print(f"[ERROR] Connection {imei or addr}: {exc}")
+        print(f"[ERROR] Session {imei or addr}: {exc}")
     finally:
         print(f"[DISCONN] {imei or addr} disconnected")
         writer.close()
@@ -258,9 +220,7 @@ async def run_gateway():
     await init_clients()
     asyncio.create_task(sync_queue_to_backend())
     server = await asyncio.start_server(handle_bus, '0.0.0.0', GATEWAY_PORT)
-    addr = server.sockets[0].getsockname()
-    print(f"[START] AsyncIO Gateway on {addr}")
-
+    print(f"[START] GPS Gateway on port {GATEWAY_PORT}")
     async with server:
         await server.serve_forever()
 

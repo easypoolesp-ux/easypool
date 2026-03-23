@@ -99,16 +99,15 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Run Migrations
         run: |
-          # Deploy job definition only if image hash changed (gcloud handles idempotency)
           gcloud run jobs deploy backend-migrate \
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
             --command "python,manage.py,migrate" \
-            --set-env-vars "DB_NAME=bustrak,DB_USER=admin,DB_HOST=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres,DB_PORT=5432,DB_ENGINE=django.contrib.gis.db.backends.postgis,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
+            --set-env-vars "BYPASS_PGBOUNCER=True,DB_NAME=bustrak,DB_USER=admin,DB_HOST=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres,DB_PORT=5432,DB_ENGINE=django.contrib.gis.db.backends.postgis,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
             --set-secrets "SECRET_KEY=django-secret-key:latest,REDIS_URL=redis-url:latest,DB_PASSWORD=db-password:latest" \
             --set-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
-            --vpc-connector "projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/easypool-vpcc-v2" \
+            --vpc-connector "projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/easypool-vpcc" \
             --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
             --quiet
           gcloud run jobs execute backend-migrate \
@@ -130,13 +129,6 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Deploy Backend to Cloud Run
         run: |
-          # Define environment variables (shared or per-container)
-          GCP_PROJECT="${{ env.PROJECT_ID }}"
-          # Check if we are on staging branch
-          if [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
-            GCP_PROJECT="${{ secrets.STAGING_PROJECT_ID || 'easypool-staging-v2' }}"
-          fi
-
           # Deploy Multi-Container Service
           gcloud run deploy easypool-backend \
             --container backend \
@@ -147,11 +139,13 @@ jobs:
             --container pgbouncer \
               --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:latest \
               --port 6432 \
+              --set-env-vars "DB_PASSWORD_DUMMY=placeholder" \
+              --set-secrets "DB_PASSWORD=db-password:latest" \
             --region ${{ env.REGION }} \
-            --project ${GCP_PROJECT} \
-            --add-cloudsql-instances "${GCP_PROJECT}:${{ env.REGION }}:easypool-postgres" \
-            --vpc-connector "projects/${GCP_PROJECT}/locations/${{ env.REGION }}/connectors/easypool-vpcc-v2" \
-            --service-account "easypool-backend-sa@${GCP_PROJECT}.iam.gserviceaccount.com" \
+            --project ${{ env.PROJECT_ID }} \
+            --add-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
+            --vpc-connector "projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/easypool-vpcc" \
+            --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
             --cpu-boost \
             --quiet
 
