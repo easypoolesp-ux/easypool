@@ -13,6 +13,8 @@ gunicorn==21.2.0
 python-decouple==3.8
 pgvector==0.2.4
 whitenoise==6.6.0
+google-auth==2.23.4
+requests==2.31.0
 
 drf-spectacular==0.26.5
 django-filter==23.3
