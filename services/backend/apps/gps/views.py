@@ -1,4 +1,5 @@
 from django.contrib.gis.geos import Point
+from django.contrib.gis.measure import D  # noqa: F401 — available for future geo-filters
 from rest_framework import decorators, permissions, response, viewsets
 
 from apps.buses.models import Bus
@@ -75,6 +76,78 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(timestamp__date=timezone.now().date())
 
         return response.Response(GPSPlaybackSerializer(qs.order_by('timestamp'), many=True).data)
+
+    @decorators.action(detail=False, methods=['get'], permission_classes=[IsManager | IsViewer])
+    def timeline(self, request):
+        """Return cumulative KM series per bus, computed in PostGIS.
+
+        PostgreSQL computes ST_Distance between consecutive points using a LAG
+        window function — the browser receives ready-to-plot {timestamp, km} pairs.
+
+        Query params:
+          start  ISO date (default: today)
+          end    ISO date (default: start)
+          bus    comma-separated bus IDs (optional)
+        """
+        from django.db import connection
+        from django.utils import timezone
+        from django.utils.dateparse import parse_date
+
+        today = timezone.now().date()
+        start_date = parse_date(request.query_params.get('start', '')) or today
+        end_date   = parse_date(request.query_params.get('end',   '')) or start_date
+
+        if end_date < start_date:
+            return response.Response({'error': 'end must be >= start'}, status=400)
+
+        buses = apply_isolation(request.user, Bus.objects.all())
+        bus_filter = request.query_params.get('bus')
+        if bus_filter:
+            ids = [b.strip() for b in bus_filter.split(',') if b.strip()]
+            buses = buses.filter(id__in=ids)
+
+        result = []
+        for bus in buses.distinct():
+            # Compute cumulative distance (metres → km) entirely in PostGIS.
+            # ST_Distance on geography columns gives true geodesic metres.
+            sql = """
+                SELECT
+                    timestamp,
+                    ROUND(
+                        CAST(
+                            SUM(
+                                COALESCE(
+                                    ST_Distance(
+                                        location::geography,
+                                        LAG(location::geography) OVER (ORDER BY timestamp)
+                                    ),
+                                    0
+                                )
+                            ) OVER (ORDER BY timestamp) / 1000.0
+                        AS numeric), 3
+                    ) AS cumulative_km
+                FROM gps_gpspoint
+                WHERE bus_id = %s
+                  AND timestamp::date BETWEEN %s AND %s
+                ORDER BY timestamp
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(sql, [bus.id, start_date, end_date])
+                rows = cursor.fetchall()
+
+            if not rows:
+                continue
+
+            result.append({
+                'bus_id': str(bus.id),
+                'internal_id': bus.internal_id,
+                'series': [
+                    {'timestamp': row[0].isoformat(), 'cumulative_km': float(row[1])}
+                    for row in rows
+                ],
+            })
+
+        return response.Response(result)
 
     @decorators.action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def telemetry(self, request):

@@ -155,6 +155,12 @@ export default function DashboardPage() {
               <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Fleet Overview
               </h1>
+              <Link
+                href="/dashboard/analytics"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-blue-500/10 border border-blue-500/25 text-blue-400 hover:bg-blue-500/20 transition-all"
+              >
+                📈 Analytics
+              </Link>
             </div>
           </div>
         </div>
