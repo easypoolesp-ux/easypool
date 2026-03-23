@@ -1,4 +1,4 @@
-# Final trigger for production deployment verification after idempotent job fix
+# Final trigger for production deployment verification after port 8080 alignment
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D  # noqa: F401 — available for future geo-filters
 from rest_framework import decorators, permissions, response, viewsets
