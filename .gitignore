@@ -15,7 +15,14 @@ gcloud_logs.json
 *.json.log
 .terraform/
 .terragrunt-cache/
-infra/
+# Ignore Terraform state and generated files, but TRACK .hcl source configs
+infra/**/.terraform/
+infra/**/.terragrunt-cache/
+infra/**/*.tfstate
+infra/**/*.tfstate.backup
+infra/**/*.tfvars
+infra/**/terraform.tfvars.json
+infra/**/.terraform.lock.hcl
 
 # Personal local files
 .env
