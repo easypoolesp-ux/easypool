@@ -1,1 +1,1 @@
-"admin" "adminpassword"
+"admin" "${DB_PASSWORD}"
