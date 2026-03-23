@@ -83,7 +83,7 @@ DATABASES = {
         'ENGINE': config('DB_ENGINE', default='django.contrib.gis.db.backends.postgis'),
         'NAME': config('DB_NAME', default='bustrak'),
         'USER': config('DB_USER', default='easypool-backend-sa@project-05588bf2-f685-4769-a37.iam'),
-        'PASSWORD': get_iam_token,
+        'PASSWORD': get_iam_token(),
         'HOST': config('DB_HOST', default='db'),
         'PORT': config('DB_PORT', default='5432'),
         'CONN_MAX_AGE': 60,
