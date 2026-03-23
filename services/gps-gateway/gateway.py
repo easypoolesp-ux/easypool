@@ -6,10 +6,15 @@ import redis.asyncio as redis
 import json
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-BACKEND_API_URL = os.getenv("BACKEND_API_URL", "https://easypool-backend-ihsu77lpaa-el.a.run.app/api/gps/")
-API_KEY = os.getenv("GPS_SERVICE_API_KEY", "easypool_gps_secret_2026")
-GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", 5027))
-REDIS_URL = os.getenv("REDIS_URL", "redis://:easypool_live_redis_2026@127.0.0.1:6379/0")
+# BASE_URL must end with /api/gps/ -- the script appends the action name perfectly.
+BACKEND_BASE_URL = os.getenv("BACKEND_API_URL", "https://easypool-backend-222076803846.asia-south1.run.app/api/gps/")
+API_KEY          = os.getenv("GPS_SERVICE_API_KEY", "easypool_gps_secret_2026")
+GATEWAY_PORT     = int(os.getenv("GATEWAY_PORT", 5027))
+REDIS_URL        = os.getenv("REDIS_URL", "redis://:easypool_live_redis_2026@127.0.0.1:6379/0")
+
+# API Endpoints (Derived from openapi.yaml SSOT)
+ENDPOINT_TELEMETRY      = "telemetry/"
+ENDPOINT_BULK_TELEMETRY = "bulk_telemetry/"
 
 # ── Global Clients ────────────────────────────────────────────────────────────
 redis_client = None
@@ -117,7 +122,6 @@ async def forward_to_backend(imei: str, data: dict):
 async def sync_queue_to_backend():
     """Smarter background task with Adaptive Batching."""
     print("[SYNC] Started high-performance adaptive sync")
-    bulk_url = BACKEND_API_URL.rstrip('/') + "/bulk/"
     
     while True:
         if not redis_client or not http_session:
@@ -143,8 +147,12 @@ async def sync_queue_to_backend():
             
             payload_batch = [json.loads(p) for p in items]
             
-            # Send bulk to backend
-            async with http_session.post(bulk_url, json=payload_batch) as resp:
+            async with http_session.post(
+            BACKEND_BASE_URL.rstrip('/') + "/" + ENDPOINT_BULK_TELEMETRY,
+            json=payload_batch,
+            headers={"X-API-KEY": API_KEY},
+            timeout=10
+        ) as resp:
                 if resp.status not in [200, 201]:
                     print(f"[ERROR] Bulk Backend returned {resp.status}, requeuing...")
                     for p_str in reversed(items):

@@ -118,6 +118,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Universal API for school bus tracking, attendance, and video monitoring.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'PROJECT_PATH': os.path.join(BASE_DIR, 'openapi.yaml'),
 }
 
 # CORS Configuration

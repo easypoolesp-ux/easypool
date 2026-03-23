@@ -51,9 +51,7 @@ const getLatLng = (obj: { lat?: number; lng?: number; location?: { coordinates: 
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://easypool-backend-222076803846.asia-south1.run.app";
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const MAP_CENTER = { lat: 22.5726, lng: 88.3639 };
 const LIBRARIES: ("marker" | "maps" | "places")[] = ["marker"];
 

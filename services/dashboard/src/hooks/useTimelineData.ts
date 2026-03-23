@@ -1,9 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { KmPoint } from "@/lib/geoUtils";
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://easypool-backend-222076803846.asia-south1.run.app";
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export interface BusTimeline {
   bus_id: string;

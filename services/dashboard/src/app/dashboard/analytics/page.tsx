@@ -10,9 +10,7 @@ import SummaryStats from "@/components/analytics/SummaryStats";
 // KmChart uses browser-only APIs (ResizeObserver + canvas) — load client-side only
 const KmChart = dynamic(() => import("@/components/analytics/KmChart"), { ssr: false });
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://easypool-backend-222076803846.asia-south1.run.app";
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 interface BusOption { id: string; internal_id: string }
 

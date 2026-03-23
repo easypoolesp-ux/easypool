@@ -570,6 +570,72 @@ paths:
               schema:
                 $ref: '#/components/schemas/GPSPoint'
           description: ''
+  /api/gps/telemetry/:
+    post:
+      operationId: gps_telemetry_create
+      description: Update GPS point for a bus (called by TCP gateway).
+      parameters:
+      - in: header
+        name: X-API-KEY
+        schema:
+          type: string
+        required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                imei: {type: string}
+                lat: {type: number}
+                lng: {type: number}
+                speed: {type: number}
+                heading: {type: number}
+                ignition: {type: boolean}
+                timestamp: {type: number}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string}
+          description: ''
+  /api/gps/bulk_telemetry/:
+    post:
+      operationId: gps_bulk_telemetry_create
+      description: Batch update for GPS points (called by smarter Gateway).
+      parameters:
+      - in: header
+        name: X-API-KEY
+        schema:
+          type: string
+        required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  imei: {type: string}
+                  coords: {type: array, items: {type: number}, minItems: 2, maxItems: 2}
+                  speed: {type: number}
+                  heading: {type: number}
+                  ignition: {type: boolean}
+                  timestamp: {type: number}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string}
+                  count: {type: integer}
+          description: ''
   /api/gps/latest/:
     get:
       operationId: gps_latest_retrieve
