@@ -66,14 +66,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 # Database configuration
+BYPASS_PGBOUNCER = config('BYPASS_PGBOUNCER', default=False, cast=bool)
+
 DATABASES = {
     'default': {
         'ENGINE': config('DB_ENGINE', default='django.contrib.gis.db.backends.postgis'),
         'NAME': config('DB_NAME', default='bustrak'),
         'USER': config('DB_USER', default='admin'),
         'PASSWORD': config('DB_PASSWORD', default='adminpassword'),
-        'HOST': config('DB_HOST', default='127.0.0.1'),
-        'PORT': config('DB_PORT', default='6432'),
+        'HOST': config('DB_HOST', default='/cloudsql/project-05588bf2-f685-4769-a37:asia-south1:easypool-postgres' if BYPASS_PGBOUNCER else '127.0.0.1'),
+        'PORT': config('DB_PORT', default='5432' if BYPASS_PGBOUNCER else '6432'),
         'CONN_MAX_AGE': 0,
     }
 }
