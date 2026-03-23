@@ -12,6 +12,7 @@ import {
   Crosshair,
   Maximize,
   Unlock,
+  FastForward,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { MONOCHROME_DARK, MONOCHROME_LIGHT, DARK_DEFAULT } from "./mapStyles";
@@ -144,6 +145,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     ),
   );
   const [playbackIndex, setPlaybackIndex] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
 
@@ -463,7 +465,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       lastHistoryPosRef.current = pos;
     } else {
       // ── Smooth history movement ──────────────────────────────
-      const ANIM_DURATION = isPlaying ? 450 : 150; // Faster transition for manual scrubbing
+      const ANIM_DURATION = isPlaying ? (500 / playbackSpeed) * 0.9 : 50; // Dynamic duration based on speed
       const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
       if (historyAnimationRef.current)
@@ -559,7 +561,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       setIsPlaying(false);
       return;
     }
-    const t = setInterval(() => setPlaybackIndex((v) => v + 1), 500);
+    const t = setInterval(() => setPlaybackIndex((v) => v + 1), 500 / playbackSpeed);
     return () => clearInterval(t);
   }, [isPlaying, playbackIndex, historyPoints]);
 
@@ -793,6 +795,26 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     ) : (
                       <Play size={18} fill="currentColor" />
                     )}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const speeds = [1, 2, 4, 8];
+                      const nextIndex =
+                        (speeds.indexOf(playbackSpeed) + 1) % speeds.length;
+                      setPlaybackSpeed(speeds[nextIndex]);
+                    }}
+                    className="p-3 bg-slate-800/80 hover:bg-slate-700 text-white rounded-2xl shadow-lg transition-all active:scale-95 flex items-center gap-1.5 border border-white/10"
+                    title={`Playback Speed: x${playbackSpeed}`}
+                  >
+                    <FastForward
+                      size={16}
+                      fill={playbackSpeed > 1 ? "currentColor" : "none"}
+                      className={playbackSpeed > 1 ? "text-blue-400" : "text-white"}
+                    />
+                    <span className="text-[11px] font-black w-5 tracking-tighter">
+                      x{playbackSpeed}
+                    </span>
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-black text-blue-300 truncate">

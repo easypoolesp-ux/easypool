@@ -9,18 +9,6 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-development-key')
 DEBUG = config('DEBUG', default=True, cast=bool)
 REDIS_URL = config('REDIS_URL', default='redis://:easypool_live_redis_2026@10.128.0.2:6379/0')
 
-def get_iam_token():
-    """Attempt to get an IAM token for Cloud SQL, fallback to DB_PASSWORD if it fails."""
-    try:
-        import google.auth
-        from google.auth.transport.requests import Request
-        credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/sqlservice.login"])
-        credentials.refresh(Request())
-        return credentials.token
-    except Exception as e:
-        # Fallback to static password if IAM fails
-        return config('DB_PASSWORD', default='')
-
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
@@ -77,20 +65,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
-# DB Configuration (Updated with IAM/Secret Bridge)
-ASGI_APPLICATION = 'config.asgi.application'
-
 # Database configuration
-DB_USER = config('DB_USER', default='easypool-backend-sa@project-05588bf2-f685-4769-a37.iam')
-# If the user is an IAM user, we need to fetch a token as the password
-DB_PASSWORD = get_iam_token() if DB_USER.endswith('.iam') else config('DB_PASSWORD', default='')
-
 DATABASES = {
     'default': {
         'ENGINE': config('DB_ENGINE', default='django.contrib.gis.db.backends.postgis'),
         'NAME': config('DB_NAME', default='bustrak'),
-        'USER': DB_USER,
-        'PASSWORD': DB_PASSWORD,
+        'USER': config('DB_USER', default='admin'),
+        'PASSWORD': config('DB_PASSWORD', default='adminpassword'),
         'HOST': config('DB_HOST', default='db'),
         'PORT': config('DB_PORT', default='5432'),
         'CONN_MAX_AGE': 60,
