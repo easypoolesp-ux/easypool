@@ -1,4 +1,3 @@
-import json
 from datetime import timedelta
 
 from django.utils import timezone
@@ -62,7 +61,7 @@ class BusListSerializer(serializers.ModelSerializer):
                 # This ensures we get the location without complex Subquery functions
                 point = GPSPoint.objects.only('location').get(id=gps_id)
                 if point.location:
-                    return {"type": "Point", "coordinates": [point.location.x, point.location.y]}
+                    return {'type': 'Point', 'coordinates': [point.location.x, point.location.y]}
             except GPSPoint.DoesNotExist:
                 pass
         return None

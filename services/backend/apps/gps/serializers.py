@@ -20,7 +20,7 @@ class GPSLatestSerializer(serializers.ModelSerializer):
 
     def get_location(self, obj):
         if obj.location:
-            return {"type": "Point", "coordinates": [obj.location.x, obj.location.y]}
+            return {'type': 'Point', 'coordinates': [obj.location.x, obj.location.y]}
         return None
 
 
@@ -33,7 +33,7 @@ class GPSPlaybackSerializer(serializers.ModelSerializer):
 
     def get_location(self, obj):
         if obj.location:
-            return {"type": "Point", "coordinates": [obj.location.x, obj.location.y]}
+            return {'type': 'Point', 'coordinates': [obj.location.x, obj.location.y]}
         return None
 
 
