@@ -28,7 +28,11 @@ RUN DB_ENGINE=django.db.backends.dummy python manage.py check
 
 # SAFETY NET 2: Database Integrity
 # Fails the build immediately if someone forgot to run `makemigrations` locally.
-RUN DB_ENGINE=django.db.backends.dummy python manage.py makemigrations --check --dry-run
+RUN DB_ENGINE=django.db.backends.dummy python manage.py makemigrations --check --dry-run || \
+    (echo "--- MIGRATION MISMATCH DETECTED ---" && \
+    echo "The following uncommitted changes were found:" && \
+    DB_ENGINE=django.db.backends.dummy python manage.py makemigrations --dry-run && \
+    exit 1)
 
 EXPOSE 8000
 
