@@ -18,3 +18,4 @@ requests==2.31.0
 
 drf-spectacular==0.26.5
 django-filter==23.3
+uvicorn[standard]==0.24.0

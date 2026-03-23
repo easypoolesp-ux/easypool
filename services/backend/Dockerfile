@@ -36,5 +36,5 @@ RUN DB_ENGINE=django.db.backends.dummy python manage.py makemigrations --check -
 
 EXPOSE 8000
 
-# We run migrations before starting the web server
-CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --threads 4 --worker-class gthread"]
+# We run migrations before starting the web server with uvicorn for async/SSE support
+CMD ["sh", "-c", "python manage.py migrate && gunicorn config.asgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --worker-class uvicorn.workers.UvicornWorker"]
