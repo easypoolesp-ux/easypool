@@ -14,23 +14,13 @@ class RouteSerializer(serializers.ModelSerializer):
 
 
 class BusListSerializer(serializers.ModelSerializer):
-    lat = serializers.SerializerMethodField()
-    lng = serializers.SerializerMethodField()
+    lat = serializers.FloatField(source='latest_lat', read_only=True)
+    lng = serializers.FloatField(source='latest_lng', read_only=True)
     speed = serializers.FloatField(source='latest_speed', read_only=True)
     heading = serializers.FloatField(source='latest_heading', read_only=True)
     last_heartbeat = serializers.DateTimeField(source='latest_heartbeat', read_only=True)
 
     route_name = serializers.SerializerMethodField()
-
-    @extend_schema_field(serializers.FloatField())
-    def get_lat(self, obj):
-        loc = self.get_location(obj)
-        return loc['coordinates'][1] if loc else None
-
-    @extend_schema_field(serializers.FloatField())
-    def get_lng(self, obj):
-        loc = self.get_location(obj)
-        return loc['coordinates'][0] if loc else None
 
     @extend_schema_field(serializers.CharField())
     def get_route_name(self, obj):
@@ -124,8 +114,8 @@ class BusDetailSerializer(serializers.ModelSerializer):
     route = RouteSerializer(read_only=True)
     cameras = CameraSerializer(many=True, read_only=True)
 
-    lat = serializers.SerializerMethodField()
-    lng = serializers.SerializerMethodField()
+    lat = serializers.FloatField(source='latest_lat', read_only=True)
+    lng = serializers.FloatField(source='latest_lng', read_only=True)
     last_heartbeat = serializers.DateTimeField(source='latest_heartbeat', read_only=True)
 
     permission_level = serializers.SerializerMethodField()
@@ -163,32 +153,6 @@ class BusDetailSerializer(serializers.ModelSerializer):
             'last_heartbeat',
             'permission_level',
         )
-
-    @extend_schema_field(serializers.FloatField())
-    def get_lat(self, obj):
-        gps_id = getattr(obj, 'latest_gps_id', None)
-        if gps_id:
-            from apps.gps.models import GPSPoint
-            try:
-                point = GPSPoint.objects.only('location').get(id=gps_id)
-                if point.location:
-                    return point.location.y
-            except GPSPoint.DoesNotExist:
-                pass
-        return None
-
-    @extend_schema_field(serializers.FloatField())
-    def get_lng(self, obj):
-        gps_id = getattr(obj, 'latest_gps_id', None)
-        if gps_id:
-            from apps.gps.models import GPSPoint
-            try:
-                point = GPSPoint.objects.only('location').get(id=gps_id)
-                if point.location:
-                    return point.location.x
-            except GPSPoint.DoesNotExist:
-                pass
-        return None
 
     @extend_schema_field(serializers.CharField())
     def get_permission_level(self, obj):
