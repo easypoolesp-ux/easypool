@@ -142,102 +142,94 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Deploy Backend to Cloud Run
-        run: |
-      - name: Generate and Deploy Cloud Run Service
-        run: |
-          # Generate Service YAML with absolute left-alignment
-          cat <<EOF > service.yaml
-apiVersion: serving.knative.dev/v1
-kind: Service
-metadata:
-  name: easypool-backend
-  annotations:
-    run.googleapis.com/ingress: all
-    run.googleapis.com/ingress-status: all
-spec:
-  template:
-    metadata:
-      annotations:
-        run.googleapis.com/cloudsql-instances: project-05588bf2-f685-4769-a37:asia-south1:easypool-postgres
-        run.googleapis.com/vpc-access-connector: projects/project-05588bf2-f685-4769-a37/locations/asia-south1/connectors/easypool-vpcc-v2
-        run.googleapis.com/vpc-access-egress: private-ranges-only
-        run.googleapis.com/startup-cpu-boost: 'true'
-    spec:
-      serviceAccountName: easypool-backend-sa@project-05588bf2-f685-4769-a37.iam.gserviceaccount.com
-      containerConcurrency: 80
-      timeoutSeconds: 300
-      containers:
-      - name: backend
-        image: asia-south1-docker.pkg.dev/project-05588bf2-f685-4769-a37/easypool-repo/backend:latest
-        ports:
-        - containerPort: 8080
-        resources:
-          limits:
-            cpu: '1'
-            memory: 1024Mi
-        startupProbe:
-          failureThreshold: 3
-          periodSeconds: 10
-          tcpSocket:
-            port: 8080
-          timeoutSeconds: 240
-        env:
-        - name: DB_NAME
-          value: "bustrak"
-        - name: DB_USER
-          value: "admin"
-        - name: DB_HOST
-          value: "127.0.0.1"
-        - name: DB_PORT
-          value: "6432"
-        - name: DB_ENGINE
-          value: "django.contrib.gis.db.backends.postgis"
-        - name: DEBUG
-          value: "False"
-        - name: DJANGO_SETTINGS_MODULE
-          value: "config.settings"
-        - name: FIREBASE_PROJECT_ID
-          value: "project-05588bf2-f685-4769-a37"
-        - name: SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: django-secret-key
-              key: latest
-        - name: REDIS_URL
-          valueFrom:
-            secretKeyRef:
-              name: redis-url
-              key: latest
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: db-password
-              key: latest
-      - name: pgbouncer
-        image: asia-south1-docker.pkg.dev/project-05588bf2-f685-4769-a37/easypool-repo/pgbouncer:latest
-        resources:
-          limits:
-            cpu: '0.5'
-            memory: 256Mi
-        env:
-        - name: DB_PASSWORD_DUMMY
-          value: "placeholder"
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: db-password
-              key: latest
-EOF
-          # Debug visibility
-          echo "Built service.yaml:"
-          cat service.yaml
-
-          # Deploy via YAML
-          gcloud beta run services replace service.yaml \
-            --region ${{ env.REGION }} \
-            --project ${{ env.PROJECT_ID }} \
-            --quiet
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: easypool-backend
+          region: ${{ env.REGION }}
+          project_id: ${{ env.PROJECT_ID }}
+          # Use complete service YAML for multi-container/sidecar support
+          # Indentation here is handled correctly by the action's YAML parser
+          service_yaml: |
+            apiVersion: serving.knative.dev/v1
+            kind: Service
+            metadata:
+              name: easypool-backend
+              annotations:
+                run.googleapis.com/ingress: all
+            spec:
+              template:
+                metadata:
+                  annotations:
+                    run.googleapis.com/cloudsql-instances: project-05588bf2-f685-4769-a37:asia-south1:easypool-postgres
+                    run.googleapis.com/vpc-access-connector: projects/project-05588bf2-f685-4769-a37/locations/asia-south1/connectors/easypool-vpcc-v2
+                    run.googleapis.com/vpc-access-egress: private-ranges-only
+                    run.googleapis.com/startup-cpu-boost: 'true'
+                spec:
+                  serviceAccountName: easypool-backend-sa@project-05588bf2-f685-4769-a37.iam.gserviceaccount.com
+                  containerConcurrency: 80
+                  timeoutSeconds: 300
+                  containers:
+                  - name: backend
+                    image: asia-south1-docker.pkg.dev/project-05588bf2-f685-4769-a37/easypool-repo/backend:latest
+                    ports:
+                    - containerPort: 8080
+                    resources:
+                      limits:
+                        cpu: '1'
+                        memory: 1024Mi
+                    startupProbe:
+                      failureThreshold: 3
+                      periodSeconds: 10
+                      tcpSocket:
+                        port: 8080
+                      timeoutSeconds: 240
+                    env:
+                    - name: DB_NAME
+                      value: "bustrak"
+                    - name: DB_USER
+                      value: "admin"
+                    - name: DB_HOST
+                      value: "127.0.0.1"
+                    - name: DB_PORT
+                      value: "6432"
+                    - name: DB_ENGINE
+                      value: "django.contrib.gis.db.backends.postgis"
+                    - name: DEBUG
+                      value: "False"
+                    - name: DJANGO_SETTINGS_MODULE
+                      value: "config.settings"
+                    - name: FIREBASE_PROJECT_ID
+                      value: "project-05588bf2-f685-4769-a37"
+                    - name: SECRET_KEY
+                      valueFrom:
+                        secretKeyRef:
+                          name: django-secret-key
+                          key: latest
+                    - name: REDIS_URL
+                      valueFrom:
+                        secretKeyRef:
+                          name: redis-url
+                          key: latest
+                    - name: DB_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                          name: db-password
+                          key: latest
+                  - name: pgbouncer
+                    image: asia-south1-docker.pkg.dev/project-05588bf2-f685-4769-a37/easypool-repo/pgbouncer:latest
+                    resources:
+                      limits:
+                        cpu: '0.5'
+                        memory: 256Mi
+                    env:
+                    - name: DB_PASSWORD_DUMMY
+                      value: "placeholder"
+                    - name: DB_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                          name: db-password
+                          key: latest
 
   # ── Dashboard ─────────────────────────────────────────────────────────────
   build-dashboard:
