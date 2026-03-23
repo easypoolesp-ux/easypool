@@ -25,8 +25,8 @@ class Attendance(models.Model):
     class Meta:
         ordering = ['-timestamp']
         indexes = [
-            models.Index(fields=['bus', '-timestamp']),
-            models.Index(fields=['student', '-timestamp']),
+            models.Index(fields=['bus', '-timestamp'], name='attendance__bus_id_8e681b_idx'),
+            models.Index(fields=['student', '-timestamp'], name='attendance__student_2a90dc_idx'),
         ]
 
     def __str__(self):

@@ -15,7 +15,7 @@ class GPSPoint(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='gps_points')
     location = gis_models.PointField(srid=4326)  # No longer null
     speed = models.FloatField(default=0)
-    heading = models.FloatField(default=0, help_text='Direction of travel in degrees (0-360)')
+    heading = models.FloatField(default=0)
     accuracy = models.FloatField(null=True, blank=True)
     timestamp = models.DateTimeField()
     ignition = models.BooleanField(default=False)
@@ -31,6 +31,7 @@ class GPSPoint(models.Model):
     class Meta:
         ordering = ['-timestamp']
         indexes = [
+            models.Index(fields=['bus', '-timestamp'], name='gps_gpspoin_bus_id_de6d73_idx'),
             BrinIndex(fields=['timestamp'], name='gps_gpspoin_timesta_eb9802_brin'),
             GistIndex(fields=['location'], name='gps_location_gist'),
         ]
