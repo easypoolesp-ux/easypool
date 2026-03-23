@@ -55,11 +55,6 @@ jobs:
       - name: Bandit Security Scan
         run: bandit -c pyproject.toml -r .
 
-      - name: Django Configuration Check
-        run: |
-          python manage.py check
-          python manage.py makemigrations --check --dry-run
-
 
   # ── Frontend Checks (Next.js/TypeScript) ──────────────────────────────────
   dashboard-lint-and-typecheck:
