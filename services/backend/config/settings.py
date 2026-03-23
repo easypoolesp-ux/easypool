@@ -9,6 +9,18 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-development-key')
 DEBUG = config('DEBUG', default=True, cast=bool)
 REDIS_URL = config('REDIS_URL', default='redis://:easypool_live_redis_2026@10.128.0.2:6379/0')
 
+def get_iam_token():
+    try:
+        import google.auth
+        from google.auth.transport.requests import Request
+        credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/sqlservice.login"])
+        credentials.refresh(Request())
+        return credentials.token
+    except ImportError:
+        return config('DB_PASSWORD', default='')
+    except Exception:
+        return config('DB_PASSWORD', default='')
+
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
@@ -72,7 +84,7 @@ DATABASES = {
         'ENGINE': config('DB_ENGINE', default='django.contrib.gis.db.backends.postgis'),
         'NAME': config('DB_NAME', default='bustrak'),
         'USER': config('DB_USER', default='admin'),
-        'PASSWORD': config('DB_PASSWORD', default='adminpassword'),
+        'PASSWORD': get_iam_token,
         'HOST': config('DB_HOST', default='db'),
         'PORT': config('DB_PORT', default='5432'),
         'CONN_MAX_AGE': 60,
