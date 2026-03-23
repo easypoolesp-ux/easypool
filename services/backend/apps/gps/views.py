@@ -1,4 +1,4 @@
-# Final trigger for production deployment verification after YAML-based deploy fix
+# Final trigger for production deployment verification - verified YAML + health checks + sidecar auth
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D  # noqa: F401 — available for future geo-filters
 from rest_framework import decorators, permissions, response, viewsets
