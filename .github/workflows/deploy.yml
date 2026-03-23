@@ -241,7 +241,7 @@ jobs:
 
   # ── GPS Gateway (VM) ──────────────────────────────────────────────────────
   build-gateway:
-    needs: [changes, build-backend]
+    needs: changes
     if: |
       (needs.changes.outputs.gateway == 'true') || 
       (inputs.deploy_target == 'all') || 
