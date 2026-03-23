@@ -144,26 +144,88 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Deploy Backend to Cloud Run
         run: |
-          # Deploy Multi-Container Service
-          gcloud beta run deploy easypool-backend \
-            --container backend \
-              --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
-              --port 8080 \
-              --cpu 1 --memory 1Gi \
-              --set-env-vars "DB_NAME=bustrak,DB_USER=admin,DB_HOST=127.0.0.1,DB_PORT=6432,DB_ENGINE=django.contrib.gis.db.backends.postgis,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
-              --set-secrets "SECRET_KEY=django-secret-key:latest,REDIS_URL=redis-url:latest,DB_PASSWORD=db-password:latest" \
-            --container pgbouncer \
-              --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:latest \
-              --cpu 0.5 --memory 256Mi \
-              --set-env-vars "DB_PASSWORD_DUMMY=placeholder" \
-              --set-secrets "DB_PASSWORD=db-password:latest" \
+      - name: Generate and Deploy Cloud Run Service
+        run: |
+          cat <<EOF > service.yaml
+          apiVersion: serving.knative.dev/v1
+          kind: Service
+          metadata:
+            name: easypool-backend
+            annotations:
+              run.googleapis.com/ingress: all
+          spec:
+            template:
+              metadata:
+                annotations:
+                  run.googleapis.com/cloudsql-instances: ${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres
+                  run.googleapis.com/vpc-access-connector: projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/easypool-vpcc-v2
+                  run.googleapis.com/vpc-access-egress: private-ranges-only
+                  run.googleapis.com/startup-cpu-boost: 'true'
+              spec:
+                serviceAccountName: easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+                containerConcurrency: 80
+                timeoutSeconds: 300
+                containers:
+                - name: backend
+                  image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest
+                  ports:
+                  - containerPort: 8080
+                  resources:
+                    limits:
+                      cpu: '1'
+                      memory: 1024Mi
+                  env:
+                  - name: DB_NAME
+                    value: "bustrak"
+                  - name: DB_USER
+                    value: "admin"
+                  - name: DB_HOST
+                    value: "127.0.0.1"
+                  - name: DB_PORT
+                    value: "6432"
+                  - name: DB_ENGINE
+                    value: "django.contrib.gis.db.backends.postgis"
+                  - name: DEBUG
+                    value: "False"
+                  - name: DJANGO_SETTINGS_MODULE
+                    value: "config.settings"
+                  - name: FIREBASE_PROJECT_ID
+                    value: "${{ secrets.FIREBASE_PROJECT_ID }}"
+                  - name: SECRET_KEY
+                    valueFrom:
+                      secretKeyRef:
+                        name: django-secret-key
+                        key: latest
+                  - name: REDIS_URL
+                    valueFrom:
+                      secretKeyRef:
+                        name: redis-url
+                        key: latest
+                  - name: DB_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: db-password
+                        key: latest
+                - name: pgbouncer
+                  image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:latest
+                  resources:
+                    limits:
+                      cpu: '0.5'
+                      memory: 256Mi
+                  env:
+                  - name: DB_PASSWORD_DUMMY
+                    value: "placeholder"
+                  - name: DB_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: db-password
+                        key: latest
+          EOF
+
+          # Deploy via YAML
+          gcloud beta run services replace service.yaml \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
-            --add-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
-            --vpc-connector "projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/easypool-vpcc-v2" \
-            --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
-            --ingress all \
-            --cpu-boost \
             --quiet
 
   # ── Dashboard ─────────────────────────────────────────────────────────────
