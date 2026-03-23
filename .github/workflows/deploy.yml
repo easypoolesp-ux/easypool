@@ -152,7 +152,6 @@ jobs:
               --set-secrets "SECRET_KEY=django-secret-key:latest,REDIS_URL=redis-url:latest,DB_PASSWORD=db-password:latest" \
             --container pgbouncer \
               --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:latest \
-              --port 6432 \
               --set-env-vars "DB_PASSWORD_DUMMY=placeholder" \
               --set-secrets "DB_PASSWORD=db-password:latest" \
             --region ${{ env.REGION }} \
@@ -360,7 +359,7 @@ jobs:
 
   # ── Execution Report ──────────────────────────────────────────────────────
   deployment-report:
-    needs: [changes, build-backend, build-dashboard, build-gateway]
+    needs: [changes, deploy-backend, deploy-dashboard, deploy-vm-gateway]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -371,28 +370,28 @@ jobs:
           echo "|---------|--------|---------|" >> $GITHUB_STEP_SUMMARY
           
           # Backend
-          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
+          if [[ "${{ needs.deploy-backend.result }}" == "success" ]]; then
             echo "| Backend | ✅ Deployed | Path Filter / Manual |" >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ needs.build-backend.result }}" == "skipped" ]]; then
+          elif [[ "${{ needs.deploy-backend.result }}" == "skipped" ]]; then
             echo "| Backend | ⏭️ Skipped | No relevant changes |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| Backend | ❌ Failed | Error in build/deploy |" >> $GITHUB_STEP_SUMMARY
+            echo "| Backend | ❌ Failed | Check deploy logs |" >> $GITHUB_STEP_SUMMARY
           fi
 
           # Dashboard
-          if [[ "${{ needs.build-dashboard.result }}" == "success" ]]; then
+          if [[ "${{ needs.deploy-dashboard.result }}" == "success" ]]; then
             echo "| Dashboard | ✅ Deployed | Path Filter / Manual |" >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ needs.build-dashboard.result }}" == "skipped" ]]; then
+          elif [[ "${{ needs.deploy-dashboard.result }}" == "skipped" ]]; then
             echo "| Dashboard | ⏭️ Skipped | No relevant changes |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| Dashboard | ❌ Failed | Error in build/deploy |" >> $GITHUB_STEP_SUMMARY
+            echo "| Dashboard | ❌ Failed | Check deploy logs |" >> $GITHUB_STEP_SUMMARY
           fi
 
           # Gateway
-          if [[ "${{ needs.build-gateway.result }}" == "success" ]]; then
+          if [[ "${{ needs.deploy-vm-gateway.result }}" == "success" ]]; then
             echo "| Gateway | ✅ Deployed | Path Filter / Manual |" >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ needs.build-gateway.result }}" == "skipped" ]]; then
+          elif [[ "${{ needs.deploy-vm-gateway.result }}" == "skipped" ]]; then
             echo "| Gateway | ⏭️ Skipped | No relevant changes |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| Gateway | ❌ Failed | Error in build/deploy |" >> $GITHUB_STEP_SUMMARY
+            echo "| Gateway | ❌ Failed | Check deploy logs |" >> $GITHUB_STEP_SUMMARY
           fi
