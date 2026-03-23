@@ -113,7 +113,8 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Run Migrations
         run: |
-          gcloud run jobs deploy backend-migrate \
+          # Use deploy (idempotent) instead of create
+          gcloud beta run jobs deploy backend-migrate \
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
