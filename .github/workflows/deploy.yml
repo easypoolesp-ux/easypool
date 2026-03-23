@@ -2,75 +2,39 @@ name: Build and Deploy EasyPool to GCP
 
 on:
   push:
-    branches:
-      - master
+    branches: [master]
     paths:
       - 'services/**'
       - '.github/workflows/**'
+      - 'api/**'
   workflow_dispatch:
     inputs:
       deploy_target:
-        description: 'Which service to force deploy? (Select "none" to use automatic path-filtering)'
-        required: false
-        default: 'none'
+        description: 'Which service to deploy'
+        required: true
+        default: 'all'
         type: choice
-        options:
-          - 'none'
-          - 'all'
-          - 'backend'
-          - 'dashboard'
-          - 'gateway'
-      force_deploy:
-        description: 'Legacy force flag (deprecated, use deploy_target instead)'
-        required: false
-        default: 'false'
-        type: boolean
+        options: ['all', 'backend', 'dashboard', 'gateway']
 
 env:
   PROJECT_ID: project-05588bf2-f685-4769-a37
   REGION: asia-south1
   REPO_NAME: easypool-repo
   REGISTRY: asia-south1-docker.pkg.dev
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
-# ── Path filters ──────────────────────────────────────────────────────────────
-# Each build job only runs when its own service files change.
-# This is the single biggest time saver: changing dashboard CSS
-# no longer triggers a backend rebuild + migration run.
 
 jobs:
-  # ── Detect which services changed ─────────────────────────────────────────
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      dashboard: ${{ steps.filter.outputs.dashboard }}
-      gateway: ${{ steps.filter.outputs.gateway }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            backend:
-              - 'services/backend/**'
-            dashboard:
-              - 'services/dashboard/**'
-            gateway:
-              - 'services/gps-gateway/**'
 
-  # ── Backend ───────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
+  # BACKEND: Build → Migrate → Deploy
+  # ═══════════════════════════════════════════════════════════════════════════
+
   build-backend:
-    needs: changes
-    if: |
-      (needs.changes.outputs.backend == 'true') || 
-      (inputs.deploy_target == 'all') || 
-      (inputs.deploy_target == 'backend') || 
-      (inputs.force_deploy == true)
+    if: >-
+      github.event_name == 'push' ||
+      github.event.inputs.deploy_target == 'all' ||
+      github.event.inputs.deploy_target == 'backend'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+    permissions: { contents: read, id-token: write }
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -79,19 +43,14 @@ jobs:
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
       - uses: docker/setup-buildx-action@v3
-      - name: Sync OpenAPI Spec
-        run: cp api/openapi.yaml services/backend/openapi.yaml
-      - name: Build and Push Backend
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: ./services/backend
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
-
-      - name: Build and Push PgBouncer
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: ./services/backend/pgbouncer
           push: true
@@ -102,28 +61,25 @@ jobs:
   run-migrations:
     needs: build-backend
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+    permissions: { contents: read, id-token: write }
     steps:
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Run Migrations
+      - name: Deploy and Run Migrations
         run: |
-          # Use deploy (idempotent) instead of create
-          gcloud beta run jobs deploy backend-migrate \
+          gcloud run jobs deploy backend-migrate \
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
-            --command "python,manage.py,migrate" \
-            --set-env-vars "BYPASS_PGBOUNCER=True,DB_NAME=bustrak,DB_USER=admin,DB_HOST=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres,DB_PORT=5432,DB_ENGINE=django.contrib.gis.db.backends.postgis,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
-            --set-secrets "SECRET_KEY=django-secret-key:latest,REDIS_URL=redis-url:latest,DB_PASSWORD=db-password:latest" \
+            --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
             --set-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
             --vpc-connector "projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/easypool-vpcc-v2" \
-            --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
+            --vpc-egress private-ranges-only \
+            --set-env-vars "DB_NAME=bustrak,DB_USER=admin,DB_HOST=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres,DB_PORT=5432,DB_ENGINE=django.contrib.gis.db.backends.postgis,BYPASS_PGBOUNCER=True,DJANGO_SETTINGS_MODULE=config.settings" \
+            --set-secrets "DB_PASSWORD=db-password:latest" \
             --quiet
           gcloud run jobs execute backend-migrate \
             --region ${{ env.REGION }} \
@@ -133,49 +89,113 @@ jobs:
   deploy-backend:
     needs: run-migrations
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+    permissions: { contents: read, id-token: write }
     steps:
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Deploy to Cloud Run (Multi-Container)
+      - name: Deploy Backend to Cloud Run
         run: |
-          gcloud beta run deploy easypool-backend \
-            --container backend \
-              --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
-              --port 8080 \
-              --set-env-vars "DB_NAME=bustrak,DB_USER=admin,DB_HOST=127.0.0.1,DB_PORT=6432,DB_ENGINE=django.contrib.gis.db.backends.postgis,DB_CONN_MAX_AGE=0,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ env.PROJECT_ID }}" \
-              --set-secrets "SECRET_KEY=django-secret-key:latest,REDIS_URL=redis-url:latest,DB_PASSWORD=db-password:latest" \
-            --container pgbouncer \
-              --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:latest \
-              --set-env-vars "DB_PASSWORD_DUMMY=placeholder" \
-              --set-secrets "DB_PASSWORD=db-password:latest" \
+          cat > /tmp/service.yaml <<'EOF'
+          apiVersion: serving.knative.dev/v1
+          kind: Service
+          metadata:
+            name: easypool-backend
+            annotations:
+              run.googleapis.com/ingress: all
+          spec:
+            template:
+              metadata:
+                annotations:
+                  run.googleapis.com/cloudsql-instances: project-05588bf2-f685-4769-a37:asia-south1:easypool-postgres
+                  run.googleapis.com/vpc-access-connector: projects/project-05588bf2-f685-4769-a37/locations/asia-south1/connectors/easypool-vpcc-v2
+                  run.googleapis.com/vpc-access-egress: private-ranges-only
+                  run.googleapis.com/startup-cpu-boost: "true"
+                  autoscaling.knative.dev/maxScale: "10"
+              spec:
+                serviceAccountName: easypool-backend-sa@project-05588bf2-f685-4769-a37.iam.gserviceaccount.com
+                containerConcurrency: 80
+                timeoutSeconds: 300
+                containers:
+                - name: backend
+                  image: asia-south1-docker.pkg.dev/project-05588bf2-f685-4769-a37/easypool-repo/backend:latest
+                  ports:
+                  - containerPort: 8080
+                  resources:
+                    limits:
+                      cpu: "1"
+                      memory: 1024Mi
+                  startupProbe:
+                    failureThreshold: 10
+                    periodSeconds: 30
+                    tcpSocket:
+                      port: 8080
+                    timeoutSeconds: 20
+                  env:
+                  - name: DB_NAME
+                    value: bustrak
+                  - name: DB_USER
+                    value: admin
+                  - name: DB_HOST
+                    value: "127.0.0.1"
+                  - name: DB_PORT
+                    value: "6432"
+                  - name: DB_ENGINE
+                    value: django.contrib.gis.db.backends.postgis
+                  - name: DB_CONN_MAX_AGE
+                    value: "0"
+                  - name: DEBUG
+                    value: "False"
+                  - name: DJANGO_SETTINGS_MODULE
+                    value: config.settings
+                  - name: FIREBASE_PROJECT_ID
+                    value: project-05588bf2-f685-4769-a37
+                  - name: SECRET_KEY
+                    valueFrom:
+                      secretKeyRef:
+                        name: django-secret-key
+                        key: latest
+                  - name: REDIS_URL
+                    valueFrom:
+                      secretKeyRef:
+                        name: redis-url
+                        key: latest
+                  - name: DB_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: db-password
+                        key: latest
+                - name: pgbouncer
+                  image: asia-south1-docker.pkg.dev/project-05588bf2-f685-4769-a37/easypool-repo/pgbouncer:latest
+                  resources:
+                    limits:
+                      cpu: "0.5"
+                      memory: 256Mi
+                  env:
+                  - name: DB_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: db-password
+                        key: latest
+          EOF
+          gcloud run services replace /tmp/service.yaml \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
-            --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
-            --vpc-connector "projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/easypool-vpcc-v2" \
-            --vpc-egress private-ranges-only \
-            --add-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
-            --ingress all \
-            --max-instances 10 \
             --quiet
 
-  # ── Dashboard ─────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
+  # DASHBOARD: Build → Deploy
+  # ═══════════════════════════════════════════════════════════════════════════
+
   build-dashboard:
-    needs: changes
-    if: |
-      (needs.changes.outputs.dashboard == 'true') || 
-      (inputs.deploy_target == 'all') || 
-      (inputs.deploy_target == 'dashboard') || 
-      (inputs.force_deploy == true)
+    if: >-
+      github.event_name == 'push' ||
+      github.event.inputs.deploy_target == 'all' ||
+      github.event.inputs.deploy_target == 'dashboard'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+    permissions: { contents: read, id-token: write }
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -183,21 +203,17 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: services/dashboard/package-lock.json
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
         working-directory: services/dashboard
-      - name: Run Typecheck
-        run: npm run typecheck
+      - run: npm run typecheck
         working-directory: services/dashboard
       - uses: docker/setup-buildx-action@v3
-      - name: Build and Push Dashboard
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: ./services/dashboard
           push: true
@@ -220,16 +236,14 @@ jobs:
   deploy-dashboard:
     needs: build-dashboard
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+    permissions: { contents: read, id-token: write }
     steps:
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Deploy Dashboard to Cloud Run
+      - name: Deploy Dashboard
         run: |
           gcloud run deploy easypool-dashboard-schools \
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/dashboard:latest \
@@ -240,18 +254,17 @@ jobs:
             --cpu-boost \
             --quiet
 
-  # ── GPS Gateway (VM) ──────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
+  # GATEWAY: Build → Deploy to VM
+  # ═══════════════════════════════════════════════════════════════════════════
+
   build-gateway:
-    needs: changes
-    if: |
-      (needs.changes.outputs.gateway == 'true') || 
-      (inputs.deploy_target == 'all') || 
-      (inputs.deploy_target == 'gateway') || 
-      (inputs.force_deploy == true)
+    if: >-
+      github.event_name == 'push' ||
+      github.event.inputs.deploy_target == 'all' ||
+      github.event.inputs.deploy_target == 'gateway'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+    permissions: { contents: read, id-token: write }
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -260,10 +273,8 @@ jobs:
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
       - uses: docker/setup-buildx-action@v3
-      - name: Sync OpenAPI Spec
-        run: cp api/openapi.yaml services/gps-gateway/openapi.yaml
-      - name: Build and Push Gateway
-        uses: docker/build-push-action@v5
+      - run: cp api/openapi.yaml services/gps-gateway/openapi.yaml
+      - uses: docker/build-push-action@v5
         with:
           context: ./services/gps-gateway
           push: true
@@ -271,129 +282,38 @@ jobs:
           cache-from: type=gha,scope=gateway
           cache-to: type=gha,scope=gateway,mode=max
 
-  deploy-vm-gateway:
+  deploy-gateway:
     needs: build-gateway
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+    permissions: { contents: read, id-token: write }
     steps:
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Update VM Gateway (Docker)
+      - name: Deploy to VM
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/gps-gateway:latest"
           ACCESS_TOKEN=$(gcloud auth print-access-token)
           GPS_API_KEY="${{ secrets.GPS_SERVICE_API_KEY }}"
-
           gcloud compute ssh camera-relay-server \
             --zone ${{ env.REGION }}-a \
             --project ${{ env.PROJECT_ID }} \
-            --tunnel-through-iap \
-            --quiet \
+            --tunnel-through-iap --quiet \
             -- bash -s -- "${IMAGE}" "${ACCESS_TOKEN}" "${GPS_API_KEY}" <<'DEPLOY_SCRIPT'
           set -euo pipefail
-          
-          IMAGE=$1
-          ACCESS_TOKEN=$2
-          GPS_API_KEY=$3
-
-          # ── Auth Docker to Artifact Registry ─────────────────────────────────
+          IMAGE=$1; ACCESS_TOKEN=$2; GPS_API_KEY=$3
           export DOCKER_CONFIG=$(mktemp -d)
           trap "rm -rf ${DOCKER_CONFIG}" EXIT
           echo '{"auths":{}}' > ${DOCKER_CONFIG}/config.json
-          echo "${ACCESS_TOKEN}" | docker login -u oauth2accesstoken --password-stdin \
-            https://${{ env.REGISTRY }}
-
-          echo "[CI] Pulling latest gateway image: ${IMAGE}"
+          echo "${ACCESS_TOKEN}" | docker login -u oauth2accesstoken --password-stdin https://asia-south1-docker.pkg.dev
           docker pull "${IMAGE}"
-
-          # ── Stop any running gateway ──────────────────────────────────────────
           docker stop gps_gateway 2>/dev/null || true
           docker rm   gps_gateway 2>/dev/null || true
-
-          # Kill any leftover bare-python processes (the old /tmp/gateway.py hack)
-          pkill -f "python.*gateway.py" 2>/dev/null || true
-
-          # ── Start gateway container ───────────────────────────────────────────
-          docker run -d \
-            --name gps_gateway \
-            --restart always \
-            --network host \
+          docker run -d --name gps_gateway --restart always --network host \
             -e BACKEND_API_URL=https://easypool-backend-ihsu77lpaa-el.a.run.app/api/gps/ \
             -e GPS_SERVICE_API_KEY="${GPS_API_KEY}" \
-            -e GATEWAY_PORT=5027 \
-            "${IMAGE}"
-
-          # ── Verify ───────────────────────────────────────────────────────────
-          echo "[CI] Waiting for container health check..."
-          MAX_RETRIES=12  # 12 * 5s = 60s
-          RETRY_COUNT=0
-          while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
-            HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' gps_gateway 2>/dev/null || echo "unhealthy")
-            RUNNING_STATUS=$(docker inspect --format='{{.State.Status}}' gps_gateway 2>/dev/null || echo "not_found")
-            
-            echo "[CI] Attempt $((RETRY_COUNT+1)): Running=${RUNNING_STATUS}, Health=${HEALTH_STATUS}"
-            
-            if [ "${HEALTH_STATUS}" == "healthy" ]; then
-              echo "[CI] ✅ GPS Gateway is healthy and listening."
-              docker logs gps_gateway --tail=10
-              exit 0
-            fi
-            
-            if [ "${RUNNING_STATUS}" != "running" ]; then
-              echo "[CI][ERROR] Container stopped unexpectedly. Logs:"
-              docker logs gps_gateway --tail=50
-              exit 1
-            fi
-            
-            RETRY_COUNT=$((RETRY_COUNT+1))
-            sleep 5
-          done
-
-          echo "[CI][ERROR] Health check timed out after 60s. Logs:"
-          docker logs gps_gateway --tail=50
-          exit 1
+            -e GATEWAY_PORT=5027 "${IMAGE}"
+          echo "✅ Gateway deployed"
           DEPLOY_SCRIPT
-
-  # ── Execution Report ──────────────────────────────────────────────────────
-  deployment-report:
-    needs: [changes, deploy-backend, deploy-dashboard, deploy-vm-gateway]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate Deployment Summary
-        run: |
-          echo "### 🚀 EasyPool Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | Status | Trigger |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          
-          # Backend
-          if [[ "${{ needs.deploy-backend.result }}" == "success" ]]; then
-            echo "| Backend | ✅ Deployed | Path Filter / Manual |" >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ needs.deploy-backend.result }}" == "skipped" ]]; then
-            echo "| Backend | ⏭️ Skipped | No relevant changes |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Backend | ❌ Failed | Check deploy logs |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Dashboard
-          if [[ "${{ needs.deploy-dashboard.result }}" == "success" ]]; then
-            echo "| Dashboard | ✅ Deployed | Path Filter / Manual |" >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ needs.deploy-dashboard.result }}" == "skipped" ]]; then
-            echo "| Dashboard | ⏭️ Skipped | No relevant changes |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Dashboard | ❌ Failed | Check deploy logs |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          # Gateway
-          if [[ "${{ needs.deploy-vm-gateway.result }}" == "success" ]]; then
-            echo "| Gateway | ✅ Deployed | Path Filter / Manual |" >> $GITHUB_STEP_SUMMARY
-          elif [[ "${{ needs.deploy-vm-gateway.result }}" == "skipped" ]]; then
-            echo "| Gateway | ⏭️ Skipped | No relevant changes |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Gateway | ❌ Failed | Check deploy logs |" >> $GITHUB_STEP_SUMMARY
-          fi
