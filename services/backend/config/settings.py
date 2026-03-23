@@ -72,9 +72,9 @@ DATABASES = {
         'NAME': config('DB_NAME', default='bustrak'),
         'USER': config('DB_USER', default='admin'),
         'PASSWORD': config('DB_PASSWORD', default='adminpassword'),
-        'HOST': config('DB_HOST', default='db'),
-        'PORT': config('DB_PORT', default='5432'),
-        'CONN_MAX_AGE': 60,
+        'HOST': config('DB_HOST', default='127.0.0.1'),
+        'PORT': config('DB_PORT', default='6432'),
+        'CONN_MAX_AGE': 0,
     }
 }
 

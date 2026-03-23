@@ -73,9 +73,17 @@ jobs:
           context: ./services/backend
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest
-          # Service-scoped cache key prevents cross-service cache pollution
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
+
+      - name: Build and Push PgBouncer
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/backend/pgbouncer
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:latest
+          cache-from: type=gha,scope=pgbouncer
+          cache-to: type=gha,scope=pgbouncer,mode=max
 
   run-migrations:
     needs: build-backend
@@ -122,15 +130,28 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Deploy Backend to Cloud Run
         run: |
+          # Define environment variables (shared or per-container)
+          GCP_PROJECT="${{ env.PROJECT_ID }}"
+          # Check if we are on staging branch
+          if [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            GCP_PROJECT="${{ secrets.STAGING_PROJECT_ID || env.PROJECT_ID }}"
+          fi
+
+          # Deploy Multi-Container Service
           gcloud run deploy easypool-backend \
-            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
+            --container backend \
+              --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
+              --port 8000 \
+              --set-env-vars "DB_NAME=bustrak,DB_USER=admin,DB_HOST=127.0.0.1,DB_PORT=6432,DB_ENGINE=django.contrib.gis.db.backends.postgis,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
+              --set-secrets "SECRET_KEY=django-secret-key:latest,REDIS_URL=redis-url:latest,DB_PASSWORD=db-password:latest" \
+            --container pgbouncer \
+              --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:latest \
+              --port 6432 \
             --region ${{ env.REGION }} \
-            --project ${{ env.PROJECT_ID }} \
-            --update-env-vars "DB_NAME=bustrak,DB_USER=admin,DB_HOST=/cloudsql/${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres,DB_PORT=5432,DB_ENGINE=django.contrib.gis.db.backends.postgis,DEBUG=False,DJANGO_SETTINGS_MODULE=config.settings,FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" \
-            --set-secrets "SECRET_KEY=django-secret-key:latest,REDIS_URL=redis-url:latest,DB_PASSWORD=db-password:latest" \
-            --add-cloudsql-instances "${{ env.PROJECT_ID }}:${{ env.REGION }}:easypool-postgres" \
-            --vpc-connector "projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/easypool-vpcc-v2" \
-            --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
+            --project ${GCP_PROJECT} \
+            --add-cloudsql-instances "${GCP_PROJECT}:${{ env.REGION }}:easypool-postgres" \
+            --vpc-connector "projects/${GCP_PROJECT}/locations/${{ env.REGION }}/connectors/easypool-vpcc-v2" \
+            --service-account "easypool-backend-sa@${GCP_PROJECT}.iam.gserviceaccount.com" \
             --cpu-boost \
             --quiet
 
