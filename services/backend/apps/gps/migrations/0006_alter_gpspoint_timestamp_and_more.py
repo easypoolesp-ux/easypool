@@ -17,10 +17,15 @@ class Migration(migrations.Migration):
             name="timestamp",
             field=models.DateTimeField(),
         ),
-        migrations.AddIndex(
-            model_name="gpspoint",
-            index=django.contrib.postgres.indexes.BrinIndex(
-                fields=["timestamp"], name="gps_gpspoin_timesta_eb9802_brin"
-            ),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddIndex(
+                    model_name="gpspoint",
+                    index=django.contrib.postgres.indexes.BrinIndex(
+                        fields=["timestamp"], name="gps_gpspoin_timesta_eb9802_brin"
+                    ),
+                ),
+            ],
+            database_operations=[],
         ),
     ]
