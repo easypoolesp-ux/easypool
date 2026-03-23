@@ -237,6 +237,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       const effectiveStatus = bus.computed_status || bus.status || 'offline';
       const color = getStatusColor(effectiveStatus);
       const heading = bus.heading || 0;
+      const speed = bus.speed || 0;
       
       const pos = getLatLng(bus);
 
