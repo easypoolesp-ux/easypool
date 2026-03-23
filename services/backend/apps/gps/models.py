@@ -1,4 +1,5 @@
 import uuid
+# Trigger: Spatial Migration Build (Unblocked CI)
 
 from django.contrib.postgres.indexes import BrinIndex
 from django.db import models
