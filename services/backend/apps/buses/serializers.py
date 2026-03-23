@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 
 from django.utils import timezone
@@ -53,7 +54,15 @@ class BusListSerializer(serializers.ModelSerializer):
         )
 
     def get_location(self, obj):
-        # We use the annotated latest_lat/lng or the property
+        # 1. Prefer the direct GeoJSON from the database
+        geojson_str = getattr(obj, 'latest_location_json', None)
+        if geojson_str:
+            try:
+                return json.loads(geojson_str)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # 2. Fallback to RawSQL-derived lat/lng
         lat = getattr(obj, 'latest_lat', None)
         lng = getattr(obj, 'latest_lng', None)
         if lat is not None and lng is not None:
