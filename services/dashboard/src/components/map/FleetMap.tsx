@@ -23,28 +23,18 @@ import {
   FLEET_STATUSES,
 } from "@/constants/fleetStatus";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface Bus {
-  id: string;
-  internal_id: string;
-  status: string; // raw stored status (may be stale)
-  computed_status?: string; // derived: moving | idle | no_signal | offline
-  lat: number;
-  lng: number;
-  location?: { type: string; coordinates: [number, number] };
-  plate_number?: string;
-  route_name?: string;
+import { components } from "@/types/api";
+
+type Bus = components["schemas"]["BusList"] & {
+  computed_status?: string;
   speed?: number;
   heading?: number;
-}
-
-interface GPSPoint {
-  lat: number;
-  lng: number;
   location?: { type: string; coordinates: [number, number] };
-  speed: number;
-  timestamp: string;
-}
+  last_heartbeat?: string;
+};
+type GPSPoint = components["schemas"]["GPSPoint"] & {
+  location?: { type: string; coordinates: [number, number] };
+};
 
 interface Props {
   buses: Bus[];
@@ -178,9 +168,9 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
   // Refs
   const mapRef = useRef<google.maps.Map | null>(null);
-  const markerRefs = useRef<Map<string, google.maps.Marker>>(new Map());
+  const markerRefs = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map());
   const markerStateRefs = useRef<Map<string, string>>(new Map()); // Hash of lat,lng,status,heading
-  const historyMarkerRef = useRef<google.maps.Marker | null>(null);
+  const historyMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const historyAnimationRef = useRef<number | undefined>(undefined);
   const lastHistoryPosRef = useRef<{ lat: number; lng: number } | null>(null);
   // Smooth-animation refs: cancel any in-flight animation before starting a new one
@@ -196,6 +186,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
+      mapId: "fleet_map", // Required for AdvancedMarkerElement
       styles: highContrast
         ? isDark
           ? MONOCHROME_DARK
@@ -226,7 +217,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
   useEffect(() => {
     if (!isLoaded || !isMapReady || !mapRef.current) return;
     if (isHistoryMode) {
-      markerRefs.current.forEach((m) => m.setMap(null));
+      markerRefs.current.forEach((m) => { m.map = null; });
       markerRefs.current.clear();
       markerStateRefs.current.clear(); // Force rebuild when exiting history
       return;
@@ -236,7 +227,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     const ids = new Set(buses.map((b) => b.id));
     markerRefs.current.forEach((m, id) => {
       if (!ids.has(id)) {
-        m.setMap(null);
+        m.map = null;
         markerRefs.current.delete(id);
         markerStateRefs.current.delete(id);
       }
@@ -244,7 +235,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
     buses.forEach((bus) => {
       if (!bus.location && (bus.lat == null || bus.lng == null)) return;
-      const effectiveStatus = bus.computed_status || bus.status;
+      const effectiveStatus = bus.computed_status || bus.status || 'offline';
       const color = getStatusColor(effectiveStatus);
       const heading = bus.heading || 0;
       
@@ -258,26 +249,22 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       markerStateRefs.current.set(bus.id, stateHash);
 
       const iconUrl = buildMarkerSvg(color, heading, isMoving);
-      const iconSize = new google.maps.Size(80, 80);
-      const iconAnchor = new google.maps.Point(40, 40);
 
       const existing = markerRefs.current.get(bus.id);
       if (existing) {
         // ── Smooth position transition ──────────────────────────────
-        const ANIM_DURATION = 800; // ms — matches typical GPS polling interval
+        const ANIM_DURATION = 800; 
         const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
-        // Cancel any in-flight animation for this marker
         const pendingRaf = animationRefs.current.get(bus.id);
         if (pendingRaf !== undefined) cancelAnimationFrame(pendingRaf);
 
-        // Start position: wherever the marker currently is (or last known)
         const from =
           currentPosRefs.current.get(bus.id) ??
-          (existing.getPosition()
+          (existing.position
             ? {
-                lat: existing.getPosition()!.lat(),
-                lng: existing.getPosition()!.lng(),
+                lat: (existing.position as google.maps.LatLngLiteral).lat,
+                lng: (existing.position as google.maps.LatLngLiteral).lng,
               }
             : pos);
         const to = pos;
@@ -291,7 +278,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             lat: from.lat + (to.lat - from.lat) * ease,
             lng: from.lng + (to.lng - from.lng) * ease,
           };
-          existing.setPosition(interpPos);
+          existing.position = interpPos;
           if (t < 1) {
             animationRefs.current.set(bus.id, requestAnimationFrame(animate));
           } else {
@@ -302,37 +289,32 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         animationRefs.current.set(bus.id, requestAnimationFrame(animate));
         // ────────────────────────────────────────────────────────────
 
-        existing.setIcon({
-          url: iconUrl,
-          scaledSize: iconSize,
-          anchor: iconAnchor,
-          labelOrigin: new google.maps.Point(40, 72),
-        });
-        existing.setLabel({
-          text: bus.internal_id,
-          color: isDark ? "#ffffff" : "#0f172a",
-          fontSize: "10px",
-          fontWeight: "bold",
-          className: "bus-map-label",
-        });
+        // Update content for AdvancedMarkerElement
+        const div = document.createElement('div');
+        div.innerHTML = `
+          <div style="position: relative; width: 80px; height: 80px;">
+            <img src="${iconUrl}" style="width: 80px; height: 80px;" />
+            <div style="position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: ${isDark ? "#ffffff" : "#0f172a"}; font-size: 10px; font-weight: bold; font-family: sans-serif; text-shadow: 0 1px 2px rgba(0,0,0,0.5); pointer-events: none;">
+              ${bus.internal_id}
+            </div>
+          </div>
+        `;
+        existing.content = div;
       } else {
-        const m = new google.maps.Marker({
+        const div = document.createElement('div');
+        div.innerHTML = `
+          <div style="position: relative; width: 80px; height: 80px;">
+            <img src="${iconUrl}" style="width: 80px; height: 80px;" />
+            <div style="position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: ${isDark ? "#ffffff" : "#0f172a"}; font-size: 10px; font-weight: bold; font-family: sans-serif; text-shadow: 0 1px 2px rgba(0,0,0,0.5); pointer-events: none;">
+              ${bus.internal_id}
+            </div>
+          </div>
+        `;
+        const m = new google.maps.marker.AdvancedMarkerElement({
           map: mapRef.current!,
           position: pos,
           title: bus.internal_id,
-          icon: {
-            url: iconUrl,
-            scaledSize: iconSize,
-            anchor: iconAnchor,
-            labelOrigin: new google.maps.Point(40, 72),
-          },
-          label: {
-            text: bus.internal_id,
-            color: isDark ? "#ffffff" : "#0f172a",
-            fontSize: "10px",
-            fontWeight: "bold",
-            className: "bus-map-label",
-          },
+          content: div,
         });
         m.addListener("click", () => {
           setSelectedBusId(bus.id);
@@ -437,7 +419,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     if (!isHistoryMode || !historyPoints[playbackIndex] || !mapRef.current) {
       if (historyAnimationRef.current)
         cancelAnimationFrame(historyAnimationRef.current);
-      historyMarkerRef.current?.setMap(null);
+      if (historyMarkerRef.current) historyMarkerRef.current.map = null;
       historyMarkerRef.current = null;
       lastHistoryPosRef.current = null;
       return;
@@ -449,32 +431,28 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       : { lat: pt.lat, lng: pt.lng };
 
     if (!historyMarkerRef.current) {
-      historyMarkerRef.current = new google.maps.Marker({
+      const div = document.createElement('div');
+      div.innerHTML = `
+        <div style="width: 22px; height: 22px; background: #3b82f6; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
+      `;
+      historyMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
         map: mapRef.current!,
         position: pos,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: "#3b82f6",
-          fillOpacity: 1,
-          strokeColor: "#ffffff",
-          strokeWeight: 3,
-          scale: 11,
-        },
+        content: div,
         zIndex: 1000,
       });
       lastHistoryPosRef.current = pos;
     } else {
       // ── Smooth history movement ──────────────────────────────
-      const ANIM_DURATION = isPlaying ? (500 / playbackSpeed) * 0.9 : 50; // Dynamic duration based on speed
+      const ANIM_DURATION = isPlaying ? (500 / playbackSpeed) * 0.9 : 50; 
       const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
       if (historyAnimationRef.current)
         cancelAnimationFrame(historyAnimationRef.current);
 
-      // Start from where the marker *is* right now visually
-      const startPos = historyMarkerRef.current.getPosition();
+      const startPos = historyMarkerRef.current.position as google.maps.LatLngLiteral;
       const from = startPos
-        ? { lat: startPos.lat(), lng: startPos.lng() }
+        ? { lat: startPos.lat, lng: startPos.lng }
         : lastHistoryPosRef.current || pos;
 
       const to = pos;
@@ -488,7 +466,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
           lat: from.lat + (to.lat - from.lat) * ease,
           lng: from.lng + (to.lng - from.lng) * ease,
         };
-        historyMarkerRef.current?.setPosition(interpPos);
+        if (historyMarkerRef.current) historyMarkerRef.current.position = interpPos;
         if (t < 1) {
           historyAnimationRef.current = requestAnimationFrame(animate);
         } else {
@@ -825,7 +803,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                         : "—"}
                     </p>
                     <p className="text-[11px] text-white/60 font-semibold">
-                      {currentPt ? `${Math.round(currentPt.speed)} km/h` : "—"}
+                      {currentPt ? `${Math.round(currentPt.speed || 0)} km/h` : "—"}
                     </p>
                   </div>
                 </div>

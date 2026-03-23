@@ -57,6 +57,7 @@ class BusListSerializer(serializers.ModelSerializer):
             'permission_level',
         )
 
+    @extend_schema_field(serializers.DictField())
     def get_location(self, obj):
         gps_id = getattr(obj, 'latest_gps_id', None)
         if gps_id:

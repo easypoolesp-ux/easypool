@@ -1,3 +1,8 @@
+import { components } from "@/types/api";
+
+type BusList = components["schemas"]["BusList"];
+type GPSPoint = components["schemas"]["GPSPoint"];
+
 // All API calls use relative paths — routed through Next.js reverse proxy to the backend
 const BASE_URL = "";
 
@@ -20,7 +25,7 @@ async function apiFetch<T>(
   return res.json();
 }
 
-export const fetchBuses = () => apiFetch<any[]>("/api/buses");
+export const fetchBuses = () => apiFetch<BusList[]>("/api/buses");
 
 export const fetchBusLocation = (busId: string) =>
-  apiFetch<any>(`/api/gps/${busId}/latest`);
+  apiFetch<GPSPoint>(`/api/gps/${busId}/latest`);

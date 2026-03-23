@@ -4,6 +4,7 @@ import redis
 from django.conf import settings
 from django.db.models import OuterRef, Subquery
 from django.http import StreamingHttpResponse
+from drf_spectacular.utils import extend_schema
 from rest_framework import decorators, response, viewsets
 
 from apps.gps.models import GPSPoint
@@ -74,6 +75,7 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(organisation=self.request.user.organisation)
 
+    @extend_schema(responses={200: BusListSerializer(many=True)})
     @decorators.action(detail=False, methods=['get'])
     def online(self, request):
         """Return only online buses for the user's scope."""
@@ -81,6 +83,10 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
         serializer = BusListSerializer(buses, many=True)
         return response.Response(serializer.data)
 
+    @extend_schema(
+        responses={200: {'type': 'string', 'format': 'binary'}},
+        description="SSE endpoint for live bus locations streaming directly from Redis."
+    )
     @decorators.action(detail=False, methods=['get'])
     def stream(self, request):
         """SSE endpoint for live bus locations streaming directly from Redis."""

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { components } from "@/types/api";
 import { auth } from "@/lib/firebase";
+import { fetchBuses as apiFetchBuses } from "@/lib/api";
 
 type BusType = components["schemas"]["BusList"];
 type AlertType = components["schemas"]["Alert"];
@@ -34,34 +35,15 @@ export function useBusPolling(): UseBusPollingReturn {
     abortControllerRef.current = controller;
 
     try {
-      const user = auth.currentUser;
-      const token = user
-        ? await user.getIdToken()
-        : typeof window !== "undefined"
-          ? localStorage.getItem("token")
-          : null;
-      const headers: HeadersInit = token
-        ? { Authorization: `Bearer ${token}` }
-        : {};
+      const data = await apiFetchBuses();
+      // apiFetchBuses returns BusList[]
+      setBuses(data);
+      setLastUpdated(new Date());
+      setError(null);
 
-      const res = await fetch(`/api/buses?_t=${Date.now()}`, {
-        headers,
-        signal: controller.signal,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const results = data.results || data;
-        setBuses(results);
-        setLastUpdated(new Date());
-        setError(null);
-
-        // Cache results
-        if (typeof window !== "undefined") {
-          localStorage.setItem("cached_buses", JSON.stringify(results));
-        }
-      } else {
-        setError(`Failed to fetch buses: ${res.statusText}`);
+      // Cache results
+      if (typeof window !== "undefined") {
+        localStorage.setItem("cached_buses", JSON.stringify(data));
       }
     } catch (err: any) {
       if (err.name !== "AbortError") {
@@ -69,38 +51,23 @@ export function useBusPolling(): UseBusPollingReturn {
         setError("Failed to fetch bus data. Please check your connection.");
       }
     } finally {
-      // Keep loading true on first mount, false on subsequent polls
       setLoading((prev) => (prev ? false : prev));
-      setTick((t) => t + 1); // Force re-render to ensure relative times update
+      setTick((t) => t + 1);
     }
   }, []);
 
   const fetchMeta = useCallback(async () => {
     try {
-      const user = auth.currentUser;
-      const token = user
-        ? await user.getIdToken()
-        : typeof window !== "undefined"
-          ? localStorage.getItem("token")
-          : null;
-      const headers: HeadersInit = token
-        ? { Authorization: `Bearer ${token}` }
-        : {};
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
       const ts = Date.now();
 
-      const [alertRes, transRes] = await Promise.all([
-        fetch(`/api/alerts?_t=${ts}`, { headers }),
-        fetch(`/api/transporters?_t=${ts}`, { headers }),
-      ]);
-
+      const alertRes = await fetch(`/api/alerts?_t=${ts}`, { headers });
       if (alertRes.ok) {
         const d = await alertRes.json();
         setAlerts(d.results || d);
       }
-      if (transRes.ok) {
-        const d = await transRes.json();
-        setTransporters(d.results || d);
-      }
+      // Note: transporters fetch skipped for now as it's not in schema
     } catch (err) {
       console.error("Meta fetch error:", err);
     }
@@ -126,22 +93,15 @@ export function useBusPolling(): UseBusPollingReturn {
     const startPollingFallback = () => {
       if (busInterval) return;
       console.log("[useBusPolling] Falling back to 10s polling.");
-      busInterval = setInterval(fetchBuses, 10000);
+      busInterval = setInterval(apiFetchBuses, 10000);
     };
 
     const setupStream = async () => {
       try {
-        const user = auth.currentUser;
-        const token = user
-          ? await user.getIdToken()
-          : typeof window !== "undefined"
-            ? localStorage.getItem("token")
-            : null;
-        const headers: HeadersInit = token
-          ? { Authorization: `Bearer ${token}` }
-          : {};
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const res = await fetch(`/api/buses/stream/`, { headers });
+        const res = await fetch(`/api/buses/stream`, { headers });
         if (!res.ok) throw new Error(`Stream HTTP Error ${res.status}`);
 
         const reader = res.body?.getReader();
@@ -166,30 +126,24 @@ export function useBusPolling(): UseBusPollingReturn {
                 if (data.status === "connected") continue;
                 if (data.error) continue;
 
-                // Incoming Redis live update from Gateway
                 setBuses((prevBuses) => {
                   const updated = prevBuses.map((b) =>
                     b.internal_id === data.imei
                       ? {
                           ...b,
-                          location: {
-                            type: 'Point',
-                            coordinates: [data.lng, data.lat]
-                          },
+                          lat: data.lat,
+                          lng: data.lng,
                           latest_speed: data.speed,
                           latest_heading: data.heading,
                           latest_heartbeat: new Date(
                             data.timestamp * 1000,
                           ).toISOString(),
-                          status: "online" as any,
+                          status: "online" as BusType["status"],
                         }
                       : b,
                   );
                   if (typeof window !== "undefined") {
-                    localStorage.setItem(
-                      "cached_buses",
-                      JSON.stringify(updated),
-                    );
+                    localStorage.setItem("cached_buses", JSON.stringify(updated));
                   }
                   return updated;
                 });
@@ -202,18 +156,15 @@ export function useBusPolling(): UseBusPollingReturn {
 
         if (isMounted) startPollingFallback();
       } catch (err) {
-        console.warn(
-          "[useBusPolling] SSE Stream failed, falling back to polling.",
-          err,
-        );
+        console.warn("[useBusPolling] SSE Stream failed, falling back to polling.", err);
         if (isMounted) startPollingFallback();
       }
     };
 
-    // 1. Initial complete fetch to get all buses and routes
-    fetchBuses().then(() => {
-      // 2. Start the live stream
-      setupStream();
+    // 1. Initial complete fetch
+    apiFetchBuses().then((data) => {
+        setBuses(data);
+        setupStream();
     });
 
     fetchMeta();
@@ -228,7 +179,7 @@ export function useBusPolling(): UseBusPollingReturn {
         abortControllerRef.current.abort();
       }
     };
-  }, [fetchBuses, fetchMeta]);
+  }, [apiFetchBuses, fetchMeta]);
 
   return { buses, alerts, transporters, loading, error, lastUpdated };
 }

@@ -157,8 +157,8 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/dashboard:latest
           build-args: |
-            BACKEND_API_URL=https://easypool-backend-ihsu77lpaa-el.a.run.app
-            NEXT_PUBLIC_API_URL=https://easypool-backend-ihsu77lpaa-el.a.run.app
+            BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
+            NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app
             NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
             NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=${{ secrets.GOOGLE_MAPS_MAP_ID }}
             NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
@@ -189,7 +189,7 @@ jobs:
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/dashboard:latest \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
-            --set-env-vars "BACKEND_API_URL=https://easypool-backend-ihsu77lpaa-el.a.run.app,NEXT_PUBLIC_API_URL=https://easypool-backend-ihsu77lpaa-el.a.run.app,NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }},NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }},NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }},NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }},NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }},NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }},NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }}" \
+            --set-env-vars "BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app,NEXT_PUBLIC_API_URL=https://easypool-backend-222076803846.asia-south1.run.app,NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }},NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }},NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }},NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }},NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }},NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }},NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }}" \
             --allow-unauthenticated \
             --cpu-boost \
             --quiet
@@ -271,7 +271,7 @@ jobs:
             --name gps_gateway \
             --restart always \
             --network host \
-            -e BACKEND_API_URL=https://easypool-backend-ihsu77lpaa-el.a.run.app/api/gps/telemetry \
+            -e BACKEND_API_URL=https://easypool-backend-222076803846.asia-south1.run.app/api/gps/telemetry \
             -e GPS_SERVICE_API_KEY="${GPS_API_KEY}" \
             -e GATEWAY_PORT=5027 \
             "${IMAGE}"
