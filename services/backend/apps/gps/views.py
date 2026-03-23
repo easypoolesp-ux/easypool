@@ -159,12 +159,21 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         imei = request.data.get('imei')
         try:
             from django.utils import timezone
+            from datetime import datetime
 
             bus = Bus.objects.get(gps_imei=imei)
             lat, lng = request.data.get('lat'), request.data.get('lng')
             speed = float(request.data.get('speed', 0))
             heading = float(request.data.get('heading', 0))
             ignition = request.data.get('ignition', False)
+            
+            # Use provided timestamp or fallback to now
+            ts_raw = request.data.get('timestamp')
+            if ts_raw:
+                ts = datetime.fromtimestamp(float(ts_raw), tz=timezone.utc)
+            else:
+                ts = timezone.now()
+
             if isinstance(ignition, str):
                 ignition = ignition.lower() == 'true'
 
@@ -174,7 +183,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                 speed=speed,
                 heading=heading,
                 ignition=ignition,
-                timestamp=timezone.now(),
+                timestamp=ts,
             )
 
             if not ignition:
@@ -223,6 +232,14 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             if isinstance(ignition, str):
                 ignition = ignition.lower() == 'true'
 
+            # Parse original GPS timestamp
+            ts_raw = entry.get('timestamp')
+            if ts_raw:
+                from datetime import datetime
+                ts = datetime.fromtimestamp(float(ts_raw), tz=timezone.utc)
+            else:
+                ts = timezone.now()
+
             points_to_create.append(
                 GPSPoint(
                     bus=bus,
@@ -230,7 +247,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                     speed=speed,
                     heading=float(entry.get('heading', 0)),
                     ignition=ignition,
-                    timestamp=timezone.now(),
+                    timestamp=ts,
                 )
             )
             # Track latest status per bus in this batch
