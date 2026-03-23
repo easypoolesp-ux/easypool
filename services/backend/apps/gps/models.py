@@ -2,6 +2,8 @@ import uuid
 
 from django.contrib.postgres.indexes import BrinIndex
 from django.db import models
+from django.contrib.gis.db import models as gis_models
+from django.contrib.gis.geos import Point
 
 from apps.buses.models import Bus
 from apps.schools.models import User
@@ -12,6 +14,7 @@ class GPSPoint(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='gps_points')
     lat = models.FloatField()
     lng = models.FloatField()
+    location = gis_models.PointField(null=True, blank=True, srid=4326)
     speed = models.FloatField(default=0)
     heading = models.FloatField(default=0, help_text='Direction of travel in degrees (0-360)')
     accuracy = models.FloatField(null=True, blank=True)
@@ -24,6 +27,12 @@ class GPSPoint(models.Model):
             models.Index(fields=['bus', '-timestamp']),
             BrinIndex(fields=['timestamp']),
         ]
+
+    def save(self, *args, **kwargs):
+        # Automatically sync location if lat/lng are present but location is not
+        if (self.lat and self.lng) and not self.location:
+            self.location = Point(self.lng, self.lat)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.bus.internal_id} @ {self.timestamp}'
