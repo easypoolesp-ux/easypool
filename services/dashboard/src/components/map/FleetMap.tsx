@@ -51,6 +51,14 @@ interface Props {
   initialBusId?: string | null;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const getLatLng = (obj: { lat?: number; lng?: number; location?: { coordinates: [number, number] } }) => {
+  if (obj.location?.coordinates) {
+    return { lat: obj.location.coordinates[1], lng: obj.location.coordinates[0] };
+  }
+  return { lat: obj.lat || 0, lng: obj.lng || 0 };
+};
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -238,10 +246,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       const color = getStatusColor(effectiveStatus);
       const heading = bus.heading || 0;
       
-      const pos = { 
-        lat: bus.location ? bus.location.coordinates[1] : bus.lat!, 
-        lng: bus.location ? bus.location.coordinates[0] : bus.lng! 
-      };
+      const pos = getLatLng(bus);
 
       const isMoving = effectiveStatus === "moving";
 
@@ -341,10 +346,12 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       if (cameraMode === "follow" && selectedBusId) {
         // Follow: pan to the selected bus
         const target = buses.find((b) => b.id === selectedBusId);
-        const targetPos = target?.location ? { lat: target.location.coordinates[1], lng: target.location.coordinates[0] } : { lat: target?.lat, lng: target?.lng };
-        if (target && targetPos.lat != null && targetPos.lng != null) {
-          mapRef.current.panTo({ lat: targetPos.lat, lng: targetPos.lng });
-          if ((mapRef.current.getZoom() ?? 0) < 15) mapRef.current.setZoom(15);
+        if (target) {
+          const targetPos = getLatLng(target);
+          if (targetPos.lat !== 0) {
+            mapRef.current.panTo(targetPos);
+            if ((mapRef.current.getZoom() ?? 0) < 15) mapRef.current.setZoom(15);
+          }
         }
       } else if (cameraMode === "overview") {
         // Overview: fit all visible buses, then snap back to free
@@ -352,8 +359,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         if (valid.length > 0) {
           const bounds = new google.maps.LatLngBounds();
           valid.forEach((v) => {
-            const vp = v.location ? { lat: v.location.coordinates[1], lng: v.location.coordinates[0] } : { lat: v.lat!, lng: v.lng! };
-            bounds.extend(vp);
+            bounds.extend(getLatLng(v));
           });
           // Cap at zoom 15 — maxZoom is the most reliable way to limit fitBounds
           mapRef.current.setOptions({ maxZoom: 15 });
@@ -607,11 +613,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
           Array.from(liveTrails.values()).map((trail, i) => (
             <Polyline
               key={`trail-${i}`}
-              path={trail.map((p) => 
-                p.location 
-                  ? { lat: p.location.coordinates[1], lng: p.location.coordinates[0] }
-                  : { lat: p.lat, lng: p.lng }
-              )}
+              path={trail.map((p) => getLatLng(p))}
               options={{
                 strokeColor: "#3b82f6",
                 strokeOpacity: 0,
@@ -634,11 +636,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         {/* History playback line */}
         {isHistoryMode && historyPoints.length > 1 && (
           <Polyline
-            path={historyPoints.map((p) => 
-              p.location 
-                ? { lat: p.location.coordinates[1], lng: p.location.coordinates[0] }
-                : { lat: p.lat, lng: p.lng }
-            )}
+            path={historyPoints.map((p) => getLatLng(p))}
             options={{
               strokeColor: "#3b82f6",
               strokeWeight: 3,
