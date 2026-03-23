@@ -65,6 +65,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+# DB Configuration (Updated with IAM/Secret Bridge)
 ASGI_APPLICATION = 'config.asgi.application'
 
 DATABASES = {
