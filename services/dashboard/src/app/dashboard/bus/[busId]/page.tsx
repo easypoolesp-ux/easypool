@@ -113,6 +113,7 @@ export default function BusDetailPage({ params }: Props) {
     status: bus.status || "offline",
     lat: (bus as any).lat,
     lng: (bus as any).lng,
+    location: (bus as any).location,
     plate: bus.plate_number,
   };
 

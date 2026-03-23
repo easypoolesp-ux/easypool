@@ -233,20 +233,20 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     });
 
     buses.forEach((bus) => {
-      if (bus.lat == null || bus.lng == null) return;
+      if (!bus.location && (bus.lat == null || bus.lng == null)) return;
       const effectiveStatus = bus.computed_status || bus.status;
       const color = getStatusColor(effectiveStatus);
       const heading = bus.heading || 0;
       
-      // Use location if available, fallback to lat/lng
-      const pos = bus.location 
-        ? { lat: bus.location.coordinates[1], lng: bus.location.coordinates[0] }
-        : { lat: bus.lat, lng: bus.lng };
+      const pos = { 
+        lat: bus.location ? bus.location.coordinates[1] : bus.lat!, 
+        lng: bus.location ? bus.location.coordinates[0] : bus.lng! 
+      };
 
       const isMoving = effectiveStatus === "moving";
 
       // Generate a state hash to skip redundant Google Maps DOM/Canvas updates
-      const stateHash = `${bus.lat},${bus.lng},${effectiveStatus},${heading},${isDark}`;
+      const stateHash = `${pos.lat},${pos.lng},${effectiveStatus},${heading},${isDark}`;
       if (markerStateRefs.current.get(bus.id) === stateHash) return;
       markerStateRefs.current.set(bus.id, stateHash);
 
@@ -341,16 +341,20 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       if (cameraMode === "follow" && selectedBusId) {
         // Follow: pan to the selected bus
         const target = buses.find((b) => b.id === selectedBusId);
-        if (target && target.lat != null && target.lng != null) {
-          mapRef.current.panTo({ lat: target.lat, lng: target.lng });
+        const targetPos = target?.location ? { lat: target.location.coordinates[1], lng: target.location.coordinates[0] } : { lat: target?.lat, lng: target?.lng };
+        if (target && targetPos.lat != null && targetPos.lng != null) {
+          mapRef.current.panTo({ lat: targetPos.lat, lng: targetPos.lng });
           if ((mapRef.current.getZoom() ?? 0) < 15) mapRef.current.setZoom(15);
         }
       } else if (cameraMode === "overview") {
         // Overview: fit all visible buses, then snap back to free
-        const valid = buses.filter((b) => b.lat != null && b.lng != null);
+        const valid = buses.filter((b) => b.location != null || (b.lat != null && b.lng != null));
         if (valid.length > 0) {
           const bounds = new google.maps.LatLngBounds();
-          valid.forEach((v) => bounds.extend({ lat: v.lat, lng: v.lng }));
+          valid.forEach((v) => {
+            const vp = v.location ? { lat: v.location.coordinates[1], lng: v.location.coordinates[0] } : { lat: v.lat!, lng: v.lng! };
+            bounds.extend(vp);
+          });
           // Cap at zoom 15 — maxZoom is the most reliable way to limit fitBounds
           mapRef.current.setOptions({ maxZoom: 15 });
           mapRef.current.fitBounds(bounds, 80);
@@ -386,7 +390,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       }).format(new Date());
       const result = new Map<string, GPSPoint[]>();
       const subset = buses
-        .filter((b) => b.lat != null && b.lng != null)
+        .filter((b) => b.location != null || (b.lat != null && b.lng != null))
         .slice(0, 10);
 
       await Promise.all(

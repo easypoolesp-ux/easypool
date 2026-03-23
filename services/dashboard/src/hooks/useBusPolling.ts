@@ -172,8 +172,10 @@ export function useBusPolling(): UseBusPollingReturn {
                     b.internal_id === data.imei
                       ? {
                           ...b,
-                          latest_lat: data.lat,
-                          latest_lng: data.lng,
+                          location: {
+                            type: 'Point',
+                            coordinates: [data.lng, data.lat]
+                          },
                           latest_speed: data.speed,
                           latest_heading: data.heading,
                           latest_heartbeat: new Date(

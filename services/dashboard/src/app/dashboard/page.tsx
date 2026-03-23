@@ -187,6 +187,7 @@ export default function DashboardPage() {
               computed_status: (b as any).computed_status,
               lat: b.lat,
               lng: b.lng,
+              location: (b as any).location,
               plate_number: b.plate_number,
               route_name: b.route_name,
               speed: (b as any).speed,
