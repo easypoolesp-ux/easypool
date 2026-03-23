@@ -85,3 +85,13 @@ jobs:
 
       - name: TypeScript Compiler Check (No Emit)
         run: npm run typecheck
+
+  # ── Backend Docker Build (Validation) ─────────────────────────────────────
+  backend-docker-build:
+    needs: [changes, backend-lint-and-security]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Backend Docker Image
+        run: docker build -t easypool-backend:ci ./services/backend
