@@ -101,6 +101,15 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
+      - name: Setup Terragrunt
+        uses: gruntwork-io/setup-terragrunt@v2
+        with:
+          terragrunt_version: 0.54.12
+      - name: Terragrunt Apply (Backend Production)
+        if: needs.changes.outputs.infra == 'true' || inputs.force_deploy == 'true'
+        run: |
+          cd infra/live/prod/cloudrun-backend
+          terragrunt apply --terragrunt-non-interactive -auto-approve
       - name: Run Migrations
         run: |
           gcloud run jobs deploy backend-migrate \
@@ -131,15 +140,6 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Setup Terragrunt
-        uses: gruntwork-io/setup-terragrunt@v2
-        with:
-          terragrunt_version: 0.54.12
-      - name: Terragrunt Apply (Backend Production)
-        if: needs.changes.outputs.infra == 'true' || inputs.force_deploy == 'true'
-        run: |
-          cd infra/live/prod/cloudrun-backend
-          terragrunt apply --terragrunt-non-interactive -auto-approve
       - name: Deploy Backend to Cloud Run
         run: |
           # Deploy Multi-Container Service
