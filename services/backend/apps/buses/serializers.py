@@ -54,19 +54,17 @@ class BusListSerializer(serializers.ModelSerializer):
         )
 
     def get_location(self, obj):
-        # 1. Prefer the direct GeoJSON from the database
-        geojson_str = getattr(obj, 'latest_location_json', None)
-        if geojson_str:
-            try:
-                return json.loads(geojson_str)
-            except (json.JSONDecodeError, TypeError):
-                pass
+        gps_id = getattr(obj, 'latest_gps_id', None)
+        if gps_id:
+            from apps.gps.models import GPSPoint
 
-        # 2. Fallback to RawSQL-derived lat/lng
-        lat = getattr(obj, 'latest_lat', None)
-        lng = getattr(obj, 'latest_lng', None)
-        if lat is not None and lng is not None:
-            return {"type": "Point", "coordinates": [lng, lat]}
+            try:
+                # This ensures we get the location without complex Subquery functions
+                point = GPSPoint.objects.only('location').get(id=gps_id)
+                if point.location:
+                    return {"type": "Point", "coordinates": [point.location.x, point.location.y]}
+            except GPSPoint.DoesNotExist:
+                pass
         return None
 
     @extend_schema_field(serializers.CharField())
