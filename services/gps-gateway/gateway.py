@@ -6,10 +6,10 @@ import redis.asyncio as redis
 import json
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-BACKEND_API_URL = os.getenv("BACKEND_API_URL", "https://easypool-backend-ihsu77lpaa-el.a.run.app/api/gps/telemetry")
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "https://easypool-backend-ihsu77lpaa-el.a.run.app/api/gps/")
 API_KEY = os.getenv("GPS_SERVICE_API_KEY", "easypool_gps_secret_2026")
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", 5027))
-REDIS_URL = os.getenv("REDIS_URL", "redis://:easypool_live_redis_2026@10.128.0.2:6379/0")
+REDIS_URL = os.getenv("REDIS_URL", "redis://:easypool_live_redis_2026@127.0.0.1:6379/0")
 
 # ── Global Clients ────────────────────────────────────────────────────────────
 redis_client = None
