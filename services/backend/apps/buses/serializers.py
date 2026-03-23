@@ -31,6 +31,11 @@ class BusListSerializer(serializers.ModelSerializer):
     permission_level = serializers.SerializerMethodField()
 
     location = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.CharField())
+    def get_status(self, obj):
+        return 'stopped' if obj.status == 'ignition_off' else obj.status
 
     class Meta:
         model = Bus
@@ -94,7 +99,7 @@ class BusListSerializer(serializers.ModelSerializer):
         ignition = getattr(obj, 'latest_ignition', True)
 
         if not ignition:
-            return 'ignition_off'
+            return 'stopped'
 
         return 'moving' if speed > 2 else 'idle'
 
@@ -114,6 +119,11 @@ class BusDetailSerializer(serializers.ModelSerializer):
     last_heartbeat = serializers.DateTimeField(source='latest_heartbeat', read_only=True)
 
     permission_level = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.CharField())
+    def get_status(self, obj):
+        return 'stopped' if obj.status == 'ignition_off' else obj.status
 
     class Meta:
         model = Bus

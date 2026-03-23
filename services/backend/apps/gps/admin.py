@@ -5,7 +5,7 @@ from .models import Alert, GPSPoint
 
 @admin.register(GPSPoint)
 class GPSPointAdmin(admin.GISModelAdmin):
-    list_display = ('bus', 'lat', 'lng', 'location', 'speed', 'heading', 'ignition', 'timestamp')
+    list_display = ('bus', 'location', 'speed', 'heading', 'ignition', 'timestamp')
     list_filter = ('bus', 'ignition', 'timestamp')
     readonly_fields = ('timestamp',)
 
