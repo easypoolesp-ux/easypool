@@ -1,4 +1,4 @@
-# Final trigger for parallel build verification
+# Final trigger for production deployment & report verification
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D  # noqa: F401 — available for future geo-filters
 from rest_framework import decorators, permissions, response, viewsets
