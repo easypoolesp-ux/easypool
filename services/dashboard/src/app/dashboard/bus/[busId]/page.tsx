@@ -19,7 +19,20 @@ interface Props {
   };
 }
 
-type BusDetail = components["schemas"]["BusDetail"];
+interface Camera {
+  id: string;
+  name: string;
+  stream_slug: string;
+  stream_url?: string;
+}
+
+type BusDetail = components["schemas"]["BusDetail"] & {
+  cameras?: Camera[];
+  last_heartbeat?: string;
+  lat?: number;
+  lng?: number;
+  location?: string;
+};
 
 export default function BusDetailPage({ params }: Props) {
   const { busId } = params;
@@ -131,7 +144,7 @@ export default function BusDetailPage({ params }: Props) {
   const HLS_PORT = "8888";
 
   const activeCamera = bus?.cameras?.find(
-    (c) => c.stream_slug === selectedCamera,
+    (c: Camera) => c.stream_slug === selectedCamera,
   );
 
   // PUBLIC TEST STREAM (Zero-Install fallback)
@@ -229,7 +242,7 @@ export default function BusDetailPage({ params }: Props) {
                 bus?.cameras &&
                 bus.cameras.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {bus.cameras.map((cam) => (
+                    {bus.cameras.map((cam: Camera) => (
                       <button
                         key={cam.id}
                         onClick={() => setSelectedCamera(cam.stream_slug!)}
@@ -384,8 +397,8 @@ export default function BusDetailPage({ params }: Props) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {(bus.cameras || [])
-              .filter((c) => c.stream_slug !== selectedCamera)
-              .map((cam) => (
+              .filter((c: Camera) => c.stream_slug !== selectedCamera)
+              .map((cam: Camera) => (
                 <div
                   key={cam.id}
                   className="aspect-video bg-slate-900 rounded-lg flex flex-col items-center justify-center border border-border group relative overflow-hidden"

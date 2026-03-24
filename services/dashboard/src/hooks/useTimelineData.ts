@@ -1,33 +1,57 @@
-import { useQuery } from "@tanstack/react-query";
-import { KmPoint } from "@/lib/geoUtils";
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "";
+import * as React from "react";
+import { apiRequest } from "@/lib/apiClient";
 
 export interface BusTimeline {
   bus_id: string;
   internal_id: string;
-  series: KmPoint[];  // pre-computed by PostGIS
+  series: { timestamp: string; cumulative_km: number }[];
 }
 
 export function useTimelineData(
+  busIds: string[],
   startDate: string,
   endDate: string,
-  selectedBuses: Set<string>
 ) {
-  const busParam = selectedBuses.size > 0 ? Array.from(selectedBuses).join(",") : undefined;
+  const [data, setData] = React.useState<BusTimeline[]>([]);
+  const [isLoading, setIsLoading] = React.useState<boolean>(false);
 
-  return useQuery<BusTimeline[]>({
-    queryKey: ["gps-timeline", startDate, endDate, busParam],
-    queryFn: async () => {
-      const token = localStorage.getItem("token");
-      const params = new URLSearchParams({ start: startDate, end: endDate });
-      if (busParam) params.set("bus", busParam);
-      const res = await fetch(`${BACKEND_URL}/api/gps/timeline/?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Failed to fetch timeline");
-      return res.json();
-    },
-    staleTime: 60_000,
-  });
+  React.useEffect(() => {
+    let isMounted = true;
+
+    async function fetchData() {
+      setIsLoading(true);
+      try {
+        const sortedBusIds = [...busIds].sort();
+        const busParam = sortedBusIds.length > 0 ? sortedBusIds.join(",") : "";
+        
+        const res = await apiRequest("/api/gps/timeline", "get", {
+          params: {
+            start: startDate,
+            end: endDate,
+            bus: busParam,
+          },
+        });
+
+        if (isMounted) {
+          setData(res);
+        }
+      } catch (err) {
+        console.error("Timeline data error:", err);
+        if (isMounted) {
+          setData([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    fetchData();
+    return () => {
+      isMounted = false;
+    };
+  }, [busIds, startDate, endDate]);
+
+  return { data, isLoading };
 }
