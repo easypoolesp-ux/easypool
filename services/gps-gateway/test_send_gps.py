@@ -3,10 +3,11 @@ import time
 import struct
 import binascii
 
-def send_fake_gps(host, port, imei):
+def send_fake_gps(host, port, imei, is_extended=False):
     # Ensure IMEI is 15 digits
     imei = imei.zfill(15)
-    print(f"[*] Targeting {host}:{port} with IMEI {imei}")
+    codec_name = "8 Extended" if is_extended else "8"
+    print(f"[*] Targeting {host}:{port} with IMEI {imei} using Codec {codec_name}")
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -14,9 +15,6 @@ def send_fake_gps(host, port, imei):
             s.connect((host, port))
             print("[+] Connected to gateway")
 
-            # 1. Handshake: Send IMEI
-            # Some Teltonika devices send length prefix (2 bytes), others send plain string.
-            # Our gateway handles both. Let's send plain string if it's 15 chars.
             s.sendall(imei.encode())
             
             # Expect 0x01 response
@@ -27,8 +25,6 @@ def send_fake_gps(host, port, imei):
                 print(f"[-] Handshake failed, received: {resp.hex()}")
                 return
 
-            # 2. Construct Codec 8 Packet
-            # Sample coordinates: New Delhi (28.6139, 77.2090)
             timestamp = int(time.time() * 1000)
             lat = int(28.6139 * 10000000)
             lng = int(77.2090 * 10000000)
@@ -37,16 +33,8 @@ def send_fake_gps(host, port, imei):
             sat = 12
             speed = 45 # km/h
             
-            # BODY (Codec 8)
-            # Codec ID (0x08) + Num Data (0x01) + Record... + Num Data (0x01)
-            # Note: The gateway simplified parser expects body[0]=CodecID, body[2:10]=TS
-            # Wait, let's look at parse_codec8_packet again.
-            # ts_raw = packet[2:10]
-            # lng_raw = packet[11:15]
-            # lat_raw = packet[15:19]
-            
             body = bytearray()
-            body.append(0x08)      # Codec ID
+            body.append(0x8E if is_extended else 0x08) # Codec ID
             body.append(0x01)      # Number of Data 1
             body.extend(struct.pack(">Q", timestamp)) # TS (8 bytes)
             body.append(0x01)      # Priority (1 byte)
@@ -57,19 +45,23 @@ def send_fake_gps(host, port, imei):
             body.append(sat)       # Sat (1 byte)
             body.extend(struct.pack(">H", speed))     # Speed (2 bytes)
             
-            # IO Elements (0 IOs for simplicity, but gateway loop needs to not crash)
-            body.append(0x00) # Event ID
-            body.append(0x00) # Total IO count
-            body.append(0x00) # 1B IO count
-            body.append(0x00) # 2B IO count
-            body.append(0x00) # 4B IO count
-            body.append(0x00) # 8B IO count
+            # IO Elements (0 IOs for simplicity)
+            if is_extended:
+                body.extend(b'\x00\x00') # Event ID
+                body.extend(b'\x00\x00') # Total IO count
+                body.extend(b'\x00\x00') # 1B IO count
+                body.extend(b'\x00\x00') # 2B IO count
+                body.extend(b'\x00\x00') # 4B IO count
+                body.extend(b'\x00\x00') # 8B IO count
+            else:
+                body.append(0x00) # Event ID
+                body.append(0x00) # Total IO count
+                body.append(0x00) # 1B IO count
+                body.append(0x00) # 2B IO count
+                body.append(0x00) # 4B IO count
+                body.append(0x00) # 8B IO count
             
             body.append(0x01) # Num Data 1 (footer count)
-            
-            # WRAPPER
-            # 00 00 00 00 + LENGTH (4B) + BODY + CRC (4B)
-            # Length = len(body)
             
             packet = bytearray()
             packet.extend(b'\x00\x00\x00\x00')
@@ -80,7 +72,6 @@ def send_fake_gps(host, port, imei):
             print(f"[+] Sending data: {binascii.hexlify(packet).decode()}")
             s.sendall(packet)
             
-            # 3. Wait for Acknowledgment (4 bytes)
             ack_raw = s.recv(4)
             if len(ack_raw) == 4:
                 ack_count = struct.unpack(">I", ack_raw)[0]
@@ -95,7 +86,11 @@ def send_fake_gps(host, port, imei):
 
 if __name__ == "__main__":
     import sys
-    # Default to localhost if no host provided
-    target_host = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
+    args = sys.argv[1:]
+    is_extended = "--extended" in args
+    if is_extended:
+        args.remove("--extended")
+    
+    target_host = args[0] if len(args) > 0 else "127.0.0.1"
     target_port = 5027
-    send_fake_gps(target_host, target_port, "1234567890")
+    send_fake_gps(target_host, target_port, "1234567890", is_extended)
