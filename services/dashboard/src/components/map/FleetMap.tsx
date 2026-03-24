@@ -551,8 +551,8 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         .length,
       idle: buses.filter((b) => (b.computed_status || b.status) === "idle")
         .length,
-      ignition_off: buses.filter(
-        (b) => (b.computed_status || b.status) === "ignition_off",
+      stopped: buses.filter(
+        (b) => (b.computed_status || b.status) === "stopped",
       ).length,
       offline: buses.filter(
         (b) => (b.computed_status || b.status) === "offline",
