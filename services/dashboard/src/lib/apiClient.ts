@@ -48,11 +48,21 @@ export async function apiRequest<
   });
 
   if (!res.ok) {
+    let errorData;
+    try {
+      errorData = await res.json();
+    } catch {
+      errorData = { error: res.statusText };
+    }
+    
     if (res.status === 401) {
-      // Handle logout or refresh (future)
       console.warn("Unauthorized API call");
     }
-    throw new Error(`API Error ${res.status}: ${res.statusText}`);
+
+    const msg = errorData.error || errorData.details || res.statusText || `status ${res.status}`;
+    const err = new Error(`API Error ${res.status}: ${msg}`);
+    (err as any).data = errorData;
+    throw err;
   }
 
   return res.json();

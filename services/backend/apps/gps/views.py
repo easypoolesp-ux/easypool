@@ -163,17 +163,24 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                         AS numeric), 3
                     ) AS cumulative_km
                 FROM gps_gpspoint
-                WHERE bus_id = ANY(%s::uuid[])
+                WHERE bus_id = ANY(%s)
                   AND timestamp >= %s::timestamp
                   AND timestamp < (%s::timestamp + interval '1 day')
+                  AND location IS NOT NULL
                 ORDER BY bus_id, timestamp
             """
             
             with connection.cursor() as cursor:
                 # Pass bus IDs as a list of strings
                 params = [list(bus_map.keys()), str(start_date), str(end_date)]
+                
+                # Debug logging for troubleshooting
+                print(f"Timeline Query SQL: {sql}", file=sys.stderr)
+                print(f"Timeline Query Params: {params}", file=sys.stderr)
+                
                 cursor.execute(sql, params)
                 rows = cursor.fetchall()
+                print(f"Timeline Query returned {len(rows)} rows", file=sys.stderr)
 
             # Group rows by bus_id
             grouped_data = defaultdict(list)
@@ -194,10 +201,15 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         except Exception as e:
             error_details = traceback.format_exc()
             print(f"Timeline API error: {error_details}", file=sys.stderr)
+            # Re-throw with more context or return detailed response
             return response.Response({
                 'error': str(e),
                 'details': error_details,  # Force details for investigation
-                'sql_debug': True
+                'sql_context': {
+                    'bus_ids': list(bus_map.keys()),
+                    'start_date': str(start_date),
+                    'end_date': str(end_date)
+                }
             }, status=500)
 
         return response.Response(result)
