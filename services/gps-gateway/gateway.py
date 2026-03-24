@@ -131,6 +131,21 @@ def parse_codec8_packet(packet: bytes):
                     if io_id in IGNITION_IO_IDS:
                         ignition = bool(io_val)
 
+            # Handle Variable-Length IO elements for Codec 8 Extended
+            if is_extended:
+                if pos + 2 > len(packet): break
+                nx_ios = struct.unpack(">H", packet[pos : pos + 2])[0]
+                pos += 2
+                
+                for _ in range(nx_ios):
+                    if pos + 4 > len(packet): break # 2 bytes ID + 2 bytes Length
+                    io_id = struct.unpack(">H", packet[pos : pos + 2])[0]
+                    io_len = struct.unpack(">H", packet[pos + 2 : pos + 4])[0]
+                    pos += 4
+                    
+                    if pos + io_len > len(packet): break
+                    pos += io_len
+
             records.append({
                 "lat": lat,
                 "lng": lng,
