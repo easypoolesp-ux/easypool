@@ -668,7 +668,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             else setLiveTrailMode("off");
           }}
           className={`p-3 relative rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${liveTrailMode !== "off" ? "bg-blue-600 text-white shadow-blue-500/20" : "bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white"}`}
-          title={`Live Trail: ${liveTrailMode === "off" ? "Off" : liveTrailMode === "2h" ? "Last 2 Hours" : "Today (Full)"}`}
+          title={`Live Trail: ${liveTrailMode === "off" ? "Off" : liveTrailMode === "2h" ? "Last 2 Hours" : "Last 24 Hours"}`}
         >
           <Route
             size={20}
@@ -676,7 +676,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
           />
           {liveTrailMode !== "off" && (
             <span className="absolute -bottom-1 -right-1 bg-white text-blue-600 text-[8px] font-bold px-1 rounded-sm shadow-sm border border-blue-100">
-              {liveTrailMode === "2h" ? "2H" : "DAY"}
+              {liveTrailMode === "2h" ? "2H" : "24H"}
             </span>
           )}
         </button>

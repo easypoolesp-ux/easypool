@@ -140,7 +140,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                     ) AS cumulative_km
                 FROM gps_gpspoint
                 WHERE bus_id = %s
-                  AND timestamp::date BETWEEN %s AND %s
+                  AND timestamp >= %s AND timestamp <= (%s::date + interval '1 day')
                 ORDER BY timestamp
             """
             with connection.cursor() as cursor:
