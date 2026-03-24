@@ -16,6 +16,9 @@ from .serializers import (
 )
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
+import sys
+import traceback
+from collections import defaultdict
 
 
 class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
@@ -193,7 +196,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             print(f"Timeline API error: {error_details}", file=sys.stderr)
             return response.Response({
                 'error': str(e),
-                'details': error_details if settings.DEBUG else "Check server logs",
+                'details': error_details,  # Force details for investigation
                 'sql_debug': True
             }, status=500)
 
