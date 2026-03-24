@@ -3,6 +3,7 @@ from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D  # noqa: F401 — available for future geo-filters
 from rest_framework import decorators, permissions, response, viewsets
 
+from django.conf import settings
 from apps.buses.models import Bus
 from core.permissions import IsAdmin, IsManager, IsViewer, SchoolIsolationMixin, apply_isolation
 
@@ -132,6 +133,7 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 
         result = []
         try:
+            import sys
             for bus in buses.distinct():
                 # Compute cumulative distance (metres → km) entirely in PostGIS.
                 # ST_Distance on geography columns gives true geodesic metres.
@@ -152,12 +154,15 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                             AS numeric), 3
                         ) AS cumulative_km
                     FROM gps_gpspoint
-                    WHERE bus_id = %s
-                      AND timestamp >= %s AND timestamp <= (%s::date + interval '1 day')
+                    WHERE bus_id = %s::uuid
+                      AND timestamp >= %s::timestamp
+                      AND timestamp < (%s::timestamp + interval '1 day')
                     ORDER BY timestamp
                 """
                 with connection.cursor() as cursor:
-                    cursor.execute(sql, [bus.id, start_date, end_date])
+                    # Explicitly stringify UUID and dates to avoid adapter issues
+                    params = [str(bus.id), str(start_date), str(end_date)]
+                    cursor.execute(sql, params)
                     rows = cursor.fetchall()
 
                 if not rows:
@@ -172,7 +177,13 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                     ],
                 })
         except Exception as e:
-            return response.Response({'error': str(e), 'sql_debug': True}, status=500)
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Timeline API error: {error_details}", file=sys.stderr)
+            return response.Response({
+                'error': str(e),
+                'details': error_details if settings.DEBUG else "Check server logs"
+            }, status=500)
 
         return response.Response(result)
 
