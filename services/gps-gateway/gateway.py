@@ -317,17 +317,3 @@ if __name__ == "__main__":
 
 
 
-async def run_gateway():
-    await init_clients()
-    asyncio.create_task(sync_queue_to_backend())
-    server = await asyncio.start_server(handle_bus, '0.0.0.0', GATEWAY_PORT)
-    print(f"[START] GPS Gateway on port {GATEWAY_PORT}")
-    async with server:
-        await server.serve_forever()
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(run_gateway())
-    except KeyboardInterrupt:
-        pass
