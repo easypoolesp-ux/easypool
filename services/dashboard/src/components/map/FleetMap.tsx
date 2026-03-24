@@ -382,9 +382,6 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
     const fetchLiveTrails = async () => {
       const token = localStorage.getItem("token");
-      const date = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Kolkata",
-      }).format(new Date());
       const result = new Map<string, GPSPoint[]>();
       const subset = buses
         .filter((b) => b.location != null || (b.lat != null && b.lng != null))
@@ -393,21 +390,15 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       await Promise.all(
         subset.map(async (bus) => {
           try {
+            const hours = liveTrailMode === "2h" ? "2" : "24";
             const res = await fetch(
-              `${BACKEND_URL}/api/gps/playback?bus=${bus.id}&date=${date}`,
+              `${BACKEND_URL}/api/gps/playback?bus=${bus.id}&hours=${hours}`,
               {
                 headers: { Authorization: `Bearer ${token}` },
               },
             );
             if (res.ok) {
-              let data: GPSPoint[] = await res.json();
-              // If only 2h mode, filter by threshold
-              if (liveTrailMode === "2h") {
-                const threshold = Date.now() - 2 * 60 * 60 * 1000;
-                data = data.filter(
-                  (p) => new Date(p.timestamp).getTime() > threshold,
-                );
-              }
+              const data: GPSPoint[] = await res.json();
               if (data.length > 0) result.set(bus.id, data);
             }
           } catch {}
