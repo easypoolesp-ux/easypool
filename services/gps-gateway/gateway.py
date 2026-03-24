@@ -13,8 +13,8 @@ GATEWAY_PORT     = int(os.getenv("GATEWAY_PORT", 5027))
 REDIS_URL        = os.getenv("REDIS_URL", "redis://:easypool_live_redis_2026@127.0.0.1:6379/0")
 
 # API Endpoints (Derived from openapi.yaml SSOT)
-ENDPOINT_TELEMETRY      = "telemetry/"
-ENDPOINT_BULK_TELEMETRY = "bulk_telemetry/"
+ENDPOINT_TELEMETRY      = "telemetry"
+ENDPOINT_BULK_TELEMETRY = "bulk_telemetry"
 
 # ── Global Clients ────────────────────────────────────────────────────────────
 redis_client = None
