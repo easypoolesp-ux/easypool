@@ -62,5 +62,21 @@ class Alert(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+class BusHourlyDistance(models.Model):
+    """
+    Pre-calculated summary of distance traveled per bus per hour.
+    Highly optimized for time-series analytics.
+    """
+    bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='hourly_distances')
+    hour = models.DateTimeField(help_text="The start of the hour (e.g., 2026-03-24 10:00:00)")
+    distance_km = models.FloatField(default=0, help_text="Total distance traveled during this hour.")
+
+    class Meta:
+        unique_together = ('bus', 'hour')
+        indexes = [
+            models.Index(fields=['bus', 'hour']),
+            models.Index(fields=['hour']),
+        ]
+
     def __str__(self):
-        return f'{self.get_type_display()} - {self.bus.internal_id}'
+        return f"{self.bus.internal_id} - {self.hour} - {self.distance_km} km"
