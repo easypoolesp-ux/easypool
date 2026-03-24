@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: Universal API for school bus tracking, attendance, and video monitoring.
 paths:
-  /api/alerts/:
+  /api/alerts:
     get:
       operationId: alerts_list
       description: |-
@@ -270,7 +270,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenRefresh'
           description: ''
-  /api/buses/:
+  /api/buses:
     get:
       operationId: buses_list
       description: |-
@@ -522,7 +522,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BusDetail'
           description: ''
-  /api/gps/:
+  /api/gps:
     get:
       operationId: gps_list
       description: |-
@@ -636,6 +636,43 @@ paths:
                   status: {type: string}
                   count: {type: integer}
           description: ''
+  /api/gps/timeline:
+    get:
+      operationId: gps_timeline
+      description: Return cumulative KM series per bus, computed in PostGIS.
+      parameters:
+      - name: start
+        in: query
+        schema: {type: string, format: date}
+      - name: end
+        in: query
+        schema: {type: string, format: date}
+      - name: bus
+        in: query
+        schema: {type: string}
+      tags:
+      - gps
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    bus_id: {type: string, format: uuid}
+                    internal_id: {type: string}
+                    series:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          timestamp: {type: string, format: date-time}
+                          cumulative_km: {type: number}
+          description: ''
   /api/gps/latest/:
     get:
       operationId: gps_latest_retrieve
@@ -651,7 +688,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/GPSPoint'
           description: ''
-  /api/routes/:
+  /api/routes:
     get:
       operationId: routes_list
       description: |-
@@ -819,7 +856,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/schools/:
+  /api/schools:
     get:
       operationId: schools_list
       description: |-
@@ -987,7 +1024,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/users/:
+  /api/users:
     get:
       operationId: users_list
       description: |-

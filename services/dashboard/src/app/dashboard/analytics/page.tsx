@@ -10,7 +10,7 @@ import SummaryStats from "@/components/analytics/SummaryStats";
 // KmChart uses browser-only APIs (ResizeObserver + canvas) — load client-side only
 const KmChart = dynamic(() => import("@/components/analytics/KmChart"), { ssr: false });
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "";
+import { apiRequest } from "@/lib/apiClient";
 
 interface BusOption { id: string; internal_id: string }
 
@@ -24,14 +24,13 @@ export default function AnalyticsPage() {
 
   // Load available buses once
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    fetch(`${BACKEND_URL}/api/buses/`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
+    apiRequest("/api/buses", "get")
       .then((d) => setBusOptions(Array.isArray(d) ? d : d.results ?? []))
-      .catch(() => {});
+      .catch((err) => console.error("Filter bus load error:", err));
   }, []);
 
-  const { data = [], isFetching, refetch } = useTimelineData(startDate, endDate, selectedBuses);
+  const busIds = Array.from(selectedBuses);
+  const { data = [], isLoading: isFetching } = useTimelineData(busIds, startDate, endDate);
 
   const toggleBus = useCallback((id: string) => {
     setSelectedBuses((prev) => {
@@ -51,16 +50,9 @@ export default function AnalyticsPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-slate-100">Fleet Analytics</h1>
-            <p className="text-xs text-slate-400">Cumulative KM · computed by PostGIS</p>
+            <p className="text-xs text-slate-400">View and analyze your fleet performance</p>
           </div>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-slate-200 transition-all disabled:opacity-40"
-        >
-          <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
-        </button>
       </div>
 
       {/* Filters */}

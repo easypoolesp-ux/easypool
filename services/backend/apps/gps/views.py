@@ -13,6 +13,8 @@ from .serializers import (
     GPSPlaybackSerializer,
     GPSPointSerializer,
 )
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 
 class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
@@ -89,6 +91,16 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 
         return response.Response(GPSPlaybackSerializer(qs.order_by('timestamp'), many=True).data)
 
+    @extend_schema(
+        summary="Cumulative KM Timeline",
+        description="Return cumulative KM series per bus, computed in PostGIS.",
+        parameters=[
+            OpenApiParameter("start", OpenApiTypes.DATE, description="ISO date (default: today)"),
+            OpenApiParameter("end", OpenApiTypes.DATE, description="ISO date (default: start)"),
+            OpenApiParameter("bus", OpenApiTypes.STR, description="Comma-separated bus IDs"),
+        ],
+        responses={200: OpenApiTypes.ANY}
+    )
     @decorators.action(detail=False, methods=['get'], permission_classes=[IsManager | IsViewer])
     def timeline(self, request):
         """Return cumulative KM series per bus, computed in PostGIS.
