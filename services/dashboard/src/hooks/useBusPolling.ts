@@ -164,7 +164,11 @@ export function useBusPolling(): UseBusPollingReturn {
     // 1. Initial complete fetch
     apiFetchBuses().then((data) => {
         setBuses(data);
+        setLoading(false);
+        setLastUpdated(new Date());
         setupStream();
+    }).catch(() => {
+        setLoading(false);
     });
 
     fetchMeta();

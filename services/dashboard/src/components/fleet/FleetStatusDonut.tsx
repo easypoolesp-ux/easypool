@@ -35,7 +35,7 @@ export default function FleetStatusDonut({ statuses }: Props) {
   // Build arcs (skip zero-count segments)
   let accumulatedOffset = 0;
   const arcs = statuses
-    .filter((s) => s.count > 0 && s.key !== "no_signal") // no_signal shown separately
+    .filter((s) => s.count > 0) // Show all statuses in the donut arcs if count > 0
     .map((s) => {
       const fraction = s.count / total;
       const dashLength = fraction * CIRCUMFERENCE;
@@ -93,9 +93,7 @@ export default function FleetStatusDonut({ statuses }: Props) {
       {/* ── Right side: Legend ── */}
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap gap-x-3 gap-y-1">
-          {statuses
-            .filter((s) => s.key !== "no_signal")
-            .map((s) => (
+          {statuses.map((s) => (
               <div
                 key={s.key}
                 className={`flex items-center gap-1.5 ${s.count === 0 ? "opacity-30" : ""}`}

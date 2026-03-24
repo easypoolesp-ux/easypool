@@ -43,7 +43,7 @@ export const FLEET_STATUSES: StatusConfig[] = [
     bg: "bg-slate-500/10",
   },
   {
-    key: "offline",
+    key: "no_signal",
     label: "No Signal",
     hex: "#ef4444",
     dot: "bg-red-500",

@@ -35,33 +35,35 @@ def send_fake_gps(host, port, imei, is_extended=False):
             
             body = bytearray()
             body.append(0x8E if is_extended else 0x08) # Codec ID
-            body.append(0x01)      # Number of Data 1
-            body.extend(struct.pack(">Q", timestamp)) # TS (8 bytes)
-            body.append(0x01)      # Priority (1 byte)
-            body.extend(struct.pack(">i", lng))       # Lng (4 bytes)
-            body.extend(struct.pack(">i", lat))       # Lat (4 bytes)
-            body.extend(struct.pack(">H", alt))       # Alt (2 bytes)
-            body.extend(struct.pack(">H", angle))     # Angle (2 bytes)
-            body.append(sat)       # Sat (1 byte)
-            body.extend(struct.pack(">H", speed))     # Speed (2 bytes)
+            body.append(0x05)      # Number of Data 1
+            for i in range(5):
+                body.extend(struct.pack(">Q", timestamp + i*1000)) # TS (8 bytes)
+                body.append(0x01)      # Priority (1 byte)
+                body.extend(struct.pack(">i", lng))       # Lng (4 bytes)
+                body.extend(struct.pack(">i", lat))       # Lat (4 bytes)
+                body.extend(struct.pack(">H", alt))       # Alt (2 bytes)
+                body.extend(struct.pack(">H", angle))     # Angle (2 bytes)
+                body.append(sat)       # Sat (1 byte)
+                body.extend(struct.pack(">H", speed))     # Speed (2 bytes)
+                
+                # IO Elements
+                if is_extended:
+                    body.extend(b'\x00\x00') # Event ID
+                    body.extend(b'\x00\x00') # Total IO count
+                    body.extend(b'\x00\x00') # 1B IO count
+                    body.extend(b'\x00\x00') # 2B IO count
+                    body.extend(b'\x00\x00') # 4B IO count
+                    body.extend(b'\x00\x00') # 8B IO count
+                    body.extend(b'\x00\x00') # X-BYte IO count (The Fix!)
+                else:
+                    body.append(0x00) # Event ID
+                    body.append(0x00) # Total IO count
+                    body.append(0x00) # 1B IO count
+                    body.append(0x00) # 2B IO count
+                    body.append(0x00) # 4B IO count
+                    body.append(0x00) # 8B IO count
             
-            # IO Elements (0 IOs for simplicity)
-            if is_extended:
-                body.extend(b'\x00\x00') # Event ID
-                body.extend(b'\x00\x00') # Total IO count
-                body.extend(b'\x00\x00') # 1B IO count
-                body.extend(b'\x00\x00') # 2B IO count
-                body.extend(b'\x00\x00') # 4B IO count
-                body.extend(b'\x00\x00') # 8B IO count
-            else:
-                body.append(0x00) # Event ID
-                body.append(0x00) # Total IO count
-                body.append(0x00) # 1B IO count
-                body.append(0x00) # 2B IO count
-                body.append(0x00) # 4B IO count
-                body.append(0x00) # 8B IO count
-            
-            body.append(0x01) # Num Data 1 (footer count)
+            body.append(0x05) # Num Data 1 (footer count)
             
             packet = bytearray()
             packet.extend(b'\x00\x00\x00\x00')

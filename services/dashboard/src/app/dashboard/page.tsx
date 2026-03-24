@@ -106,15 +106,8 @@ export default function DashboardPage() {
     });
   };
 
-  // Filter out offline (untracked) buses — they don't belong on the live dashboard
-  const activeBuses = useMemo(
-    () =>
-      buses.filter((b) => {
-        const cs = (b as any).computed_status || b.status;
-        return cs !== "offline";
-      }),
-    [buses],
-  );
+  // Include all buses in the active dashboard list (including offline/no_signal)
+  const activeBuses = buses;
 
   const filteredBuses = useMemo(
     () =>
@@ -213,24 +206,20 @@ export default function DashboardPage() {
                   Fleet Status
                 </h2>
                 <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500 mt-1">
-                  {loading && !lastUpdated ? (
-                    <span className="flex items-center gap-1 animate-pulse">
-                      <Clock size={10} /> Loading...
+                  {!lastUpdated ? (
+                    <span className="flex items-center gap-1 animate-pulse text-blue-500">
+                      <Clock size={10} /> Initializing...
                     </span>
                   ) : (
                     <span
                       className={`flex items-center gap-1 ${error ? "text-amber-500" : "text-emerald-600 dark:text-emerald-500"}`}
-                      title={error || "Live Tracking"}
+                      title={error || "Live Tracking Active"}
                     >
-                      {error ? (
-                        <WifiOff size={10} className="animate-pulse" />
-                      ) : (
-                        <Clock size={10} />
-                      )}
-                      Updated{" "}
-                      {lastUpdated
-                        ? formatTimeDisplay(lastUpdated.toISOString())
-                        : "just now"}
+                      <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse mr-0.5" />
+                      {error ? "Reconnecting..." : "Live"}
+                      <span className="opacity-50 ml-1">
+                        • Updated {formatTimeDisplay(lastUpdated.toISOString())}
+                      </span>
                     </span>
                   )}
                 </div>
