@@ -176,7 +176,6 @@ export default function FleetMap({ buses, initialBusId }: Props) {
   const currentPosRefs = useRef<Map<string, { lat: number; lng: number }>>(
     new Map(),
   ); // busId → last rendered pos
-
   // Map options — JSON styles only, no mapId (mapId disables styles)
   const mapOptions = useMemo<google.maps.MapOptions>(
     () => ({
@@ -552,11 +551,11 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         .length,
       idle: buses.filter((b) => (b.computed_status || b.status) === "idle")
         .length,
-      stopped: buses.filter(
-        (b) => (b.computed_status || b.status) === "stopped",
+      ignition_off: buses.filter(
+        (b) => (b.computed_status || b.status) === "ignition_off",
       ).length,
-      no_signal: buses.filter(
-        (b) => (b.computed_status || b.status) === "no_signal",
+      offline: buses.filter(
+        (b) => (b.computed_status || b.status) === "offline",
       ).length,
     }),
     [buses],

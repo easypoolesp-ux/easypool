@@ -44,73 +44,108 @@ async def init_clients():
 
 
 def parse_codec8_packet(packet: bytes):
-    """Sync parsing logic for Teltonika Codec 8 and Codec 8 Extended."""
+    """
+    Sync parsing logic for Teltonika Codec 8 and Codec 8 Extended.
+    Expects payload: [CodecID (1B)] [Count (1B)] [Records...] [Count (1B)]
+    Returns a list of parsed GPS records.
+    """
     try:
-        if len(packet) < 26:
-            return None
+        if len(packet) < 4:
+            return []
 
         codec_id = packet[0]
-        is_extended = (codec_id == 0x8E)
-
-        # Basic Checks
-        ts_raw = struct.unpack(">Q", packet[2:10])[0]
-        lng_raw = struct.unpack(">i", packet[11:15])[0]
-        lat_raw = struct.unpack(">i", packet[15:19])[0]
-        alt = struct.unpack(">H", packet[19:21])[0]
-        angle = struct.unpack(">H", packet[21:23])[0]
-        sat = packet[23]
-        speed = struct.unpack(">H", packet[24:26])[0]
-
-        lat = lat_raw / 10000000.0
-        lng = lng_raw / 10000000.0
-        timestamp = ts_raw / 1000.0
-
-        # IO Elements (simplified check for ignition)
-        ignition = False
-        pos = 26
+        record_count = packet[1]
+        footer_count = packet[-1]
         
-        if is_extended:
-            if pos + 4 <= len(packet):
-                # Event ID (2 bytes), Total IO (2 bytes)
-                pos += 4
-                for val_size in (1, 2, 4, 8):
-                    if pos + 2 > len(packet): break
-                    n = struct.unpack(">H", packet[pos:pos+2])[0]
-                    pos += 2
-                    for _ in range(n):
-                        if pos + 2 + val_size > len(packet): break
-                        io_id = struct.unpack(">H", packet[pos:pos+2])[0]
-                        io_val = int.from_bytes(packet[pos+2 : pos+2+val_size], "big")
-                        pos += 2 + val_size
-                        if io_id in IGNITION_IO_IDS:
-                            ignition = bool(io_val)
-        else:
-            if pos + 2 <= len(packet):
-                # Event ID (1 byte), Total IO (1 byte)
-                pos += 2 
-                for val_size in (1, 2, 4, 8):
-                    if pos + 1 > len(packet): break
-                    n = packet[pos]
-                    pos += 1
-                    for _ in range(n):
-                        if pos + 1 + val_size > len(packet): break
-                        io_id = packet[pos]
-                        io_val = int.from_bytes(packet[pos+1 : pos+1+val_size], "big")
-                        pos += 1 + val_size
-                        if io_id in IGNITION_IO_IDS:
-                            ignition = bool(io_val)
+        if record_count != footer_count:
+            print(f"[WARN] Record count mismatch: {record_count} != {footer_count}")
+            # We still try to parse if count > 0
+            if record_count == 0: return []
 
-        return {
-            "lat": lat,
-            "lng": lng,
-            "speed": speed,
-            "heading": angle,
-            "timestamp": timestamp,
-            "ignition": ignition,
-        }
+        is_extended = (codec_id == 0x8E)
+        records = []
+        pos = 2 # Start after Codec ID and Count
+
+        for i in range(record_count):
+            # Minimum size of a GPS record without IO is ~24 bytes.
+            if pos + 24 > len(packet): 
+                print(f"[ERROR] Packet truncated at record {i+1}/{record_count}")
+                break
+
+            # 1. Timestamp (8 bytes)
+            ts_raw = struct.unpack(">Q", packet[pos : pos + 8])[0]
+            timestamp = ts_raw / 1000.0
+            pos += 8
+
+            # 2. Priority (1 byte)
+            pos += 1
+
+            # 3. GPS Element (15 bytes)
+            lng_raw = struct.unpack(">i", packet[pos : pos + 4])[0]
+            lat_raw = struct.unpack(">i", packet[pos + 4 : pos + 8])[0]
+            alt = struct.unpack(">H", packet[pos + 8 : pos + 10])[0]
+            angle = struct.unpack(">H", packet[pos + 10 : pos + 12])[0]
+            sat = packet[pos + 12]
+            speed = struct.unpack(">H", packet[pos + 13 : pos + 15])[0]
+            
+            lat = lat_raw / 10000000.0
+            lng = lng_raw / 10000000.0
+            pos += 15
+
+            # 4. IO Elements
+            # Each IO section iterates through 1B, 2B, 4B, 8B values.
+            ignition = False
+            
+            # Event ID
+            event_id_size = 2 if is_extended else 1
+            pos += event_id_size
+            
+            # Total IO count
+            total_io_size = 2 if is_extended else 1
+            if pos + total_io_size > len(packet): break
+            pos += total_io_size
+
+            # IO Groups (1, 2, 4, 8 bytes)
+            for val_size in (1, 2, 4, 8):
+                size_prefix = 2 if is_extended else 1
+                if pos + size_prefix > len(packet): break
+                
+                if is_extended:
+                    num_ios = struct.unpack(">H", packet[pos : pos + 2])[0]
+                else:
+                    num_ios = packet[pos]
+                pos += size_prefix
+                
+                for _ in range(num_ios):
+                    io_id_size = 2 if is_extended else 1
+                    if pos + io_id_size + val_size > len(packet): break
+                    
+                    if is_extended:
+                        io_id = struct.unpack(">H", packet[pos : pos + 2])[0]
+                    else:
+                        io_id = packet[pos]
+                    
+                    io_val = int.from_bytes(packet[pos + io_id_size : pos + io_id_size + val_size], "big")
+                    pos += io_id_size + val_size
+                    
+                    if io_id in IGNITION_IO_IDS:
+                        ignition = bool(io_val)
+
+            records.append({
+                "lat": lat,
+                "lng": lng,
+                "speed": speed,
+                "heading": angle,
+                "timestamp": timestamp,
+                "ignition": ignition,
+            })
+
+        return records
     except Exception as exc:
         print(f"[ERROR] Parse failed: {exc}")
-        return None
+        import traceback
+        traceback.print_exc()
+        return []
 
 
 async def forward_to_backend(imei: str, data: dict):
@@ -190,9 +225,9 @@ async def handle_bus(reader, writer):
     imei = None
 
     try:
-        # Handshake: IMEI Receipt
+        # 1. Handshake: IMEI Receipt
         try:
-            first = await asyncio.wait_for(reader.read(1024), timeout=60)
+            first = await asyncio.wait_for(reader.read(1024), timeout=30)
             if not first: return
 
             if len(first) == 15 and first.isdigit():
@@ -215,21 +250,42 @@ async def handle_bus(reader, writer):
             print(f"[TIMEOUT] No handshake from {addr}")
             return
 
-        # Data Stream
+        # 2. Data Stream: Teltonika TCP Transport Protocol
         while True:
             try:
-                data = await asyncio.wait_for(reader.read(1024), timeout=120)
-                if not data: break
+                # Read Header: 4B Preamble (0s) + 4B Length
+                header = await asyncio.wait_for(reader.readexactly(8), timeout=120)
+                if not header: break
                 
-                # Teltonika packets usually start with 4 bytes of 0s
-                # Then 4 bytes of length, then Codec, then Data...
-                if len(data) > 12 and data[0:4] == b'\x00\x00\x00\x00':
-                    # Extract body (Codec ID onwards)
-                    body = data[8:-4] 
-                    parsed = parse_codec8_packet(body)
-                    if parsed:
-                        asyncio.create_task(forward_to_backend(imei, parsed))
+                if header[0:4] != b'\x00\x00\x00\x00':
+                    print(f"[ERROR] Invalid packet preamble from {imei}")
+                    break
                 
+                data_len = struct.unpack(">I", header[4:8])[0]
+                if data_len > 8192: # Safety limit
+                    print(f"[ERROR] Packet too large ({data_len}) from {imei}")
+                    break
+                
+                # Read Body: [Codec ID] [Count] [Records...] [Count] [CRC (4 bytes)]
+                # Total length to read is data_len + 4 (for the CRC)
+                full_payload = await reader.readexactly(data_len + 4)
+                
+                # Records block is everything except the 4B CRC at the end
+                records_packet = full_payload[:-4]
+                
+                parsed_records = parse_codec8_packet(records_packet)
+                if parsed_records:
+                    count = len(parsed_records)
+                    print(f"[DATA] {imei} sent {count} records")
+                    for record in parsed_records:
+                        asyncio.create_task(forward_to_backend(imei, record))
+                    
+                    # MANDATORY: Acknowledge with a 4-byte integer (Big Endian) of records accepted
+                    writer.write(struct.pack(">I", count))
+                    await writer.drain()
+                
+            except asyncio.IncompleteReadError:
+                break
             except asyncio.TimeoutError:
                 break
 
@@ -238,7 +294,27 @@ async def handle_bus(reader, writer):
     finally:
         print(f"[DISCONN] {imei or addr} disconnected")
         writer.close()
-        await writer.wait_closed()
+        try:
+            await writer.wait_closed()
+        except:
+            pass
+
+
+async def run_gateway():
+    await init_clients()
+    asyncio.create_task(sync_queue_to_backend())
+    server = await asyncio.start_server(handle_bus, '0.0.0.0', GATEWAY_PORT)
+    print(f"[START] GPS Gateway on port {GATEWAY_PORT}")
+    async with server:
+        await server.serve_forever()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(run_gateway())
+    except KeyboardInterrupt:
+        pass
+
 
 
 async def run_gateway():
