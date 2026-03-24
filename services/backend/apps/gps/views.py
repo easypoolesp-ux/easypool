@@ -134,55 +134,67 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         result = []
         try:
             import sys
-            for bus in buses.distinct():
-                # Compute cumulative distance (metres → km) entirely in PostGIS.
-                # ST_Distance on geography columns gives true geodesic metres.
-                sql = """
-                    SELECT
-                        timestamp,
-                        ROUND(
-                            CAST(
-                                SUM(
-                                    COALESCE(
-                                        ST_Distance(
-                                            location::geography,
-                                            LAG(location::geography) OVER (ORDER BY timestamp)
-                                        ),
-                                        0
-                                    )
-                                ) OVER (ORDER BY timestamp) / 1000.0
-                            AS numeric), 3
-                        ) AS cumulative_km
-                    FROM gps_gpspoint
-                    WHERE bus_id = %s::uuid
-                      AND timestamp >= %s::timestamp
-                      AND timestamp < (%s::timestamp + interval '1 day')
-                    ORDER BY timestamp
-                """
-                with connection.cursor() as cursor:
-                    # Explicitly stringify UUID and dates to avoid adapter issues
-                    params = [str(bus.id), str(start_date), str(end_date)]
-                    cursor.execute(sql, params)
-                    rows = cursor.fetchall()
-
-                if not rows:
-                    continue
-
-                result.append({
-                    'bus_id': str(bus.id),
-                    'internal_id': bus.internal_id,
-                    'series': [
-                        {'timestamp': row[0].isoformat(), 'cumulative_km': float(row[1])}
-                        for row in rows
-                    ],
-                })
-        except Exception as e:
             import traceback
+            from collections import defaultdict
+
+            bus_map = {str(b.id): b.internal_id for b in buses}
+            if not bus_map:
+                return response.Response([])
+
+            # Compute cumulative distance (metres → km) entirely in PostGIS for all buses at once.
+            sql = """
+                SELECT
+                    bus_id,
+                    timestamp,
+                    ROUND(
+                        CAST(
+                            SUM(
+                                COALESCE(
+                                    ST_Distance(
+                                        location::geography,
+                                        LAG(location::geography) OVER (PARTITION BY bus_id ORDER BY timestamp)
+                                    ),
+                                    0
+                                )
+                            ) OVER (PARTITION BY bus_id ORDER BY timestamp) / 1000.0
+                        AS numeric), 3
+                    ) AS cumulative_km
+                FROM gps_gpspoint
+                WHERE bus_id = ANY(%s::uuid[])
+                  AND timestamp >= %s::timestamp
+                  AND timestamp < (%s::timestamp + interval '1 day')
+                ORDER BY bus_id, timestamp
+            """
+            
+            with connection.cursor() as cursor:
+                # Pass bus IDs as a list of strings
+                params = [list(bus_map.keys()), str(start_date), str(end_date)]
+                cursor.execute(sql, params)
+                rows = cursor.fetchall()
+
+            # Group rows by bus_id
+            grouped_data = defaultdict(list)
+            for row in rows:
+                b_id = str(row[0])
+                grouped_data[b_id].append({
+                    'timestamp': row[1].isoformat() if hasattr(row[1], 'isoformat') else str(row[1]),
+                    'cumulative_km': float(row[2]) if row[2] is not None else 0.0
+                })
+
+            for b_id, series in grouped_data.items():
+                result.append({
+                    'bus_id': b_id,
+                    'internal_id': bus_map.get(b_id, "Unknown"),
+                    'series': series
+                })
+
+        except Exception as e:
             error_details = traceback.format_exc()
             print(f"Timeline API error: {error_details}", file=sys.stderr)
             return response.Response({
                 'error': str(e),
-                'details': error_details if settings.DEBUG else "Check server logs"
+                'details': error_details if settings.DEBUG else "Check server logs",
+                'sql_debug': True
             }, status=500)
 
         return response.Response(result)
