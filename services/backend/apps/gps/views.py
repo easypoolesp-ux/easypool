@@ -63,6 +63,8 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 
         qs = GPSPoint.objects.filter(bus_id=bus_id)
 
+        hours = request.query_params.get('hours')
+
         if date_str:
             from django.utils.dateparse import parse_date
 
@@ -71,6 +73,15 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
                 qs = qs.filter(timestamp__date=target_date)
             else:
                 return response.Response({'error': 'Invalid date format'}, status=400)
+        elif hours:
+            from django.utils import timezone
+            from datetime import timedelta
+
+            try:
+                hours_int = int(hours)
+                qs = qs.filter(timestamp__gte=timezone.now() - timedelta(hours=hours_int))
+            except ValueError:
+                return response.Response({'error': 'Invalid hours format'}, status=400)
         else:
             from django.utils import timezone
 

@@ -44,14 +44,15 @@ async def init_clients():
 
 
 def parse_codec8_packet(packet: bytes):
-    """Sync parsing logic for Teltonika Codec 8."""
+    """Sync parsing logic for Teltonika Codec 8 and Codec 8 Extended."""
     try:
         if len(packet) < 26:
             return None
 
-        # Basic Codec 8 Check
-        # packet[0] = Codec ID (8 or 8E)
-        # packet[1] = Number of Data records
+        codec_id = packet[0]
+        is_extended = (codec_id == 0x8E)
+
+        # Basic Checks
         ts_raw = struct.unpack(">Q", packet[2:10])[0]
         lng_raw = struct.unpack(">i", packet[11:15])[0]
         lat_raw = struct.unpack(">i", packet[15:19])[0]
@@ -67,21 +68,37 @@ def parse_codec8_packet(packet: bytes):
         # IO Elements (simplified check for ignition)
         ignition = False
         pos = 26
-        if pos + 1 <= len(packet):
-            # Event ID (1 byte)
-            # Total IO count (1 byte)
-            pos += 2 
-            for val_size in (1, 2, 4, 8):
-                if pos + 1 > len(packet): break
-                n = packet[pos] # Count of IOs with this size
-                pos += 1
-                for _ in range(n):
-                    if pos + 1 + val_size > len(packet): break
-                    io_id = packet[pos]
-                    io_val = int.from_bytes(packet[pos+1 : pos+1+val_size], "big")
-                    pos += 1 + val_size
-                    if io_id in IGNITION_IO_IDS:
-                        ignition = bool(io_val)
+        
+        if is_extended:
+            if pos + 4 <= len(packet):
+                # Event ID (2 bytes), Total IO (2 bytes)
+                pos += 4
+                for val_size in (1, 2, 4, 8):
+                    if pos + 2 > len(packet): break
+                    n = struct.unpack(">H", packet[pos:pos+2])[0]
+                    pos += 2
+                    for _ in range(n):
+                        if pos + 2 + val_size > len(packet): break
+                        io_id = struct.unpack(">H", packet[pos:pos+2])[0]
+                        io_val = int.from_bytes(packet[pos+2 : pos+2+val_size], "big")
+                        pos += 2 + val_size
+                        if io_id in IGNITION_IO_IDS:
+                            ignition = bool(io_val)
+        else:
+            if pos + 2 <= len(packet):
+                # Event ID (1 byte), Total IO (1 byte)
+                pos += 2 
+                for val_size in (1, 2, 4, 8):
+                    if pos + 1 > len(packet): break
+                    n = packet[pos]
+                    pos += 1
+                    for _ in range(n):
+                        if pos + 1 + val_size > len(packet): break
+                        io_id = packet[pos]
+                        io_val = int.from_bytes(packet[pos+1 : pos+1+val_size], "big")
+                        pos += 1 + val_size
+                        if io_id in IGNITION_IO_IDS:
+                            ignition = bool(io_val)
 
         return {
             "lat": lat,
