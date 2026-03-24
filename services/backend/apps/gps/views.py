@@ -131,45 +131,48 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             buses = buses.filter(id__in=ids)
 
         result = []
-        for bus in buses.distinct():
-            # Compute cumulative distance (metres → km) entirely in PostGIS.
-            # ST_Distance on geography columns gives true geodesic metres.
-            sql = """
-                SELECT
-                    timestamp,
-                    ROUND(
-                        CAST(
-                            SUM(
-                                COALESCE(
-                                    ST_Distance(
-                                        location::geography,
-                                        LAG(location::geography) OVER (ORDER BY timestamp)
-                                    ),
-                                    0
-                                )
-                            ) OVER (ORDER BY timestamp) / 1000.0
-                        AS numeric), 3
-                    ) AS cumulative_km
-                FROM gps_gpspoint
-                WHERE bus_id = %s
-                  AND timestamp >= %s AND timestamp <= (%s::date + interval '1 day')
-                ORDER BY timestamp
-            """
-            with connection.cursor() as cursor:
-                cursor.execute(sql, [bus.id, start_date, end_date])
-                rows = cursor.fetchall()
+        try:
+            for bus in buses.distinct():
+                # Compute cumulative distance (metres → km) entirely in PostGIS.
+                # ST_Distance on geography columns gives true geodesic metres.
+                sql = """
+                    SELECT
+                        timestamp,
+                        ROUND(
+                            CAST(
+                                SUM(
+                                    COALESCE(
+                                        ST_Distance(
+                                            location::geography,
+                                            LAG(location::geography) OVER (ORDER BY timestamp)
+                                        ),
+                                        0
+                                    )
+                                ) OVER (ORDER BY timestamp) / 1000.0
+                            AS numeric), 3
+                        ) AS cumulative_km
+                    FROM gps_gpspoint
+                    WHERE bus_id = %s
+                      AND timestamp >= %s AND timestamp <= (%s::date + interval '1 day')
+                    ORDER BY timestamp
+                """
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, [bus.id, start_date, end_date])
+                    rows = cursor.fetchall()
 
-            if not rows:
-                continue
+                if not rows:
+                    continue
 
-            result.append({
-                'bus_id': str(bus.id),
-                'internal_id': bus.internal_id,
-                'series': [
-                    {'timestamp': row[0].isoformat(), 'cumulative_km': float(row[1])}
-                    for row in rows
-                ],
-            })
+                result.append({
+                    'bus_id': str(bus.id),
+                    'internal_id': bus.internal_id,
+                    'series': [
+                        {'timestamp': row[0].isoformat(), 'cumulative_km': float(row[1])}
+                        for row in rows
+                    ],
+                })
+        except Exception as e:
+            return response.Response({'error': str(e), 'sql_debug': True}, status=500)
 
         return response.Response(result)
 
