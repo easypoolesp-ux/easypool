@@ -85,7 +85,7 @@ class BusViewSet(SchoolIsolationMixin, viewsets.ModelViewSet):
 
     @extend_schema(
         responses={200: {'type': 'string', 'format': 'binary'}},
-        description="SSE endpoint for live bus locations streaming directly from Redis."
+        description='SSE endpoint for live bus locations streaming directly from Redis.',
     )
     @decorators.action(detail=False, methods=['get'])
     def stream(self, request):

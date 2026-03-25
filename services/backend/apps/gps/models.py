@@ -15,7 +15,7 @@ class GPSPoint(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='gps_points')
     location = gis_models.PointField(srid=4326)  # No longer null
     speed = models.FloatField(default=0)
-    heading = models.FloatField(default=0, help_text="Direction of travel in degrees (0-360)")
+    heading = models.FloatField(default=0, help_text='Direction of travel in degrees (0-360)')
     accuracy = models.FloatField(null=True, blank=True)
     timestamp = models.DateTimeField()
     ignition = models.BooleanField(default=False)
@@ -62,14 +62,18 @@ class Alert(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+
 class BusHourlyDistance(models.Model):
     """
     Pre-calculated summary of distance traveled per bus per hour.
     Highly optimized for time-series analytics.
     """
+
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='hourly_distances')
-    hour = models.DateTimeField(help_text="The start of the hour (e.g., 2026-03-24 10:00:00)")
-    distance_km = models.FloatField(default=0, help_text="Total distance traveled during this hour.")
+    hour = models.DateTimeField(help_text='The start of the hour (e.g., 2026-03-24 10:00:00)')
+    distance_km = models.FloatField(
+        default=0, help_text='Total distance traveled during this hour.'
+    )
 
     class Meta:
         unique_together = ('bus', 'hour')
@@ -79,4 +83,4 @@ class BusHourlyDistance(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.bus.internal_id} - {self.hour} - {self.distance_km} km"
+        return f'{self.bus.internal_id} - {self.hour} - {self.distance_km} km'
