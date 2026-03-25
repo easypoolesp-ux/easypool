@@ -46,10 +46,10 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='bushourlydistance',
-            index=models.Index(fields=['bus', 'hour']),
+            index=models.Index(fields=['bus', 'hour'], name='gps_bushour_bus_id_8cb4f6_idx'),
         ),
         migrations.AddIndex(
             model_name='bushourlydistance',
-            index=models.Index(fields=['hour']),
+            index=models.Index(fields=['hour'], name='gps_bushour_hour_c030c5_idx'),
         ),
     ]
