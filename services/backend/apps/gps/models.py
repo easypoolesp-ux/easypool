@@ -1,4 +1,5 @@
 import uuid
+# Force Trigger: Spatial Migration Build (Unblocked CI)
 
 from django.contrib.gis.db import models as gis_models
 
