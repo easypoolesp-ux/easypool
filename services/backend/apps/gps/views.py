@@ -139,68 +139,30 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 
         result = []
         try:
-            import sys
-            import traceback
+            from .models import BusHourlyDistance
             from collections import defaultdict
 
             bus_map = {str(b.id): b.internal_id for b in buses}
             if not bus_map:
                 return response.Response([])
 
-            # Multi-step hourly aggregation: 100% accurate distance but tiny payload size (1/1000th).
-            sql = """
-                WITH step_distances AS (
-                    SELECT 
-                        bus_id,
-                        timestamp,
-                        ST_Distance(
-                            ST_SetSRID(location, 4326)::geography, 
-                            LAG(ST_SetSRID(location, 4326)::geography) OVER (PARTITION BY bus_id ORDER BY timestamp)
-                        ) as d
-                    FROM gps_gpspoint
-                    WHERE bus_id = ANY(%s)
-                      AND timestamp >= %s::timestamp
-                      AND timestamp < (%s::timestamp + interval '1 day')
-                      AND location IS NOT NULL
-                ),
-                hourly_agg AS (
-                    SELECT
-                        bus_id,
-                        date_trunc('hour', timestamp) as hr,
-                        SUM(COALESCE(d, 0)) as meters_in_hour
-                    FROM step_distances
-                    GROUP BY bus_id, hr
-                )
-                SELECT 
-                    bus_id, 
-                    hr as timestamp, 
-                    ROUND(SUM(meters_in_hour) OVER (PARTITION BY bus_id ORDER BY hr) / 1000.0, 3) as cumulative_km
-                FROM hourly_agg
-                ORDER BY bus_id, hr
-            """
-            
-            with connection.cursor() as cursor:
-                # Pass bus IDs as a list of strings
-                params = [list(bus_map.keys()), str(start_date), str(end_date)]
-                
-                # Debug logging for troubleshooting
-                print(f"Timeline Query SQL: {sql}", file=sys.stderr)
-                print(f"Timeline Query Params: {params}", file=sys.stderr)
-                
-                cursor.execute(sql, params)
-                rows = cursor.fetchall()
-                print(f"Timeline Query returned {len(rows)} rows", file=sys.stderr)
+            # Query pre-calculated hourly distances
+            stats = BusHourlyDistance.objects.filter(
+                bus__in=buses,
+                hour__date__range=[start_date, end_date]
+            ).order_by('bus', 'hour')
 
-            # Group rows by bus_id
-            grouped_data = defaultdict(list)
-            for row in rows:
-                b_id = str(row[0])
-                grouped_data[b_id].append({
-                    'timestamp': row[1].isoformat() if hasattr(row[1], 'isoformat') else str(row[1]),
-                    'cumulative_km': float(row[2]) if row[2] is not None else 0.0
+            # Group by bus and compute cumulative totals
+            bus_series = defaultdict(list)
+            for entry in stats:
+                b_id = str(entry.bus_id)
+                last_km = bus_series[b_id][-1]['cumulative_km'] if bus_series[b_id] else 0.0
+                bus_series[b_id].append({
+                    'timestamp': entry.hour.isoformat(),
+                    'cumulative_km': round(last_km + entry.distance_km, 3)
                 })
 
-            for b_id, series in grouped_data.items():
+            for b_id, series in bus_series.items():
                 result.append({
                     'bus_id': b_id,
                     'internal_id': bus_map.get(b_id, "Unknown"),
@@ -210,15 +172,9 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         except Exception as e:
             error_details = traceback.format_exc()
             print(f"Timeline API error: {error_details}", file=sys.stderr)
-            # Re-throw with more context or return detailed response
             return response.Response({
                 'error': str(e),
-                'details': error_details,  # Force details for investigation
-                'sql_context': {
-                    'bus_ids': list(bus_map.keys()),
-                    'start_date': str(start_date),
-                    'end_date': str(end_date)
-                }
+                'details': error_details
             }, status=500)
 
         return response.Response(result)
@@ -355,38 +311,55 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 
         # Pre-calculation for Industry-Standard Analytics
         try:
-            from django.db import connection
             from .models import BusHourlyDistance
             
+            # Group points by bus for efficient processing
+            bus_points = defaultdict(list)
             for entry in data_list:
                 imei = entry.get('imei')
                 bus = bus_map.get(imei)
-                if not bus: continue
+                if bus and entry.get('coords') and entry.get('timestamp'):
+                    bus_points[bus].append(entry)
+
+            for bus, entries in bus_points.items():
+                # Sort entries by timestamp
+                entries.sort(key=lambda x: float(x['timestamp']))
                 
-                coords = entry.get('coords')
-                ts_raw = entry.get('timestamp')
-                if not coords or not ts_raw: continue
-                
-                ts = datetime.fromtimestamp(float(ts_raw), tz=timezone.utc)
-                hr_ts = ts.replace(minute=0, second=0, microsecond=0)
-                
-                # We need the previous point to calculate distance.
-                # In bulk, we might have multiple points for the same bus.
-                # Simplification: get distance from the point just before this batch.
-                prev_point = GPSPoint.objects.filter(bus=bus, timestamp__lt=ts).first()
-                if prev_point and prev_point.location:
+                # Get the absolute previous point from DB only once per bus
+                first_ts = datetime.fromtimestamp(float(entries[0]['timestamp']), tz=timezone.utc)
+                prev_point = GPSPoint.objects.filter(bus=bus, timestamp__lt=first_ts).first()
+                last_loc = prev_point.location if prev_point else None
+
+                # Track hourly deltas in memory to minimize DB writes
+                hourly_deltas = defaultdict(float)
+
+                for entry in entries:
+                    coords = entry['coords']
+                    ts = datetime.fromtimestamp(float(entry['timestamp']), tz=timezone.utc)
+                    hr_ts = ts.replace(minute=0, second=0, microsecond=0)
+                    
                     new_loc = Point(float(coords[0]), float(coords[1]), srid=4326)
-                    with connection.cursor() as cursor:
-                        cursor.execute(
-                            "SELECT ST_Distance(%s::geography, %s::geography)",
-                            [new_loc.ewkt, prev_point.location.ewkt]
-                        )
-                        d_meters = cursor.fetchone()[0] or 0
-                        stats, _ = BusHourlyDistance.objects.get_or_create(bus=bus, hour=hr_ts)
-                        stats.distance_km += (d_meters / 1000.0)
-                        stats.save()
+                    
+                    if last_loc:
+                        # Use raw SQL for accurate distance calculation
+                        with connection.cursor() as cursor:
+                            cursor.execute(
+                                "SELECT ST_Distance(%s::geography, %s::geography)",
+                                [new_loc.ewkt, last_loc.ewkt]
+                            )
+                            d_meters = cursor.fetchone()[0] or 0
+                            hourly_deltas[hr_ts] += (d_meters / 1000.0)
+                    
+                    last_loc = new_loc
+
+                # Bulk update hourly stats
+                for hr, dist in hourly_deltas.items():
+                    stats, _ = BusHourlyDistance.objects.get_or_create(bus=bus, hour=hr)
+                    stats.distance_km += dist
+                    stats.save()
+
         except Exception as stats_err:
-            print(f"Bulk Stats pre-calc error: {stats_err}", file=sys.stderr)
+            print(f"Bulk Stats pre-calc error: {traceback.format_exc()}", file=sys.stderr)
 
         return response.Response({'status': 'success', 'count': len(points_to_create)})
 
