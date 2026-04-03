@@ -113,7 +113,16 @@ export function useBusPolling(): UseBusPollingReturn {
         const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
         const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const res = await fetch(`/api/buses/stream`, { headers });
+        // CRITICAL: Connect DIRECTLY to the backend for SSE — do NOT go through
+        // the Next.js rewrite proxy. Next.js rewrites buffer streaming responses
+        // (waiting for them to "finish"), which kills SSE connections entirely.
+        // NEXT_PUBLIC_API_URL is already set in Cloud Run env vars.
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || "";
+        const streamUrl = backendUrl
+          ? `${backendUrl}/api/buses/stream`
+          : `/api/buses/stream`;
+
+        const res = await fetch(streamUrl, { headers });
         if (!res.ok) throw new Error(`Stream HTTP Error ${res.status}`);
 
         const reader = res.body?.getReader();
@@ -194,14 +203,20 @@ export function useBusPolling(): UseBusPollingReturn {
       }
     };
 
-    // 1. Initial complete fetch
+    // 1. Initial complete fetch + start both SSE and polling
     apiFetchBuses().then((data) => {
       setBuses(data);
       setLoading(false);
       setLastUpdated(new Date());
+      // Start SSE — if it connects, great; if not, polling covers us.
       setupStream();
+      // Start polling immediately alongside SSE as a safety net.
+      // If SSE works, this just refreshes stale fields like computed_status.
+      // If SSE fails (Cloud Run timeout, CORS, etc.), this keeps markers moving.
+      startPollingFallback();
     }).catch(() => {
       setLoading(false);
+      startPollingFallback();
     });
 
     fetchMeta();
