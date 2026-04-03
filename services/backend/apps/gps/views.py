@@ -65,39 +65,43 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 
     @decorators.action(detail=False, methods=['get'], permission_classes=[IsManager | IsViewer])
     def playback(self, request):
-        """Return historical points for a bus on a specific date."""
+        """Return historical GPS points for a bus over a date range."""
         bus_id = request.query_params.get('bus')
-        date_str = request.query_params.get('date')
-
         if not bus_id:
             return response.Response({'error': 'bus_id is required'}, status=400)
 
-        user = request.user
-        bus_qs = apply_isolation(user, Bus.objects.filter(id=bus_id))
-
+        bus_qs = apply_isolation(request.user, Bus.objects.filter(id=bus_id))
         if not bus_qs.exists():
             return response.Response({'error': 'Unauthorized or invalid bus_id'}, status=403)
 
         qs = GPSPoint.objects.filter(bus_id=bus_id)
 
-        hours = request.query_params.get('hours')
+        # New: start_date + end_date range (front-end sends these now)
+        start_str = request.query_params.get('start_date') or request.query_params.get('date')
+        end_str   = request.query_params.get('end_date')
+        hours     = request.query_params.get('hours')
 
-        if date_str:
-            target_date = parse_date(date_str)
-            if target_date:
-                qs = qs.filter(timestamp__date=target_date)
-            else:
-                return response.Response({'error': 'Invalid date format'}, status=400)
+        if start_str:
+            start_date = parse_date(start_str)
+            if not start_date:
+                return response.Response({'error': 'Invalid start_date'}, status=400)
+            end_date = parse_date(end_str) if end_str else start_date
+            if end_date < start_date:
+                return response.Response({'error': 'end_date must be >= start_date'}, status=400)
+            # filter: start_date 00:00 IST → end_date 23:59 IST
+            qs = qs.filter(timestamp__date__gte=start_date, timestamp__date__lte=end_date)
         elif hours:
             try:
-                hours_int = int(hours)
-                qs = qs.filter(timestamp__gte=timezone.now() - timedelta(hours=hours_int))
+                qs = qs.filter(timestamp__gte=timezone.now() - timedelta(hours=int(hours)))
             except ValueError:
-                return response.Response({'error': 'Invalid hours format'}, status=400)
+                return response.Response({'error': 'Invalid hours'}, status=400)
         else:
             qs = qs.filter(timestamp__date=timezone.now().date())
 
-        return response.Response(GPSPlaybackSerializer(qs.order_by('timestamp'), many=True).data)
+        # Cap at 5000 points to keep payload sane over multi-day ranges
+        return response.Response(
+            GPSPlaybackSerializer(qs.order_by('timestamp')[:5000], many=True).data
+        )
 
     @extend_schema(
         summary='GPS Staleness Report',

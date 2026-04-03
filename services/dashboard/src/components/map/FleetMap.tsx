@@ -126,11 +126,10 @@ export default function FleetMap({ buses, initialBusId }: Props) {
   const [cameraMode, setCameraMode] = useState<"free" | "follow" | "overview">(
     "free",
   );
-  const [playbackDate, setPlaybackDate] = useState(() =>
-    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
-      new Date(),
-    ),
-  );
+  const todayIST = () =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+  const [playbackDate, setPlaybackDate] = useState(todayIST);
+  const [playbackEndDate, setPlaybackEndDate] = useState(todayIST);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -140,11 +139,11 @@ export default function FleetMap({ buses, initialBusId }: Props) {
   const { data: historyPoints = [], isFetching: isHistoryLoading } = useQuery<
     GPSPoint[]
   >({
-    queryKey: ["gps-playback", selectedBusId, playbackDate],
+    queryKey: ["gps-playback", selectedBusId, playbackDate, playbackEndDate],
     queryFn: async () => {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `${BACKEND_URL}/api/gps/playback?bus=${selectedBusId}&date=${playbackDate}`,
+        `${BACKEND_URL}/api/gps/playback?bus=${selectedBusId}&start_date=${playbackDate}&end_date=${playbackEndDate}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -153,12 +152,8 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       return res.json();
     },
     enabled: isHistoryMode && !!selectedBusId,
-    // If date is today, stale after 30s. If past date, cache "forever" (24h)
     staleTime:
-      playbackDate ===
-        new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
-          new Date(),
-        )
+      playbackEndDate === todayIST()
         ? 30 * 1000
         : 24 * 60 * 60 * 1000,
   });
@@ -747,11 +742,26 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       {isHistoryMode && (
         <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-white/10">
           <Calendar size={14} className="text-blue-500 ml-2" />
+          {/* Start date */}
           <input
             type="date"
             value={playbackDate}
+            max={playbackEndDate}
             onChange={(e) => {
               setPlaybackDate(e.target.value);
+              setPlaybackIndex(0);
+            }}
+            className="bg-transparent text-xs font-bold border-none focus:ring-0 p-0 text-slate-800 dark:text-white cursor-pointer"
+          />
+          <span className="text-slate-400 text-xs">→</span>
+          {/* End date */}
+          <input
+            type="date"
+            value={playbackEndDate}
+            min={playbackDate}
+            max={todayIST()}
+            onChange={(e) => {
+              setPlaybackEndDate(e.target.value);
               setPlaybackIndex(0);
             }}
             className="bg-transparent text-xs font-bold border-none focus:ring-0 p-0 text-slate-800 dark:text-white cursor-pointer pr-2"
