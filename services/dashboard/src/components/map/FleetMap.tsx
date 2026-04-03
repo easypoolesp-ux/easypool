@@ -446,38 +446,56 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       });
       lastHistoryPosRef.current = pos;
     } else if (isPlaying) {
-      // ── Auto-playing: smooth animation from last STABLE position ────────────
-      // Always use lastHistoryPosRef (the last fully-completed position) as
-      // the origin — never the in-flight marker position — so rapid index
-      // changes during auto-play don't accumulate stale interpolation errors.
-      const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+      // ── Auto-playing: smooth animation ──────────────────────────────────────
+      // KEY FIX: update lastHistoryPosRef on EVERY RAF frame, not just at
+      // completion. If the next tick fires and cancels this animation mid-flight,
+      // the new animation starts from the exact current visual position —
+      // eliminating the backward snap that caused the back-and-forth.
       const ANIM_DURATION = Math.max(50, (500 / playbackSpeed) * 0.85);
 
-      if (historyAnimationRef.current) {
-        cancelAnimationFrame(historyAnimationRef.current);
-        historyAnimationRef.current = undefined;
-      }
-
-      const from = lastHistoryPosRef.current ?? pos;
-      const to = pos;
-      const startTime = performance.now();
-
-      const animate = (now: number) => {
-        if (!historyMarkerRef.current) return;
-        const t = Math.min((now - startTime) / ANIM_DURATION, 1);
-        const ease = easeOutCubic(t);
-        historyMarkerRef.current.setPosition({
-          lat: from.lat + (to.lat - from.lat) * ease,
-          lng: from.lng + (to.lng - from.lng) * ease,
-        });
-        if (t < 1) {
-          historyAnimationRef.current = requestAnimationFrame(animate);
-        } else {
-          lastHistoryPosRef.current = to;
+      // At very high speeds (x4+) skip animation entirely — just snap.
+      // The human eye can't follow sub-100ms transitions anyway.
+      if (ANIM_DURATION <= 50) {
+        if (historyAnimationRef.current) {
+          cancelAnimationFrame(historyAnimationRef.current);
           historyAnimationRef.current = undefined;
         }
-      };
-      historyAnimationRef.current = requestAnimationFrame(animate);
+        historyMarkerRef.current.setPosition(pos);
+        lastHistoryPosRef.current = pos;
+      } else {
+        const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+        if (historyAnimationRef.current) {
+          cancelAnimationFrame(historyAnimationRef.current);
+          historyAnimationRef.current = undefined;
+        }
+
+        // Use the live ref — it tracks the current visual position even
+        // mid-flight, so a cancelled animation never "goes backward".
+        const from = lastHistoryPosRef.current ?? pos;
+        const to = pos;
+        const startTime = performance.now();
+
+        const animate = (now: number) => {
+          if (!historyMarkerRef.current) return;
+          const t = Math.min((now - startTime) / ANIM_DURATION, 1);
+          const ease = easeOutCubic(t);
+          const current = {
+            lat: from.lat + (to.lat - from.lat) * ease,
+            lng: from.lng + (to.lng - from.lng) * ease,
+          };
+          historyMarkerRef.current.setPosition(current);
+          // Always update ref to the current visual position — not just on
+          // completion — so mid-flight cancellations have a correct origin.
+          lastHistoryPosRef.current = current;
+          if (t < 1) {
+            historyAnimationRef.current = requestAnimationFrame(animate);
+          } else {
+            historyAnimationRef.current = undefined;
+          }
+        };
+        historyAnimationRef.current = requestAnimationFrame(animate);
+      }
       // ────────────────────────────────────────────────────────────────────────
     } else {
       // ── Manual scrub: cancel any animation and snap to exact position ───────
@@ -555,16 +573,28 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     return () => window.removeEventListener("map:viewHistory", h);
   }, [toggleHistoryMode]);
 
-  // Playback timer
+  // Stable ref to always read latest playbackIndex inside interval without
+  // making the interval a dep (which would cause it to restart every tick).
+  const playbackIndexRef = useRef(playbackIndex);
+  const historyLengthRef = useRef(historyPoints.length);
+  useEffect(() => { playbackIndexRef.current = playbackIndex; }, [playbackIndex]);
+  useEffect(() => { historyLengthRef.current = historyPoints.length; }, [historyPoints]);
+
+  // Playback timer — depends ONLY on isPlaying and playbackSpeed.
+  // Previously depending on playbackIndex caused the interval to restart
+  // on every tick, introducing a phase-jitter gap between increments at
+  // high speeds (contributing to the back-and-forth visual artifact).
   useEffect(() => {
     if (!isPlaying) return;
-    if (playbackIndex >= historyPoints.length - 1) {
-      setIsPlaying(false);
-      return;
-    }
-    const t = setInterval(() => setPlaybackIndex((v) => v + 1), 500 / playbackSpeed);
+    const t = setInterval(() => {
+      if (playbackIndexRef.current >= historyLengthRef.current - 1) {
+        setIsPlaying(false);
+        return;
+      }
+      setPlaybackIndex((v) => v + 1);
+    }, 500 / playbackSpeed);
     return () => clearInterval(t);
-  }, [isPlaying, playbackIndex, historyPoints]);
+  }, [isPlaying, playbackSpeed]);
 
   // Live status legend counts
   const counts = useMemo(
@@ -657,8 +687,8 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             else setCameraMode("free");
           }}
           className={`p-3 relative rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${cameraMode === "follow"
-              ? "bg-blue-600 text-white shadow-blue-500/20"
-              : "bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white"
+            ? "bg-blue-600 text-white shadow-blue-500/20"
+            : "bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white"
             }`}
           title={
             cameraMode === "free" ? "Enable Auto-Track" : "Disable Auto-Track"
