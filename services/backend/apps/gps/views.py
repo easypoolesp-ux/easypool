@@ -2,7 +2,8 @@
 import sys
 import traceback
 from collections import defaultdict
-from datetime import datetime, timedelta
+import zoneinfo
+from datetime import datetime, time, timedelta
 
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D  # noqa: F401 — available for future geo-filters
@@ -76,27 +77,36 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
 
         qs = GPSPoint.objects.filter(bus_id=bus_id)
 
-        # New: start_date + end_date range (front-end sends these now)
+        # Timezone-aware boundary builder (IST)
+        ist = zoneinfo.ZoneInfo('Asia/Kolkata')
+
         start_str = request.query_params.get('start_date') or request.query_params.get('date')
         end_str   = request.query_params.get('end_date')
         hours     = request.query_params.get('hours')
 
-        if start_str:
+        if hours:
+            # hours takes priority — "last N hours" is always relative to now
+            try:
+                qs = qs.filter(timestamp__gte=timezone.now() - timedelta(hours=int(hours)))
+            except ValueError:
+                return response.Response({'error': 'Invalid hours'}, status=400)
+        elif start_str:
             start_date = parse_date(start_str)
             if not start_date:
                 return response.Response({'error': 'Invalid start_date'}, status=400)
             end_date = parse_date(end_str) if end_str else start_date
             if end_date < start_date:
                 return response.Response({'error': 'end_date must be >= start_date'}, status=400)
-            # filter: start_date 00:00 IST → end_date 23:59 IST
-            qs = qs.filter(timestamp__date__gte=start_date, timestamp__date__lte=end_date)
-        elif hours:
-            try:
-                qs = qs.filter(timestamp__gte=timezone.now() - timedelta(hours=int(hours)))
-            except ValueError:
-                return response.Response({'error': 'Invalid hours'}, status=400)
+            # Explicit IST boundaries — no reliance on DB timezone conversion
+            start_dt = datetime.combine(start_date, time.min, tzinfo=ist)
+            end_dt   = datetime.combine(end_date, time(23, 59, 59, 999999), tzinfo=ist)
+            qs = qs.filter(timestamp__gte=start_dt, timestamp__lte=end_dt)
         else:
-            qs = qs.filter(timestamp__date=timezone.now().date())
+            # Fallback: today in IST
+            today = timezone.now().astimezone(ist).date()
+            start_dt = datetime.combine(today, time.min, tzinfo=ist)
+            end_dt   = datetime.combine(today, time(23, 59, 59, 999999), tzinfo=ist)
+            qs = qs.filter(timestamp__gte=start_dt, timestamp__lte=end_dt)
 
         # Cap at 5000 points to keep payload sane over multi-day ranges
         return response.Response(
