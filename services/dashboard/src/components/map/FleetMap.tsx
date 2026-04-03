@@ -371,15 +371,25 @@ export default function FleetMap({ buses, initialBusId }: Props) {
   ]);
 
   // ── Live Trail Fetcher ────────────────────────────────────────────────────
+  // NOTE: `buses` deliberately excluded from deps — we don't want to re-fetch
+  // the trail every 10s when buses poll. The 30s interval covers freshness.
+  const liveTrailModeRef = useRef(liveTrailMode);
+  useEffect(() => { liveTrailModeRef.current = liveTrailMode; }, [liveTrailMode]);
+
   useEffect(() => {
     if (liveTrailMode === "off" || !isLoaded) {
       setLiveTrails(new Map());
       return;
     }
 
+    // Clear immediately so old data (e.g. 24h) doesn't linger while 2h is fetching
+    setLiveTrails(new Map());
+
     const fetchLiveTrails = async () => {
       const token = localStorage.getItem("token");
       const result = new Map<string, GPSPoint[]>();
+      const mode = liveTrailModeRef.current;
+      const hours = mode === "2h" ? "2" : "24";
       const subset = buses
         .filter((b) => b.location != null || (b.lat != null && b.lng != null))
         .slice(0, 10);
@@ -387,7 +397,6 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       await Promise.all(
         subset.map(async (bus) => {
           try {
-            const hours = liveTrailMode === "2h" ? "2" : "24";
             const res = await fetch(
               `${BACKEND_URL}/api/gps/playback?bus=${bus.id}&hours=${hours}`,
               {
@@ -401,13 +410,15 @@ export default function FleetMap({ buses, initialBusId }: Props) {
           } catch { }
         }),
       );
-      setLiveTrails(result);
+      // Only update if the mode hasn't changed while we were fetching
+      if (liveTrailModeRef.current === mode) setLiveTrails(result);
     };
 
     fetchLiveTrails();
     const interval = setInterval(fetchLiveTrails, 30_000);
     return () => clearInterval(interval);
-  }, [isLoaded, liveTrailMode, buses]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, liveTrailMode]);
 
   // ── Playback Marker + Auto-Follow ─────────────────────────────────────────
   useEffect(() => {
