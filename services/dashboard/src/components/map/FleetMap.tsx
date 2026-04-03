@@ -171,6 +171,9 @@ export default function FleetMap({ buses, initialBusId }: Props) {
   const historyAnimationRef = useRef<number | undefined>(undefined);
   const lastHistoryPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const historyFitDoneRef = useRef<GPSPoint[] | null>(null); // guard: fitBounds only once per dataset
+  // Tracks whether playback was active when the user grabbed the slider,
+  // so we can resume after they release (scrub takes priority over timer).
+  const wasPlayingRef = useRef(false);
   // Smooth-animation refs: cancel any in-flight animation before starting a new one
   const animationRefs = useRef<Map<string, number>>(new Map()); // busId → RAF handle
   const currentPosRefs = useRef<Map<string, { lat: number; lng: number }>>(
@@ -864,6 +867,17 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                   min={0}
                   max={Math.max(0, historyPoints.length - 1)}
                   value={playbackIndex}
+                  // Scrub takes priority: pause the timer the moment the user
+                  // grabs the thumb so the timer tick can't fight the drag.
+                  // On release, resume if playback was active before.
+                  onPointerDown={() => {
+                    wasPlayingRef.current = isPlaying;
+                    if (isPlaying) setIsPlaying(false);
+                  }}
+                  onPointerUp={() => {
+                    if (wasPlayingRef.current) setIsPlaying(true);
+                    wasPlayingRef.current = false;
+                  }}
                   onChange={(e) => setPlaybackIndex(Number(e.target.value))}
                   className="w-full accent-blue-500 h-1.5 rounded-full cursor-pointer"
                 />
