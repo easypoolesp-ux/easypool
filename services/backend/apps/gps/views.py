@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D  # noqa: F401 — available for future geo-filters
 from django.db import connection
+from django.db.models import F, Max, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from drf_spectacular.types import OpenApiTypes
@@ -97,6 +98,68 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(timestamp__date=timezone.now().date())
 
         return response.Response(GPSPlaybackSerializer(qs.order_by('timestamp'), many=True).data)
+
+    @extend_schema(
+        summary='GPS Staleness Report',
+        description=(
+            'Returns every bus in scope with its last GPS timestamp and a \'stale\' flag '
+            'for vehicles that have not reported in more than `threshold_minutes` (default 15). '
+            'Use this to distinguish: device offline, gateway down, or backend ingestion failure.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                'threshold_minutes',
+                OpenApiTypes.INT,
+                description='Minutes of silence before a bus is marked stale (default: 15)',
+            )
+        ],
+        responses={200: OpenApiTypes.ANY},
+    )
+    @decorators.action(detail=False, methods=['get'], permission_classes=[IsManager | IsViewer])
+    def staleness(self, request):
+        """Flag buses that haven't sent GPS data for > threshold_minutes."""
+        try:
+            threshold_minutes = int(request.query_params.get('threshold_minutes', 15))
+        except ValueError:
+            threshold_minutes = 15
+
+        cutoff = timezone.now() - timedelta(minutes=threshold_minutes)
+        buses = apply_isolation(request.user, Bus.objects.all())
+
+        # One query: latest timestamp per bus
+        latest_per_bus = (
+            GPSPoint.objects.filter(bus__in=buses)
+            .values('bus_id')
+            .annotate(last_ts=Max('timestamp'))
+        )
+        ts_map = {str(row['bus_id']): row['last_ts'] for row in latest_per_bus}
+
+        results = []
+        for bus in buses:
+            last_ts = ts_map.get(str(bus.id))
+            stale = last_ts is None or last_ts < cutoff
+            age_seconds = int((timezone.now() - last_ts).total_seconds()) if last_ts else None
+            results.append({
+                'bus_id': str(bus.id),
+                'internal_id': bus.internal_id,
+                'plate_number': bus.plate_number,
+                'gps_imei': bus.gps_imei,
+                'last_gps_at': last_ts.isoformat() if last_ts else None,
+                'age_seconds': age_seconds,
+                'stale': stale,
+            })
+
+        # Stale buses first, then by age descending
+        results.sort(key=lambda x: (not x['stale'], x['age_seconds'] or 999999), reverse=False)
+        stale_count = sum(1 for r in results if r['stale'])
+
+        return response.Response({
+            'threshold_minutes': threshold_minutes,
+            'checked_at': timezone.now().isoformat(),
+            'total_buses': len(results),
+            'stale_count': stale_count,
+            'buses': results,
+        })
 
     @extend_schema(
         summary='Cumulative KM Timeline',

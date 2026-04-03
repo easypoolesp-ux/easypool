@@ -4,6 +4,8 @@ import aiohttp
 import os
 import redis.asyncio as redis
 import json
+import time
+from aiohttp import web
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 # BASE_URL must end with /api/gps/ -- the script appends the action name perfectly.
@@ -19,6 +21,12 @@ ENDPOINT_BULK_TELEMETRY = "bulk_telemetry"
 # ── Global Clients ────────────────────────────────────────────────────────────
 redis_client = None
 http_session = None
+
+# ── Health tracking ───────────────────────────────────────────────────────────
+# Tracks number of active TCP device connections.
+_active_connections: int = 0
+# Tracks the last received GPS point: {imei, lat, lng, ts}
+_last_gps: dict = {}
 
 # Teltonika DIN1 (ignition wire) IO IDs.
 IGNITION_IO_IDS = {239, 1}
@@ -235,9 +243,11 @@ async def sync_queue_to_backend():
 
 async def handle_bus(reader, writer):
     """Handle an individual bus connection asynchronously."""
+    global _active_connections
     addr = writer.get_extra_info("peername")
     print(f"[CONN] {addr} connected")
     imei = None
+    _active_connections += 1
 
     try:
         # 1. Handshake: IMEI Receipt
@@ -293,6 +303,13 @@ async def handle_bus(reader, writer):
                     count = len(parsed_records)
                     print(f"[DATA] {imei} sent {count} records")
                     for record in parsed_records:
+                        # Update health tracking
+                        _last_gps[imei] = {
+                            "lat": record["lat"],
+                            "lng": record["lng"],
+                            "ts": record["timestamp"],
+                            "received_at": time.time(),
+                        }
                         asyncio.create_task(forward_to_backend(imei, record))
                     
                     # MANDATORY: Acknowledge with a 4-byte integer (Big Endian) of records accepted
@@ -307,6 +324,7 @@ async def handle_bus(reader, writer):
     except Exception as exc:
         print(f"[ERROR] Session {imei or addr}: {exc}")
     finally:
+        _active_connections -= 1
         print(f"[DISCONN] {imei or addr} disconnected")
         writer.close()
         try:
@@ -315,9 +333,64 @@ async def handle_bus(reader, writer):
             pass
 
 
+async def health_handler(request):
+    """
+    GET /health — returns gateway status as JSON.
+    Includes: active TCP connections, Redis queue depth,
+    and the last GPS point received per device (with staleness).
+    Big companies use this to detect silent failures (device up,
+    gateway up, but data not flowing) vs total outages.
+    """
+    now = time.time()
+
+    # Redis connectivity + queue depth
+    redis_ok = False
+    queue_depth = -1
+    try:
+        if redis_client:
+            queue_depth = await redis_client.llen('gps_offline_queue')
+            redis_ok = True
+    except Exception:
+        pass
+
+    # Per-device staleness
+    devices = []
+    for imei, info in _last_gps.items():
+        age_s = int(now - info["received_at"])
+        devices.append({
+            "imei": imei,
+            "lat": info["lat"],
+            "lng": info["lng"],
+            "age_seconds": age_s,
+            "stale": age_s > 900,   # > 15 min = stale
+        })
+
+    payload = {
+        "status": "ok" if redis_ok else "degraded",
+        "active_tcp_connections": _active_connections,
+        "redis_connected": redis_ok,
+        "redis_queue_depth": queue_depth,
+        "devices": devices,
+        "server_time": now,
+    }
+    return web.json_response(payload)
+
+
+async def run_health_server():
+    """Lightweight HTTP server on port 8080 for health checks."""
+    app = web.Application()
+    app.router.add_get('/health', health_handler)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+    print("[HEALTH] HTTP health endpoint on port 8080")
+
+
 async def run_gateway():
     await init_clients()
     asyncio.create_task(sync_queue_to_backend())
+    asyncio.create_task(run_health_server())   # Health endpoint
     server = await asyncio.start_server(handle_bus, '0.0.0.0', GATEWAY_PORT)
     print(f"[START] GPS Gateway on port {GATEWAY_PORT}")
     async with server:
