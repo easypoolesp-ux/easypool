@@ -139,33 +139,42 @@ export function useBusPolling(): UseBusPollingReturn {
                 if (data.error) continue;
 
                 setBuses((prevBuses) => {
-                  const updated = prevBuses.map((b) =>
-                    b.internal_id === data.imei
-                      ? {
-                        ...b,
-                        // Update the GeoJSON location field — getLatLng() in
-                        // FleetMap prefers this over flat lat/lng (backend
-                        // migrated to single GeoJSON Point field).
-                        location: {
-                          type: "Point" as const,
-                          coordinates: [data.lng, data.lat] as [number, number],
-                        },
-                        lat: data.lat,
-                        lng: data.lng,
-                        // Sync both field name conventions:
-                        // FleetMap stateHash reads `heading`/`speed`
-                        // while schema uses `latest_heading`/`latest_speed`.
-                        heading: data.heading,
-                        speed: data.speed,
-                        latest_speed: data.speed,
-                        latest_heading: data.heading,
-                        latest_heartbeat: new Date(
-                          data.timestamp * 1000,
-                        ).toISOString(),
-                        status: "online" as BusType["status"],
-                      }
-                      : b,
-                  );
+                  const updated = prevBuses.map((b) => {
+                    // FIX 1: Match on gps_imei (the hardware IMEI from the device).
+                    // The gateway publishes { imei: "862549..." } — this is stored as
+                    // gps_imei on the Bus model, NOT internal_id ("BUS-01").
+                    if ((b as any).gps_imei !== data.imei) return b;
+
+                    // FIX 2: Gateway sends coords as [lng, lat] array, NOT flat lat/lng.
+                    // { "coords": [lng, lat], "speed": ..., "heading": ... }
+                    const lng: number = data.coords?.[0] ?? data.lng;
+                    const lat: number = data.coords?.[1] ?? data.lat;
+
+                    // Recompute status client-side so the marker colour stays current.
+                    // Mirrors the server-side logic in BusListSerializer.get_computed_status.
+                    const speed = data.speed || 0;
+                    const computed_status = speed > 2 ? "moving" : data.ignition ? "idle" : "stopped";
+
+                    return {
+                      ...b,
+                      // GeoJSON Point — getLatLng() in FleetMap reads this first.
+                      location: {
+                        type: "Point" as const,
+                        coordinates: [lng, lat] as [number, number],
+                      },
+                      lat,
+                      lng,
+                      computed_status,
+                      heading: data.heading,
+                      speed,
+                      latest_speed: speed,
+                      latest_heading: data.heading,
+                      latest_heartbeat: new Date(
+                        data.timestamp * 1000,
+                      ).toISOString(),
+                      status: "online" as BusType["status"],
+                    };
+                  });
                   if (typeof window !== "undefined") {
                     localStorage.setItem("cached_buses", JSON.stringify(updated));
                   }
