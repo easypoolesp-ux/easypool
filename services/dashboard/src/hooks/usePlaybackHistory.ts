@@ -36,16 +36,22 @@ async function fetchPlayback({
     const token =
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
     const url = `${BACKEND_URL}/api/gps/playback?bus=${busId}&start_date=${startDate}&end_date=${endDate}`;
-    console.log("[usePlaybackHistory] fetching:", url);
     const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
         signal,
-        cache: "no-store", // bypass Next.js fetch cache
+        cache: "no-store",
     });
     if (!res.ok) throw new Error("History fetch failed");
-    const data = await res.json();
-    console.log("[usePlaybackHistory] got", data.length, "points for", startDate, "→", endDate);
-    return data;
+    const raw: GPSPoint[] = await res.json();
+
+    // Client-side date enforcement — backend may return unfiltered data
+    // Build IST day boundaries: startDate 00:00 IST → endDate 23:59:59 IST
+    const startMs = new Date(`${startDate}T00:00:00+05:30`).getTime();
+    const endMs = new Date(`${endDate}T23:59:59.999+05:30`).getTime();
+    return raw.filter((p) => {
+        const t = new Date(p.timestamp).getTime();
+        return t >= startMs && t <= endMs;
+    });
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────

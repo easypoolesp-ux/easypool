@@ -678,16 +678,11 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                       minute: "2-digit",
                     });
                   return (
-                    <div className="flex items-center justify-between text-[10px] text-white/40 font-medium px-0.5">
-                      <span className="truncate">
-                        {first ? fmtShort(first.timestamp) : ""}
-                        {last && last !== first
-                          ? ` → ${fmtShort(last.timestamp)}`
-                          : ""}
-                      </span>
-                      <span>
-                        {playbackIndex + 1}/{historyPoints.length}
-                      </span>
+                    <div className="text-[10px] text-white/40 font-medium px-0.5 truncate">
+                      {first ? fmtShort(first.timestamp) : ""}
+                      {last && last !== first
+                        ? ` → ${fmtShort(last.timestamp)}`
+                        : ""}
                     </div>
                   );
                 })()}
