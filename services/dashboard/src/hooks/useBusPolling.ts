@@ -93,7 +93,19 @@ export function useBusPolling(): UseBusPollingReturn {
     const startPollingFallback = () => {
       if (busInterval) return;
       console.log("[useBusPolling] Falling back to 10s polling.");
-      busInterval = setInterval(apiFetchBuses, 10000);
+      busInterval = setInterval(() => {
+        apiFetchBuses()
+          .then((data) => {
+            if (isMounted) {
+              setBuses(data);
+              setLastUpdated(new Date());
+              if (typeof window !== "undefined") {
+                localStorage.setItem("cached_buses", JSON.stringify(data));
+              }
+            }
+          })
+          .catch((err) => console.error("[useBusPolling] Polling error:", err));
+      }, 10000);
     };
 
     const setupStream = async () => {
@@ -130,16 +142,28 @@ export function useBusPolling(): UseBusPollingReturn {
                   const updated = prevBuses.map((b) =>
                     b.internal_id === data.imei
                       ? {
-                          ...b,
-                          lat: data.lat,
-                          lng: data.lng,
-                          latest_speed: data.speed,
-                          latest_heading: data.heading,
-                          latest_heartbeat: new Date(
-                            data.timestamp * 1000,
-                          ).toISOString(),
-                          status: "online" as BusType["status"],
-                        }
+                        ...b,
+                        // Update the GeoJSON location field — getLatLng() in
+                        // FleetMap prefers this over flat lat/lng (backend
+                        // migrated to single GeoJSON Point field).
+                        location: {
+                          type: "Point" as const,
+                          coordinates: [data.lng, data.lat] as [number, number],
+                        },
+                        lat: data.lat,
+                        lng: data.lng,
+                        // Sync both field name conventions:
+                        // FleetMap stateHash reads `heading`/`speed`
+                        // while schema uses `latest_heading`/`latest_speed`.
+                        heading: data.heading,
+                        speed: data.speed,
+                        latest_speed: data.speed,
+                        latest_heading: data.heading,
+                        latest_heartbeat: new Date(
+                          data.timestamp * 1000,
+                        ).toISOString(),
+                        status: "online" as BusType["status"],
+                      }
                       : b,
                   );
                   if (typeof window !== "undefined") {
@@ -163,12 +187,12 @@ export function useBusPolling(): UseBusPollingReturn {
 
     // 1. Initial complete fetch
     apiFetchBuses().then((data) => {
-        setBuses(data);
-        setLoading(false);
-        setLastUpdated(new Date());
-        setupStream();
+      setBuses(data);
+      setLoading(false);
+      setLastUpdated(new Date());
+      setupStream();
     }).catch(() => {
-        setLoading(false);
+      setLoading(false);
     });
 
     fetchMeta();

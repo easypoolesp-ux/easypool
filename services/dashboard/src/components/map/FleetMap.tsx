@@ -77,15 +77,14 @@ function buildMarkerSvg(
           <stop offset="100%" stop-color="${color}" stop-opacity="0" />
         </linearGradient>
       </defs>
-      ${
-        isMoving
-          ? `
+      ${isMoving
+      ? `
       <!-- Soft heading beam (FOV) -->
       <g transform="rotate(${heading}, 40, 40)">
         <path d="M40,40 L16,4 A36,36 0 0,1 64,4 Z" fill="url(#${beamId})"/>
       </g>`
-          : ""
-      }
+      : ""
+    }
       <!-- Main Marker -->
       <circle cx="40" cy="40" r="14" fill="${color}" stroke="white" stroke-width="3"/>
       <!-- Inner core highlight -->
@@ -157,9 +156,9 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     // If date is today, stale after 30s. If past date, cache "forever" (24h)
     staleTime:
       playbackDate ===
-      new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
-        new Date(),
-      )
+        new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
+          new Date(),
+        )
         ? 30 * 1000
         : 24 * 60 * 60 * 1000,
   });
@@ -171,6 +170,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
   const historyMarkerRef = useRef<google.maps.Marker | null>(null);
   const historyAnimationRef = useRef<number | undefined>(undefined);
   const lastHistoryPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const historyFitDoneRef = useRef<GPSPoint[] | null>(null); // guard: fitBounds only once per dataset
   // Smooth-animation refs: cancel any in-flight animation before starting a new one
   const animationRefs = useRef<Map<string, number>>(new Map()); // busId → RAF handle
   const currentPosRefs = useRef<Map<string, { lat: number; lng: number }>>(
@@ -235,7 +235,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       const color = getStatusColor(effectiveStatus);
       const heading = bus.heading || 0;
       const speed = bus.speed || 0;
-      
+
       const pos = getLatLng(bus);
 
       const isMoving = effectiveStatus === "moving";
@@ -264,9 +264,9 @@ export default function FleetMap({ buses, initialBusId }: Props) {
           currentPosRefs.current.get(bus.id) ??
           (existing.getPosition()
             ? {
-                lat: existing.getPosition()!.lat(),
-                lng: existing.getPosition()!.lng(),
-              }
+              lat: existing.getPosition()!.lat(),
+              lng: existing.getPosition()!.lng(),
+            }
             : pos);
         const to = pos;
         const startTime = performance.now();
@@ -400,7 +400,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
               const data: GPSPoint[] = await res.json();
               if (data.length > 0) result.set(bus.id, data);
             }
-          } catch {}
+          } catch { }
         }),
       );
       setLiveTrails(result);
@@ -414,8 +414,10 @@ export default function FleetMap({ buses, initialBusId }: Props) {
   // ── Playback Marker + Auto-Follow ─────────────────────────────────────────
   useEffect(() => {
     if (!isHistoryMode || !historyPoints[playbackIndex] || !mapRef.current) {
+      // Cancel any in-flight animation and tear down marker
       if (historyAnimationRef.current)
         cancelAnimationFrame(historyAnimationRef.current);
+      historyAnimationRef.current = undefined;
       historyMarkerRef.current?.setMap(null);
       historyMarkerRef.current = null;
       lastHistoryPosRef.current = null;
@@ -428,6 +430,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       : { lat: pt.lat, lng: pt.lng };
 
     if (!historyMarkerRef.current) {
+      // First time: create marker and place it exactly
       historyMarkerRef.current = new google.maps.Marker({
         map: mapRef.current!,
         position: pos,
@@ -442,32 +445,31 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         zIndex: 1000,
       });
       lastHistoryPosRef.current = pos;
-    } else {
-      // ── Smooth history movement ──────────────────────────────
-      const ANIM_DURATION = isPlaying ? (500 / playbackSpeed) * 0.9 : 50; // Dynamic duration based on speed
+    } else if (isPlaying) {
+      // ── Auto-playing: smooth animation from last STABLE position ────────────
+      // Always use lastHistoryPosRef (the last fully-completed position) as
+      // the origin — never the in-flight marker position — so rapid index
+      // changes during auto-play don't accumulate stale interpolation errors.
       const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+      const ANIM_DURATION = Math.max(50, (500 / playbackSpeed) * 0.85);
 
-      if (historyAnimationRef.current)
+      if (historyAnimationRef.current) {
         cancelAnimationFrame(historyAnimationRef.current);
+        historyAnimationRef.current = undefined;
+      }
 
-      // Start from where the marker *is* right now visually
-      const startPos = historyMarkerRef.current.getPosition();
-      const from = startPos
-        ? { lat: startPos.lat(), lng: startPos.lng() }
-        : lastHistoryPosRef.current || pos;
-
+      const from = lastHistoryPosRef.current ?? pos;
       const to = pos;
       const startTime = performance.now();
 
       const animate = (now: number) => {
-        const elapsed = now - startTime;
-        const t = Math.min(elapsed / ANIM_DURATION, 1);
+        if (!historyMarkerRef.current) return;
+        const t = Math.min((now - startTime) / ANIM_DURATION, 1);
         const ease = easeOutCubic(t);
-        const interpPos = {
+        historyMarkerRef.current.setPosition({
           lat: from.lat + (to.lat - from.lat) * ease,
           lng: from.lng + (to.lng - from.lng) * ease,
-        };
-        historyMarkerRef.current?.setPosition(interpPos);
+        });
         if (t < 1) {
           historyAnimationRef.current = requestAnimationFrame(animate);
         } else {
@@ -476,16 +478,33 @@ export default function FleetMap({ buses, initialBusId }: Props) {
         }
       };
       historyAnimationRef.current = requestAnimationFrame(animate);
-      // ────────────────────────────────────────────────────────────
+      // ────────────────────────────────────────────────────────────────────────
+    } else {
+      // ── Manual scrub: cancel any animation and snap to exact position ───────
+      // This is Google Maps' recommended pattern for user-controlled scrubbing:
+      // setPosition() is synchronous and avoids any visual lag or off-screen drift.
+      if (historyAnimationRef.current) {
+        cancelAnimationFrame(historyAnimationRef.current);
+        historyAnimationRef.current = undefined;
+      }
+      historyMarkerRef.current.setPosition(pos);
+      lastHistoryPosRef.current = pos;
+      // ────────────────────────────────────────────────────────────────────────
     }
 
-    // Auto-follow during playback if user has selected the target mode
+    // Auto-follow during playback if camera is locked
     if (isPlaying && cameraMode === "follow") mapRef.current.panTo(pos);
-  }, [playbackIndex, isHistoryMode, historyPoints, isPlaying, cameraMode]);
+  }, [playbackIndex, isHistoryMode, historyPoints, isPlaying, playbackSpeed, cameraMode]);
 
-  // Fit bounds on new history data
+  // Fit bounds on new history data — only once per unique dataset, not every render
   useEffect(() => {
-    if (isHistoryMode && historyPoints.length > 0 && mapRef.current) {
+    if (
+      isHistoryMode &&
+      historyPoints.length > 0 &&
+      mapRef.current &&
+      historyFitDoneRef.current !== historyPoints // referential equality guard
+    ) {
+      historyFitDoneRef.current = historyPoints;
       const bounds = new google.maps.LatLngBounds();
       historyPoints.forEach((p) => {
         const pos = p.location
@@ -498,6 +517,9 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       google.maps.event.addListenerOnce(mapRef.current, "idle", () => {
         mapRef.current?.setOptions({ maxZoom: undefined });
       });
+    }
+    if (!isHistoryMode) {
+      historyFitDoneRef.current = null; // reset when exiting history
     }
   }, [historyPoints, isHistoryMode]);
 
@@ -634,11 +656,10 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             if (cameraMode === "free") setCameraMode("follow");
             else setCameraMode("free");
           }}
-          className={`p-3 relative rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${
-            cameraMode === "follow"
+          className={`p-3 relative rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${cameraMode === "follow"
               ? "bg-blue-600 text-white shadow-blue-500/20"
               : "bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white"
-          }`}
+            }`}
           title={
             cameraMode === "free" ? "Enable Auto-Track" : "Disable Auto-Track"
           }
@@ -799,8 +820,8 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     <p className="text-xs font-black text-blue-300 truncate">
                       {currentPt
                         ? new Date(currentPt.timestamp).toLocaleTimeString(
-                            "en-IN",
-                          )
+                          "en-IN",
+                        )
                         : "—"}
                     </p>
                     <p className="text-[11px] text-white/60 font-semibold">
