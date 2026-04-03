@@ -84,10 +84,14 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
         end_str   = request.query_params.get('end_date')
         hours     = request.query_params.get('hours')
 
+        print(f'[playback] bus={bus_id} start_date={start_str} end_date={end_str} hours={hours}', file=sys.stderr)
+
         if hours:
             # hours takes priority — "last N hours" is always relative to now
             try:
-                qs = qs.filter(timestamp__gte=timezone.now() - timedelta(hours=int(hours)))
+                cutoff = timezone.now() - timedelta(hours=int(hours))
+                qs = qs.filter(timestamp__gte=cutoff)
+                print(f'[playback] hours branch: cutoff={cutoff}', file=sys.stderr)
             except ValueError:
                 return response.Response({'error': 'Invalid hours'}, status=400)
         elif start_str:
@@ -101,17 +105,19 @@ class GPSPointViewSet(SchoolIsolationMixin, viewsets.ReadOnlyModelViewSet):
             start_dt = datetime.combine(start_date, time.min, tzinfo=ist)
             end_dt   = datetime.combine(end_date, time(23, 59, 59, 999999), tzinfo=ist)
             qs = qs.filter(timestamp__gte=start_dt, timestamp__lte=end_dt)
+            print(f'[playback] date branch: {start_dt} → {end_dt}', file=sys.stderr)
         else:
             # Fallback: today in IST
             today = timezone.now().astimezone(ist).date()
             start_dt = datetime.combine(today, time.min, tzinfo=ist)
             end_dt   = datetime.combine(today, time(23, 59, 59, 999999), tzinfo=ist)
             qs = qs.filter(timestamp__gte=start_dt, timestamp__lte=end_dt)
+            print(f'[playback] fallback (today): {start_dt} → {end_dt}', file=sys.stderr)
 
         # Cap at 5000 points to keep payload sane over multi-day ranges
-        return response.Response(
-            GPSPlaybackSerializer(qs.order_by('timestamp')[:5000], many=True).data
-        )
+        data = GPSPlaybackSerializer(qs.order_by('timestamp')[:5000], many=True).data
+        print(f'[playback] returning {len(data)} points', file=sys.stderr)
+        return response.Response(data)
 
     @extend_schema(
         summary='GPS Staleness Report',

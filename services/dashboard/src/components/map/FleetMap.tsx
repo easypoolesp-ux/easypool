@@ -535,8 +535,8 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             setCameraMode((prev) => (prev === "free" ? "follow" : "free"))
           }
           className={`p-3 relative rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${cameraMode === "follow"
-              ? "bg-blue-600 text-white shadow-blue-500/20"
-              : "bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white"
+            ? "bg-blue-600 text-white shadow-blue-500/20"
+            : "bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-white"
             }`}
           title={
             cameraMode === "free" ? "Enable Auto-Track" : "Disable Auto-Track"
@@ -679,8 +679,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     });
                   return (
                     <div className="flex items-center justify-between text-[10px] text-white/40 font-medium px-0.5">
-                      <span>{historyPoints.length} pts</span>
-                      <span className="truncate mx-2">
+                      <span className="truncate">
                         {first ? fmtShort(first.timestamp) : ""}
                         {last && last !== first
                           ? ` → ${fmtShort(last.timestamp)}`

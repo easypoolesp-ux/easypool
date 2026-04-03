@@ -30,16 +30,22 @@ type PlaybackKey = readonly [string, string | null, string, string];
 
 async function fetchPlayback({
     queryKey,
+    signal,
 }: QueryFunctionContext<PlaybackKey>): Promise<GPSPoint[]> {
     const [, busId, startDate, endDate] = queryKey;
     const token =
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const res = await fetch(
-        `${BACKEND_URL}/api/gps/playback?bus=${busId}&start_date=${startDate}&end_date=${endDate}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-    );
+    const url = `${BACKEND_URL}/api/gps/playback?bus=${busId}&start_date=${startDate}&end_date=${endDate}`;
+    console.log("[usePlaybackHistory] fetching:", url);
+    const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal,
+        cache: "no-store", // bypass Next.js fetch cache
+    });
     if (!res.ok) throw new Error("History fetch failed");
-    return res.json();
+    const data = await res.json();
+    console.log("[usePlaybackHistory] got", data.length, "points for", startDate, "→", endDate);
+    return data;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -92,6 +98,7 @@ export function usePlaybackHistory(
         queryFn: fetchPlayback, // uses queryKey context — closure-proof
         enabled: isHistoryMode && !!selectedBusId,
         staleTime: playbackEndDate === todayIST() ? 30_000 : 2 * 60_000,
+        gcTime: 0, // don't keep old date-range data in cache
     });
 
     // ── Playback timer ───────────────────────────────────────────────────────
