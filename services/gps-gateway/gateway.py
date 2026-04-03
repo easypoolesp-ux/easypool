@@ -13,6 +13,8 @@ BACKEND_BASE_URL = os.getenv("BACKEND_API_URL", "https://easypool-backend-222076
 API_KEY          = os.getenv("GPS_SERVICE_API_KEY", "easypool_gps_secret_2026")
 GATEWAY_PORT     = int(os.getenv("GATEWAY_PORT", 5027))
 REDIS_URL        = os.getenv("REDIS_URL", "redis://:easypool_live_redis_2026@127.0.0.1:6379/0")
+# Port 8080 is taken by mediamtx on the VM — use 9090 for the health endpoint.
+HEALTH_PORT      = int(os.getenv("HEALTH_PORT", 9090))
 
 # API Endpoints (Derived from openapi.yaml SSOT)
 ENDPOINT_TELEMETRY      = "telemetry"
@@ -377,14 +379,14 @@ async def health_handler(request):
 
 
 async def run_health_server():
-    """Lightweight HTTP server on port 8080 for health checks."""
+    """Lightweight HTTP server on HEALTH_PORT for health checks."""
     app = web.Application()
     app.router.add_get('/health', health_handler)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    site = web.TCPSite(runner, '0.0.0.0', HEALTH_PORT)
     await site.start()
-    print("[HEALTH] HTTP health endpoint on port 8080")
+    print(f"[HEALTH] HTTP health endpoint on port {HEALTH_PORT}")
 
 
 async def run_gateway():
