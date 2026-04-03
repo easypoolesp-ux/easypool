@@ -50,7 +50,7 @@ function formatTimeDisplay(timestamp?: string) {
   const dateStr = isToday
     ? ""
     : date.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) +
-      ", ";
+    ", ";
 
   // 2. Exact Time
   const timeStr = date.toLocaleTimeString("en-IN", {
@@ -148,12 +148,14 @@ export default function DashboardPage() {
               <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Fleet Overview
               </h1>
+              {/* Analytics button — re-enable once KM tracking is live
               <Link
                 href="/dashboard/analytics"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-blue-500/10 border border-blue-500/25 text-blue-400 hover:bg-blue-500/20 transition-all"
               >
                 📈 Analytics
               </Link>
+              */}
             </div>
           </div>
         </div>
@@ -287,11 +289,10 @@ export default function DashboardPage() {
                   <button
                     key={f.key}
                     onClick={() => toggleStatusFilter(f.key)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border ${
-                      hiddenStatuses.has(f.key)
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border ${hiddenStatuses.has(f.key)
                         ? "bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 line-through opacity-50"
                         : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
-                    }`}
+                      }`}
                   >
                     <div
                       className={`w-2 h-2 rounded-full ${f.dot} ${hiddenStatuses.has(f.key) ? "opacity-30" : ""}`}
