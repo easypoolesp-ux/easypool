@@ -828,6 +828,26 @@ export default function FleetMap({ buses, initialBusId }: Props) {
               </p>
             ) : (
               <>
+                {/* Dataset summary — shows what was actually loaded */}
+                {(() => {
+                  const first = historyPoints[0];
+                  const last = historyPoints[historyPoints.length - 1];
+                  const fmtShort = (ts: string) =>
+                    new Date(ts).toLocaleDateString("en-IN", {
+                      day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                    });
+                  return (
+                    <div className="flex items-center justify-between text-[10px] text-white/40 font-medium px-0.5">
+                      <span>{historyPoints.length} pts</span>
+                      <span className="truncate mx-2">
+                        {first ? fmtShort(first.timestamp) : ""}
+                        {last && last !== first ? ` → ${fmtShort(last.timestamp)}` : ""}
+                      </span>
+                      <span>{playbackIndex + 1}/{historyPoints.length}</span>
+                    </div>
+                  );
+                })()}
+
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
@@ -860,10 +880,12 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     </span>
                   </button>
                   <div className="flex-1 min-w-0">
+                    {/* Show full DATE+TIME so user can tell which day they're on */}
                     <p className="text-xs font-black text-blue-300 truncate">
                       {currentPt
-                        ? new Date(currentPt.timestamp).toLocaleTimeString(
+                        ? new Date(currentPt.timestamp).toLocaleString(
                           "en-IN",
+                          { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" },
                         )
                         : "—"}
                     </p>
@@ -877,9 +899,6 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                   min={0}
                   max={Math.max(0, historyPoints.length - 1)}
                   value={playbackIndex}
-                  // Scrub takes priority: pause the timer the moment the user
-                  // grabs the thumb so the timer tick can't fight the drag.
-                  // On release, resume if playback was active before.
                   onPointerDown={() => {
                     wasPlayingRef.current = isPlaying;
                     if (isPlaying) setIsPlaying(false);
