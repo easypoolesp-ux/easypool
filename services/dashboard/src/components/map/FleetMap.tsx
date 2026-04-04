@@ -555,9 +555,21 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                   path={seg.points.map((p) => getLatLng(p))}
                   options={{
                     strokeColor: "#3b82f6",
-                    strokeWeight: isCurrent ? 4 : 2,
-                    strokeOpacity: isCurrent ? 1.0 : 0.3,
+                    strokeWeight: 4,
+                    strokeOpacity: isCurrent ? 1.0 : 0,
                     zIndex: isCurrent ? 100 : 10,
+                    icons: isCurrent ? undefined : [
+                      {
+                        icon: {
+                          path: "M 0,-1 0,1",
+                          strokeOpacity: 0.8,
+                          scale: 3,
+                          strokeWeight: 4,
+                        },
+                        offset: "0",
+                        repeat: "20px",
+                      },
+                    ],
                   }}
                 />
               );
