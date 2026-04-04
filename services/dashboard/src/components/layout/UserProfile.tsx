@@ -15,6 +15,7 @@ import { useTheme } from "next-themes";
 import { useMapHighContrast } from "@/hooks/useMapHighContrast";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface UserData {
   id: string;
@@ -73,8 +74,11 @@ export default function UserProfile() {
     };
   }, []);
 
+  const queryClient = useQueryClient();
+
   const handleLogout = async () => {
     await signOut(auth);
+    queryClient.clear(); // Wipe all cached data (GPS, buses, etc.)
     localStorage.clear();
     sessionStorage.clear();
     document.cookie =
@@ -211,16 +215,14 @@ export default function UserProfile() {
                 id="map-high-contrast-toggle"
                 onClick={toggleHighContrast}
                 aria-label="Toggle monochrome map"
-                className={`relative shrink-0 w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none ${
-                  highContrast
-                    ? "bg-blue-500"
-                    : "bg-slate-300 dark:bg-slate-600"
-                }`}
+                className={`relative shrink-0 w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none ${highContrast
+                  ? "bg-blue-500"
+                  : "bg-slate-300 dark:bg-slate-600"
+                  }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
-                    highContrast ? "translate-x-4" : "translate-x-0"
-                  }`}
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${highContrast ? "translate-x-4" : "translate-x-0"
+                    }`}
                 />
               </button>
             </div>

@@ -102,10 +102,10 @@ export function usePlaybackHistory(
             queryFn: ({ signal }: { signal?: AbortSignal }) =>
                 fetchDay(selectedBusId!, date, signal),
             enabled: isHistoryMode && !!selectedBusId,
-            // Past days never change → permanent cache (zero re-fetches).
+            // Past days: 1-hour cache (as requested).
             // Today's data grows → 30s staleTime.
-            staleTime: date < today ? Infinity : 30_000,
-            gcTime: date < today ? Infinity : 60_000,
+            staleTime: date < today ? 3600_000 : 30_000,
+            gcTime: date < today ? 3600_000 : 60_000,
         })),
     });
 

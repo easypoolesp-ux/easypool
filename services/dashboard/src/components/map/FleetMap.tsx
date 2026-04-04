@@ -518,14 +518,46 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
         {/* History playback line */}
         {isHistoryMode && historyPoints.length > 1 && (
-          <Polyline
-            path={historyPoints.map((p) => getLatLng(p))}
-            options={{
-              strokeColor: "#3b82f6",
-              strokeWeight: 3,
-              strokeOpacity: 0.75,
-            }}
-          />
+          <>
+            {/* Split history into per-date segments for highlighting */}
+            {(() => {
+              const segments: { points: GPSPoint[]; isCurrent: boolean }[] = [];
+              if (historyPoints.length === 0) return null;
+
+              const currentDateStr = currentPoint
+                ? new Date(currentPoint.timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
+                : "";
+
+              let currentSegment: GPSPoint[] = [historyPoints[0]];
+              let lastDate = new Date(historyPoints[0].timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
+              for (let i = 1; i < historyPoints.length; i++) {
+                const p = historyPoints[i];
+                const d = new Date(p.timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+                if (d !== lastDate) {
+                  segments.push({ points: currentSegment, isCurrent: lastDate === currentDateStr });
+                  currentSegment = [p];
+                  lastDate = d;
+                } else {
+                  currentSegment.push(p);
+                }
+              }
+              segments.push({ points: currentSegment, isCurrent: lastDate === currentDateStr });
+
+              return segments.map((seg, idx) => (
+                <Polyline
+                  key={`${seg.points[0].timestamp}-${idx}`}
+                  path={seg.points.map((p) => getLatLng(p))}
+                  options={{
+                    strokeColor: seg.isCurrent ? "#3b82f6" : "#94a3b8",
+                    strokeWeight: seg.isCurrent ? 4 : 2,
+                    strokeOpacity: seg.isCurrent ? 1.0 : 0.25,
+                    zIndex: seg.isCurrent ? 100 : 10,
+                  }}
+                />
+              ));
+            })()}
+          </>
         )}
       </GoogleMap>
 
