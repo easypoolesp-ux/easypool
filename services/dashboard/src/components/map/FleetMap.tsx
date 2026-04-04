@@ -562,7 +562,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                       {
                         icon: {
                           path: "M 0,-1 0,1",
-                          strokeOpacity: 0.8,
+                          strokeOpacity: 0.5,
                           scale: 3,
                           strokeWeight: 4,
                         },
