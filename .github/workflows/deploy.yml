@@ -35,26 +35,38 @@ jobs:
       github.event.inputs.deploy_target == 'backend'
     runs-on: ubuntu-latest
     permissions: { contents: read, id-token: write }
+    outputs:
+      image: ${{ steps.build.outputs.imageid }}
+      sha: ${{ steps.sha.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
+      - id: sha
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
       - run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v5
+      - id: build
+        uses: docker/build-push-action@v5
         with:
           context: ./services/backend
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest
+          # Tag with both :latest AND :<sha> — service.yaml uses sha tag so
+          # Cloud Run always sees a new image reference → always creates a new revision
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:${{ steps.sha.outputs.sha }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
       - uses: docker/build-push-action@v5
         with:
           context: ./services/backend/pgbouncer
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:latest
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:latest
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/pgbouncer:${{ steps.sha.outputs.sha }}
           cache-from: type=gha,scope=pgbouncer
           cache-to: type=gha,scope=pgbouncer,mode=max
 
@@ -70,8 +82,9 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Deploy and Run Migrations
         run: |
+          SHA=${{ needs.build-backend.outputs.sha }}
           gcloud run jobs deploy backend-migrate \
-            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:latest \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:${SHA} \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
             --service-account "easypool-backend-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
@@ -87,7 +100,7 @@ jobs:
             --wait
 
   deploy-backend:
-    needs: run-migrations
+    needs: [build-backend, run-migrations]
     runs-on: ubuntu-latest
     permissions: { contents: read, id-token: write }
     steps:
@@ -98,7 +111,10 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Deploy Backend to Cloud Run
         run: |
-          cat > /tmp/service.yaml <<'EOF'
+          SHA=${{ needs.build-backend.outputs.sha }}
+          # Use SHA tag (not :latest) so Cloud Run always sees a new image
+          # reference and is forced to create a new revision on every deploy.
+          cat > /tmp/service.yaml <<EOF
           apiVersion: serving.knative.dev/v1
           kind: Service
           metadata:
@@ -120,7 +136,7 @@ jobs:
                 timeoutSeconds: 300
                 containers:
                 - name: backend
-                  image: asia-south1-docker.pkg.dev/project-05588bf2-f685-4769-a37/easypool-repo/backend:latest
+                  image: asia-south1-docker.pkg.dev/project-05588bf2-f685-4769-a37/easypool-repo/backend:${SHA}
                   ports:
                   - containerPort: 8080
                   resources:
@@ -168,7 +184,7 @@ jobs:
                         name: db-password
                         key: latest
                 - name: pgbouncer
-                  image: asia-south1-docker.pkg.dev/project-05588bf2-f685-4769-a37/easypool-repo/pgbouncer:latest
+                  image: asia-south1-docker.pkg.dev/project-05588bf2-f685-4769-a37/easypool-repo/pgbouncer:${SHA}
                   resources:
                     limits:
                       cpu: "0.5"
