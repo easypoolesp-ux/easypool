@@ -136,6 +136,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     setIsPlaying,
     wasPlayingRef,
     historyPoints,
+    dateBoundaries,
     isHistoryLoading,
     currentPoint,
   } = playback;
@@ -737,22 +738,46 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     </p>
                   </div>
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={Math.max(0, historyPoints.length - 1)}
-                  value={playbackIndex}
-                  onPointerDown={() => {
-                    wasPlayingRef.current = isPlaying;
-                    if (isPlaying) setIsPlaying(false);
-                  }}
-                  onPointerUp={() => {
-                    if (wasPlayingRef.current) setIsPlaying(true);
-                    wasPlayingRef.current = false;
-                  }}
-                  onChange={(e) => setPlaybackIndex(Number(e.target.value))}
-                  className="w-full accent-blue-500 h-1.5 rounded-full cursor-pointer"
-                />
+                {/* Slider with date-boundary markers */}
+                <div className="relative w-full">
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(0, historyPoints.length - 1)}
+                    value={playbackIndex}
+                    onPointerDown={() => {
+                      wasPlayingRef.current = isPlaying;
+                      if (isPlaying) setIsPlaying(false);
+                    }}
+                    onPointerUp={() => {
+                      if (wasPlayingRef.current) setIsPlaying(true);
+                      wasPlayingRef.current = false;
+                    }}
+                    onChange={(e) => setPlaybackIndex(Number(e.target.value))}
+                    className="w-full accent-blue-500 h-1.5 rounded-full cursor-pointer"
+                  />
+                  {/* Yellow date-change tick marks */}
+                  {dateBoundaries.map((b) => {
+                    const pct = (b.index / Math.max(1, historyPoints.length - 1)) * 100;
+                    const label = new Date(`${b.date}T00:00:00+05:30`)
+                      .toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                    return (
+                      <div
+                        key={b.date}
+                        title={label}
+                        style={{ left: `${pct}%` }}
+                        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 group pointer-events-none"
+                      >
+                        {/* Diamond tick */}
+                        <div className="w-2 h-2 bg-amber-400 rotate-45 shadow-sm shadow-amber-400/50" />
+                        {/* Date tooltip above */}
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-1.5 py-0.5 bg-slate-800 border border-amber-400/40 text-amber-300 text-[9px] font-bold rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </>
             )}
           </div>

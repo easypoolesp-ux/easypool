@@ -1,77 +1,80 @@
 /**
- * usePlaybackHistory — Single-responsibility hook for GPS history playback.
+ * usePlaybackHistory — GPS history playback with per-day chunked fetching.
  *
- * Owns:  date state, playback index/speed/playing, React Query fetch, timer.
- * Does NOT own: map rendering, markers, camera, or UI components.
+ * Architecture (Google/Uber GPS telemetry standard):
  *
- * KEY FIX: queryFn reads dates from `context.queryKey` — never from closure
- * state — so React Query always fetches the URL matching the cache key.
+ *   - Each calendar day is its own React Query cache entry.
+ *   - Past days: staleTime = Infinity (data never changes) → zero re-fetches.
+ *   - Today:     staleTime = 30s    (data grows throughout the day).
+ *   - Range Mar24–Apr4 = 12 parallel requests, all small (~3k pts each).
+ *   - Returns `dateBoundaries` for rendering date-change tick marks on slider.
  */
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useQuery, type QueryFunctionContext } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import type { components } from "@/types/api";
 
 type GPSPoint = components["schemas"]["GPSPoint"] & {
     location?: { type: string; coordinates: [number, number] };
 };
 
+export type DateBoundary = { date: string; index: number };
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 /** Today in IST as YYYY-MM-DD */
 const todayIST = () =>
-    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
-        new Date(),
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+
+/** Generate every calendar day between start and end inclusive */
+function daysBetween(start: string, end: string): string[] {
+    const days: string[] = [];
+    const cur = new Date(`${start}T00:00:00+05:30`);
+    const last = new Date(`${end}T00:00:00+05:30`);
+    while (cur <= last) {
+        days.push(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(cur));
+        cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return days;
+}
+
+// ── Per-day fetcher ────────────────────────────────────────────────────────────
+async function fetchDay(
+    busId: string,
+    date: string,
+    signal?: AbortSignal,
+): Promise<GPSPoint[]> {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const res = await fetch(
+        `${BACKEND_URL}/api/gps/playback?bus=${busId}&start_date=${date}&end_date=${date}`,
+        { headers: { Authorization: `Bearer ${token}` }, signal, cache: "no-store" },
     );
-
-// ── Fetcher (uses queryKey, never closure state) ─────────────────────────────
-type PlaybackKey = readonly [string, string | null, string, string];
-
-async function fetchPlayback({
-    queryKey,
-    signal,
-}: QueryFunctionContext<PlaybackKey>): Promise<GPSPoint[]> {
-    const [, busId, startDate, endDate] = queryKey;
-    const token =
-        typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const url = `${BACKEND_URL}/api/gps/playback?bus=${busId}&start_date=${startDate}&end_date=${endDate}`;
-    const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal,
-        cache: "no-store",
-    });
-    if (!res.ok) throw new Error("History fetch failed");
+    if (!res.ok) throw new Error(`GPS fetch failed for ${date}`);
     const raw: GPSPoint[] = await res.json();
 
-    // Client-side date enforcement — backend may return unfiltered data
-    // Build IST day boundaries: startDate 00:00 IST → endDate 23:59:59 IST
-    const startMs = new Date(`${startDate}T00:00:00+05:30`).getTime();
-    const endMs = new Date(`${endDate}T23:59:59.999+05:30`).getTime();
+    // Client-side enforcement: keep only points within this IST day
+    const startMs = new Date(`${date}T00:00:00+05:30`).getTime();
+    const endMs = new Date(`${date}T23:59:59.999+05:30`).getTime();
     return raw.filter((p) => {
         const t = new Date(p.timestamp).getTime();
         return t >= startMs && t <= endMs;
     });
 }
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
+// ── Hook ──────────────────────────────────────────────────────────────────────
 export function usePlaybackHistory(
     selectedBusId: string | null,
     isHistoryMode: boolean,
 ) {
-    // Date state
     const [playbackDate, setPlaybackDate] = useState(todayIST);
     const [playbackEndDate, setPlaybackEndDate] = useState(todayIST);
-
-    // Playback state
     const [playbackIndex, setPlaybackIndex] = useState(0);
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
     const [isPlaying, setIsPlaying] = useState(false);
-
-    // Scrub support: remember if playback was active before user grabbed slider
     const wasPlayingRef = useRef(false);
 
-    // ── Date helpers (auto-clamp the other bound) ────────────────────────────
+    // ── Date helpers ──────────────────────────────────────────────────────────
     const updateStartDate = useCallback((newStart: string) => {
         setPlaybackDate(newStart);
         setPlaybackEndDate((prev) => (prev < newStart ? newStart : prev));
@@ -86,51 +89,58 @@ export function usePlaybackHistory(
         setIsPlaying(false);
     }, []);
 
-    // ── React Query ──────────────────────────────────────────────────────────
-    const queryKey = [
-        "gps-playback",
-        selectedBusId,
-        playbackDate,
-        playbackEndDate,
-    ] as const;
+    // ── Per-day parallel queries ──────────────────────────────────────────────
+    const today = todayIST();
+    const days = useMemo(
+        () => (isHistoryMode && selectedBusId ? daysBetween(playbackDate, playbackEndDate) : []),
+        [isHistoryMode, selectedBusId, playbackDate, playbackEndDate],
+    );
 
-    const { data: historyPoints = [], isFetching: isHistoryLoading } = useQuery<
-        GPSPoint[],
-        Error,
-        GPSPoint[],
-        PlaybackKey
-    >({
-        queryKey,
-        queryFn: fetchPlayback, // uses queryKey context — closure-proof
-        enabled: isHistoryMode && !!selectedBusId,
-        staleTime: playbackEndDate === todayIST() ? 30_000 : 2 * 60_000,
-        gcTime: 0, // don't keep old date-range data in cache
+    const results = useQueries({
+        queries: days.map((date) => ({
+            queryKey: ["gps-day", selectedBusId, date] as const,
+            queryFn: ({ signal }: { signal?: AbortSignal }) =>
+                fetchDay(selectedBusId!, date, signal),
+            enabled: isHistoryMode && !!selectedBusId,
+            // Past days never change → permanent cache (zero re-fetches).
+            // Today's data grows → 30s staleTime.
+            staleTime: date < today ? Infinity : 30_000,
+            gcTime: date < today ? Infinity : 60_000,
+        })),
     });
 
-    // ── Playback timer ───────────────────────────────────────────────────────
-    // Refs so the interval doesn't need to restart on every index change.
+    const isHistoryLoading = results.some((r) => r.isFetching);
+
+    // ── Merge days in order + compute date boundaries ─────────────────────────
+    const { historyPoints, dateBoundaries } = useMemo(() => {
+        const points: GPSPoint[] = [];
+        const boundaries: DateBoundary[] = [];
+        results.forEach((r, i) => {
+            if ((r.data?.length ?? 0) > 0) {
+                if (i > 0) boundaries.push({ date: days[i], index: points.length });
+                points.push(...(r.data ?? []));
+            }
+        });
+        return { historyPoints: points, dateBoundaries: boundaries };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [results.map((r) => r.dataUpdatedAt).join(","), days.join(",")]);
+
+    // ── Playback timer ────────────────────────────────────────────────────────
     const idxRef = useRef(playbackIndex);
     const lenRef = useRef(historyPoints.length);
-    useEffect(() => {
-        idxRef.current = playbackIndex;
-    }, [playbackIndex]);
-    useEffect(() => {
-        lenRef.current = historyPoints.length;
-    }, [historyPoints.length]);
+    useEffect(() => { idxRef.current = playbackIndex; }, [playbackIndex]);
+    useEffect(() => { lenRef.current = historyPoints.length; }, [historyPoints.length]);
 
     useEffect(() => {
         if (!isPlaying) return;
         const t = setInterval(() => {
-            if (idxRef.current >= lenRef.current - 1) {
-                setIsPlaying(false);
-                return;
-            }
+            if (idxRef.current >= lenRef.current - 1) { setIsPlaying(false); return; }
             setPlaybackIndex((v) => v + 1);
         }, 500 / playbackSpeed);
         return () => clearInterval(t);
     }, [isPlaying, playbackSpeed]);
 
-    // ── Speed cycle ──────────────────────────────────────────────────────────
+    // ── Speed cycle ───────────────────────────────────────────────────────────
     const SPEEDS = [1, 2, 4, 8] as const;
     const cycleSpeed = useCallback(() => {
         setPlaybackSpeed((prev) => {
@@ -140,27 +150,10 @@ export function usePlaybackHistory(
     }, []);
 
     return {
-        // Date
-        playbackDate,
-        playbackEndDate,
-        updateStartDate,
-        updateEndDate,
-        todayIST,
-
-        // Playback controls
-        playbackIndex,
-        setPlaybackIndex,
-        playbackSpeed,
-        cycleSpeed,
-        isPlaying,
-        setIsPlaying,
-
-        // Scrub helpers
-        wasPlayingRef,
-
-        // Data
-        historyPoints,
-        isHistoryLoading,
+        playbackDate, playbackEndDate, updateStartDate, updateEndDate, todayIST,
+        playbackIndex, setPlaybackIndex, playbackSpeed, cycleSpeed,
+        isPlaying, setIsPlaying, wasPlayingRef,
+        historyPoints, dateBoundaries, isHistoryLoading,
         currentPoint: historyPoints[playbackIndex] ?? null,
     } as const;
 }
