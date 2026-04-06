@@ -149,22 +149,33 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
   const { liveTrailMode, cycleTrailMode, liveTrails } = trails;
 
-  // ── Client-side time filter ( no backend change needed ) ───────────────────
+  // ── Client-side time filter (date-aware, no backend change needed) ─────────
+  // startTime applies ONLY on the start date, endTime ONLY on the end date.
+  // Points on intermediate days are never time-filtered.
+  // If neither time is set — return all points unfiltered.
   const filteredHistoryPoints = useMemo(() => {
     if (!startTime && !endTime) return historyPoints;
+
     return historyPoints.filter((p) => {
-      // Get HH:MM in IST
+      const d = new Date(p.timestamp);
+      const istDate = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+      }).format(d); // "YYYY-MM-DD" in IST
       const istTime = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Asia/Kolkata",
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
-      }).format(new Date(p.timestamp)); // e.g. "14:30"
-      if (startTime && istTime < startTime) return false;
-      if (endTime   && istTime > endTime)   return false;
+      }).format(d); // "HH:MM" in IST
+
+      // On the start date: drop points before startTime
+      if (startTime && istDate === playbackDate && istTime < startTime) return false;
+      // On the end date: drop points after endTime
+      if (endTime && istDate === playbackEndDate && istTime > endTime) return false;
+      // Middle days or unfiltered boundary — keep all
       return true;
     });
-  }, [historyPoints, startTime, endTime]);
+  }, [historyPoints, startTime, endTime, playbackDate, playbackEndDate]);
 
   // ── Performance: Pre-calculate segments for history trace ──────────────────
   const historySegments = useMemo(() => {
