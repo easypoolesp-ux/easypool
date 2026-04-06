@@ -12,7 +12,9 @@ import {
   Maximize,
   Unlock,
   FastForward,
+  FileDown,
 } from "lucide-react";
+import { exportGpsExcel } from "@/lib/exportGpsExcel";
 import { useTheme } from "next-themes";
 import { MONOCHROME_DARK, MONOCHROME_LIGHT, DARK_DEFAULT } from "./mapStyles";
 import { useMapHighContrastListener } from "@/hooks/useMapHighContrast";
@@ -116,6 +118,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     "free",
   );
   const [isMapReady, setIsMapReady] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // ── Delegated hooks ────────────────────────────────────────────────────────
   const playback = usePlaybackHistory(selectedBusId, isHistoryMode);
@@ -763,6 +766,46 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     />
                     <span className="text-[11px] font-black w-5 tracking-tighter">
                       x{playbackSpeed}
+                    </span>
+                  </button>
+
+                  {/* Export to Excel */}
+                  <button
+                    id="gps-export-excel-btn"
+                    onClick={async () => {
+                      if (isExporting || historyPoints.length === 0) return;
+                      setIsExporting(true);
+                      try {
+                        const selectedBus = buses.find((b) => b.id === selectedBusId);
+                        exportGpsExcel({
+                          busId: selectedBusId ?? "",
+                          busInternalId: selectedBus?.internal_id ?? selectedBusId ?? "Bus",
+                          plateNumber: selectedBus?.plate_number ?? "",
+                          startDate: playbackDate,
+                          endDate: playbackEndDate,
+                          points: historyPoints,
+                        });
+                      } finally {
+                        setIsExporting(false);
+                      }
+                    }}
+                    disabled={isExporting || historyPoints.length === 0}
+                    title={historyPoints.length === 0 ? "No data to export" : `Export ${historyPoints.length} GPS points to Excel`}
+                    className={`p-3 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center gap-1.5 border ${
+                      historyPoints.length === 0
+                        ? "bg-slate-800/40 text-slate-600 border-white/5 cursor-not-allowed"
+                        : isExporting
+                          ? "bg-emerald-700 text-white border-emerald-500/30 cursor-wait"
+                          : "bg-emerald-600/20 hover:bg-emerald-500/30 text-emerald-400 border-emerald-500/20 cursor-pointer"
+                    }`}
+                  >
+                    {isExporting ? (
+                      <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <FileDown size={16} />
+                    )}
+                    <span className="text-[11px] font-black tracking-tighter">
+                      {isExporting ? "..." : ".xlsx"}
                     </span>
                   </button>
                   <div className="flex-1 min-w-0">
