@@ -672,6 +672,44 @@ export default function FleetMap({ buses, initialBusId }: Props) {
               </option>
             ))}
           </select>
+          <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+          {/* Download button — right of bus selector */}
+          <button
+            id="gps-export-excel-btn"
+            onClick={async () => {
+              if (isExporting || historyPoints.length === 0) return;
+              setIsExporting(true);
+              try {
+                const selectedBus = buses.find((b) => b.id === selectedBusId);
+                exportGpsExcel({
+                  busId: selectedBusId ?? "",
+                  busInternalId: selectedBus?.internal_id ?? selectedBusId ?? "Bus",
+                  plateNumber: selectedBus?.plate_number ?? "",
+                  startDate: playbackDate,
+                  endDate: playbackEndDate,
+                  points: historyPoints,
+                });
+              } finally {
+                setIsExporting(false);
+              }
+            }}
+            disabled={isExporting || historyPoints.length === 0}
+            title={historyPoints.length === 0 ? "No data to export" : `Download ${historyPoints.length} GPS points`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all mr-1 ${
+              historyPoints.length === 0
+                ? "text-slate-400 cursor-not-allowed opacity-40"
+                : isExporting
+                  ? "text-emerald-600 dark:text-emerald-400 cursor-wait"
+                  : "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+            }`}
+          >
+            {isExporting ? (
+              <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <FileDown size={13} />
+            )}
+            {isExporting ? "Downloading..." : "Download"}
+          </button>
         </div>
       )}
 
@@ -766,46 +804,6 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                     />
                     <span className="text-[11px] font-black w-5 tracking-tighter">
                       x{playbackSpeed}
-                    </span>
-                  </button>
-
-                  {/* Export to Excel */}
-                  <button
-                    id="gps-export-excel-btn"
-                    onClick={async () => {
-                      if (isExporting || historyPoints.length === 0) return;
-                      setIsExporting(true);
-                      try {
-                        const selectedBus = buses.find((b) => b.id === selectedBusId);
-                        exportGpsExcel({
-                          busId: selectedBusId ?? "",
-                          busInternalId: selectedBus?.internal_id ?? selectedBusId ?? "Bus",
-                          plateNumber: selectedBus?.plate_number ?? "",
-                          startDate: playbackDate,
-                          endDate: playbackEndDate,
-                          points: historyPoints,
-                        });
-                      } finally {
-                        setIsExporting(false);
-                      }
-                    }}
-                    disabled={isExporting || historyPoints.length === 0}
-                    title={historyPoints.length === 0 ? "No data to export" : `Export ${historyPoints.length} GPS points to Excel`}
-                    className={`p-3 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center gap-1.5 border ${
-                      historyPoints.length === 0
-                        ? "bg-slate-800/40 text-slate-600 border-white/5 cursor-not-allowed"
-                        : isExporting
-                          ? "bg-emerald-700 text-white border-emerald-500/30 cursor-wait"
-                          : "bg-emerald-600/20 hover:bg-emerald-500/30 text-emerald-400 border-emerald-500/20 cursor-pointer"
-                    }`}
-                  >
-                    {isExporting ? (
-                      <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <FileDown size={16} />
-                    )}
-                    <span className="text-[11px] font-black tracking-tighter">
-                      {isExporting ? "..." : ".xlsx"}
                     </span>
                   </button>
                   <div className="flex-1 min-w-0">
