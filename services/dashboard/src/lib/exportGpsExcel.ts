@@ -23,6 +23,8 @@ export interface ExportOptions {
   plateNumber: string;
   startDate: string;
   endDate: string;
+  startTime?: string; // HH:MM, optional
+  endTime?: string;   // HH:MM, optional
   points: GpsExportPoint[];
 }
 
@@ -45,36 +47,63 @@ function toIST(isoStr: string): string {
 }
 
 export function exportGpsExcel(options: ExportOptions): void {
-  const { busInternalId, plateNumber, startDate, endDate, points } = options;
+  const { busInternalId, plateNumber, startDate, endDate, startTime, endTime, points } = options;
 
   if (points.length === 0) {
     alert("No GPS data available for the selected date range.");
     return;
   }
 
-  // ── Sheet 1: Raw GPS Points ──────────────────────────────────────────────────
-  const gpsRows = points.map((p, idx) => {
-    const lat =
-      p.lat ?? (p.location?.coordinates ? p.location.coordinates[1] : null);
-    const lng =
-      p.lng ?? (p.location?.coordinates ? p.location.coordinates[0] : null);
+  // ── Report metadata ─────────────────────────────────────────────────────────
+  const generatedAt = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true,
+  }).format(new Date());
 
-    return {
-      "#": idx + 1,
-      "Bus ID": busInternalId,
-      "Plate Number": plateNumber,
-      "Timestamp (IST)": toIST(p.timestamp),
-      "Latitude": lat != null ? Number(lat.toFixed(6)) : "",
-      "Longitude": lng != null ? Number(lng.toFixed(6)) : "",
-      "Speed (km/h)": p.speed != null ? Number(p.speed.toFixed(1)) : 0,
-      "Heading (°)": p.heading != null ? Number(p.heading.toFixed(1)) : 0,
-      "Ignition": p.ignition ? "ON" : "OFF",
-    };
+  const fromLabel = startTime ? `${startDate} ${startTime}` : startDate;
+  const toLabel   = endTime   ? `${endDate} ${endTime}`     : endDate;
+
+  // Header rows — written as raw AOA (array-of-arrays) before GPS data
+  const headerRows: (string | number)[][] = [
+    ["EasyPool GPS Report"],
+    [],
+    ["Bus ID",          busInternalId],
+    ["Plate Number",    plateNumber],
+    ["Period (From)",   fromLabel],
+    ["Period (To)",     toLabel],
+    ["Total Pings",     points.length],
+    ["Report Generated", generatedAt + " IST"],
+    [],  // blank spacer row
+  ];
+  // Column headers + data rows, merged after the metadata header block
+  const columnHeaders = ["#", "Bus ID", "Plate Number", "Timestamp (IST)",
+    "Latitude", "Longitude", "Speed (km/h)", "Heading (°)", "Ignition"];
+
+  const gpsDataRows: (string | number)[][] = points.map((p, idx) => {
+    const lat = p.lat ?? p.location?.coordinates?.[1] ?? null;
+    const lng = p.lng ?? p.location?.coordinates?.[0] ?? null;
+    return [
+      idx + 1,
+      busInternalId,
+      plateNumber,
+      toIST(p.timestamp),
+      lat != null ? Number(lat.toFixed(6)) : "",
+      lng != null ? Number(lng.toFixed(6)) : "",
+      p.speed != null ? Number(p.speed.toFixed(1)) : 0,
+      p.heading != null ? Number(p.heading.toFixed(1)) : 0,
+      p.ignition ? "ON" : "OFF",
+    ];
   });
 
-  const gpsSheet = XLSX.utils.json_to_sheet(gpsRows);
+  // Build the full sheet: metadata header + blank + column headers + data
+  const fullAoa: (string | number)[][] = [
+    ...headerRows,
+    columnHeaders,
+    ...gpsDataRows,
+  ];
 
-  // Set column widths for readability
+  const gpsSheet = XLSX.utils.aoa_to_sheet(fullAoa);
   gpsSheet["!cols"] = [
     { wch: 6 },   // #
     { wch: 14 },  // Bus ID

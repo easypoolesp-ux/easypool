@@ -119,6 +119,9 @@ export default function FleetMap({ buses, initialBusId }: Props) {
   );
   const [isMapReady, setIsMapReady] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  // Time-of-day filter (client-side, no backend change needed)
+  const [startTime, setStartTime] = useState(""); // "" = no filter
+  const [endTime, setEndTime] = useState("");
 
   // ── Delegated hooks ────────────────────────────────────────────────────────
   const playback = usePlaybackHistory(selectedBusId, isHistoryMode);
@@ -146,15 +149,32 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
   const { liveTrailMode, cycleTrailMode, liveTrails } = trails;
 
+  // ── Client-side time filter ( no backend change needed ) ───────────────────
+  const filteredHistoryPoints = useMemo(() => {
+    if (!startTime && !endTime) return historyPoints;
+    return historyPoints.filter((p) => {
+      // Get HH:MM in IST
+      const istTime = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Kolkata",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(new Date(p.timestamp)); // e.g. "14:30"
+      if (startTime && istTime < startTime) return false;
+      if (endTime   && istTime > endTime)   return false;
+      return true;
+    });
+  }, [historyPoints, startTime, endTime]);
+
   // ── Performance: Pre-calculate segments for history trace ──────────────────
   const historySegments = useMemo(() => {
-    if (!isHistoryMode || historyPoints.length === 0) return [];
+    if (!isHistoryMode || filteredHistoryPoints.length === 0) return [];
     const segments: { points: GPSPoint[]; date: string }[] = [];
-    let currentSegment: GPSPoint[] = [historyPoints[0]];
-    let lastDate = new Date(historyPoints[0].timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    let currentSegment: GPSPoint[] = [filteredHistoryPoints[0]];
+    let lastDate = new Date(filteredHistoryPoints[0].timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
-    for (let i = 1; i < historyPoints.length; i++) {
-      const p = historyPoints[i];
+    for (let i = 1; i < filteredHistoryPoints.length; i++) {
+      const p = filteredHistoryPoints[i];
       const d = new Date(p.timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
       if (d !== lastDate) {
         segments.push({ points: currentSegment, date: lastDate });
@@ -166,8 +186,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     }
     segments.push({ points: currentSegment, date: lastDate });
     return segments;
-  }, [isHistoryMode, historyPoints]);
-
+  }, [isHistoryMode, filteredHistoryPoints]);
   const currentDateStr = useMemo(() => {
     if (!currentPoint) return "";
     return new Date(currentPoint.timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
@@ -364,7 +383,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
   // ── Playback Marker + Animation ───────────────────────────────────────────
   useEffect(() => {
-    if (!isHistoryMode || !historyPoints[playbackIndex] || !mapRef.current) {
+    if (!isHistoryMode || !filteredHistoryPoints[playbackIndex] || !mapRef.current) {
       if (historyAnimationRef.current)
         cancelAnimationFrame(historyAnimationRef.current);
       historyAnimationRef.current = undefined;
@@ -374,7 +393,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       return;
     }
 
-    const pt = historyPoints[playbackIndex];
+    const pt = filteredHistoryPoints[playbackIndex];
     const pos = pt.location
       ? { lat: pt.location.coordinates[1], lng: pt.location.coordinates[0] }
       : { lat: pt.lat, lng: pt.lng };
@@ -441,19 +460,19 @@ export default function FleetMap({ buses, initialBusId }: Props) {
     }
 
     if (isPlaying && cameraMode === "follow") mapRef.current.panTo(pos);
-  }, [playbackIndex, isHistoryMode, historyPoints, isPlaying, playbackSpeed, cameraMode]);
+  }, [playbackIndex, isHistoryMode, filteredHistoryPoints, isPlaying, playbackSpeed, cameraMode]);
 
   // Fit bounds on new history data (once per dataset)
   useEffect(() => {
     if (
       isHistoryMode &&
-      historyPoints.length > 0 &&
+      filteredHistoryPoints.length > 0 &&
       mapRef.current &&
-      historyFitDoneRef.current !== historyPoints
+      historyFitDoneRef.current !== filteredHistoryPoints
     ) {
-      historyFitDoneRef.current = historyPoints;
+      historyFitDoneRef.current = filteredHistoryPoints;
       const bounds = new google.maps.LatLngBounds();
-      historyPoints.forEach((p) => bounds.extend(getLatLng(p)));
+      filteredHistoryPoints.forEach((p) => bounds.extend(getLatLng(p)));
       mapRef.current.setOptions({ maxZoom: 15 });
       mapRef.current.fitBounds(bounds, 50);
       google.maps.event.addListenerOnce(mapRef.current, "idle", () => {
@@ -461,7 +480,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       });
     }
     if (!isHistoryMode) historyFitDoneRef.current = null;
-  }, [historyPoints, isHistoryMode]);
+  }, [filteredHistoryPoints, isHistoryMode]);
 
   // ── Toggle history mode ───────────────────────────────────────────────────
   const toggleHistoryMode = useCallback(
@@ -639,7 +658,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
 
       {/* History Controls (date + bus picker) */}
       {isHistoryMode && (
-        <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-white/10">
+        <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl shadow-xl border border-white/10">
           <Calendar size={14} className="text-blue-500 ml-2" />
           <input
             type="date"
@@ -655,7 +674,24 @@ export default function FleetMap({ buses, initialBusId }: Props) {
             min={playbackDate}
             max={todayIST()}
             onChange={(e) => updateEndDate(e.target.value)}
-            className="bg-transparent text-xs font-bold border-none focus:ring-0 p-0 text-slate-800 dark:text-white cursor-pointer pr-2"
+            className="bg-transparent text-xs font-bold border-none focus:ring-0 p-0 text-slate-800 dark:text-white cursor-pointer"
+          />
+          <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+          {/* Time-of-day filter */}
+          <input
+            type="time"
+            value={startTime}
+            onChange={(e) => { setStartTime(e.target.value); setPlaybackIndex(0); }}
+            title="From time (IST)"
+            className="bg-transparent text-xs font-bold border-none focus:ring-0 p-0 text-slate-800 dark:text-white cursor-pointer w-[72px]"
+          />
+          <span className="text-slate-400 text-[10px]">–</span>
+          <input
+            type="time"
+            value={endTime}
+            onChange={(e) => { setEndTime(e.target.value); setPlaybackIndex(0); }}
+            title="To time (IST)"
+            className="bg-transparent text-xs font-bold border-none focus:ring-0 p-0 text-slate-800 dark:text-white cursor-pointer w-[72px] pr-1"
           />
           <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
           <select
@@ -677,7 +713,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
           <button
             id="gps-export-excel-btn"
             onClick={async () => {
-              if (isExporting || historyPoints.length === 0) return;
+              if (isExporting || filteredHistoryPoints.length === 0) return;
               setIsExporting(true);
               try {
                 const selectedBus = buses.find((b) => b.id === selectedBusId);
@@ -687,16 +723,18 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                   plateNumber: selectedBus?.plate_number ?? "",
                   startDate: playbackDate,
                   endDate: playbackEndDate,
-                  points: historyPoints,
+                  startTime: startTime || undefined,
+                  endTime: endTime || undefined,
+                  points: filteredHistoryPoints,
                 });
               } finally {
                 setIsExporting(false);
               }
             }}
-            disabled={isExporting || historyPoints.length === 0}
-            title={historyPoints.length === 0 ? "No data to export" : `Download ${historyPoints.length} GPS points`}
+            disabled={isExporting || filteredHistoryPoints.length === 0}
+            title={filteredHistoryPoints.length === 0 ? "No data to export" : `Download ${filteredHistoryPoints.length} GPS points`}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all mr-1 ${
-              historyPoints.length === 0
+              filteredHistoryPoints.length === 0
                 ? "text-slate-400 cursor-not-allowed opacity-40"
                 : isExporting
                   ? "text-emerald-600 dark:text-emerald-400 cursor-wait"
@@ -747,20 +785,20 @@ export default function FleetMap({ buses, initialBusId }: Props) {
       {isHistoryMode && (
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-[92%] max-w-[420px] z-50">
           <div className="bg-slate-900/92 backdrop-blur-2xl p-4 rounded-3xl shadow-2xl border border-white/10 text-white flex flex-col gap-3">
-            {isHistoryLoading && historyPoints.length === 0 ? (
+            {isHistoryLoading && filteredHistoryPoints.length === 0 ? (
               <div className="flex items-center justify-center py-3">
                 <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : historyPoints.length === 0 ? (
+            ) : filteredHistoryPoints.length === 0 ? (
               <p className="text-center text-slate-400 text-xs italic py-1">
-                No data for this date
+                {historyPoints.length > 0 ? "No data in selected time range" : "No data for this date"}
               </p>
             ) : (
               <>
                 {/* Dataset summary */}
                 {(() => {
-                  const first = historyPoints[0];
-                  const last = historyPoints[historyPoints.length - 1];
+                  const first = filteredHistoryPoints[0];
+                  const last = filteredHistoryPoints[filteredHistoryPoints.length - 1];
                   const fmtShort = (ts: string) =>
                     new Date(ts).toLocaleDateString("en-IN", {
                       day: "numeric",
@@ -833,7 +871,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                   <input
                     type="range"
                     min={0}
-                    max={Math.max(0, historyPoints.length - 1)}
+                    max={Math.max(0, filteredHistoryPoints.length - 1)}
                     value={playbackIndex}
                     onPointerDown={() => {
                       wasPlayingRef.current = isPlaying;
@@ -848,7 +886,7 @@ export default function FleetMap({ buses, initialBusId }: Props) {
                   />
                   {/* Yellow date-change tick marks */}
                   {dateBoundaries.map((b) => {
-                    const pct = (b.index / Math.max(1, historyPoints.length - 1)) * 100;
+                    const pct = (b.index / Math.max(1, filteredHistoryPoints.length - 1)) * 100;
                     const label = new Date(`${b.date}T00:00:00+05:30`)
                       .toLocaleDateString("en-IN", { day: "numeric", month: "short" });
                     return (
